@@ -4,7 +4,7 @@
 | --- | --- |
 | 1 | Bổ sung lưu trữ v3, di trú có thể phục hồi và lớp chữ tĩnh trong bài học, xem trước và bài kiểm tra. |
 | 2 | Studio tạo và sửa hộp văn bản, khung ảnh thật có ba chế độ đặt ảnh và tám tay nắm. Cập nhật mục đang kéo theo khung hình. |
-| 3 | Registry bài học khớp 26 dạng. Bài kiểm tra dùng bộ renderer riêng và đọc lớp văn bản. Việc phủ hình học của từng điều khiển trong Exam Mode còn một phần. |
+| 3 | Registry bài học khớp 26 dạng. Exam Mode đọc vị trí câu dẫn, ảnh, vùng đáp án và các ô chọn ở trình chạy câu đơn. Bài đọc nhóm dùng hộp văn bản theo cột riêng. |
 | 4 | Có phím tắt, đường gióng, di chuyển nhóm, căn chỉnh, menu ngữ cảnh, mẫu và lệnh áp dụng theo Lesson. Dán ảnh phụ thuộc clipboard của nền tảng. Kéo thả tệp từ desktop chưa có. |
 
 [Nhật ký quyết định](canvas-auto-log.md) · [Ma trận từng dạng](canvas-matrix.md)
@@ -336,6 +336,34 @@ image_letter_pick: default/right=ok, default/wrong=ok, scroll/right=ok, scroll/w
 inline_dropdown_fill: default/right=ok, default/wrong=ok, scroll/right=ok, scroll/wrong=ok
 ```
 
+
+## Kiểm tra bổ sung trước khi phát hành
+
+- Commit `fd6c84f` nối hình học v3 với vùng cuộn của Exam Mode và giữ khung điều khiển bên ngoài. Phép so sánh 28 khung và danh sách hitbox của câu thi không có layout trùng với mốc gốc ở hai vị trí cuộn.
+- Bản ghi kiểm thử cho thấy khung ảnh mới được vẽ và nhấp đúng vào đáp án đã dời sau khi cuộn. Mẫu bài đọc nhóm xác định hệ tọa độ theo desktop.
+- Kiểm tra dán ảnh trong Tk dùng ảnh clipboard mô phỏng, hoàn tác và làm lại, sau đó đối chiếu đúng PNG đã xuất.
+- Bốn lượt chạy với dữ liệu giả, mỗi lượt gồm 104 thao tác cho các kiểu legacy, migrated, authored và v3. Có hai lượt xem trước với hiệu ứng phản hồi bật và tắt.
+
+```text
+test_authored_options_use_the_rendered_scrolled_rect (__main__.ExamV3.test_authored_options_use_the_rendered_scrolled_rect) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.030s
+
+OK
+test_clipboard_image_can_be_undone_before_saving (__main__.StudioV3.test_clipboard_image_can_be_undone_before_saving) ... ok
+test_create_style_undo_and_reopen (__main__.StudioV3.test_create_style_undo_and_reopen) ... invalid command name "139863847279424maximize_work_area"
+    while executing
+"139863847279424maximize_work_area"
+    ("after" script)
+ok
+test_fitted_image_and_resize (__main__.StudioV3.test_fitted_image_and_resize) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.400s
+
+OK
+```
 
 ## Cần kiểm tay trên Windows
 
