@@ -18,6 +18,7 @@ from learning_audio import LearningAudio
 from waveform_player import WaveformPlayer
 import tkinter as tk
 from tkinter import ttk, messagebox
+import ui_dialogs as dialogs
 
 # Python 3.13: Tcl callbacks can fire during widget teardown after the
 # associated command list has already been cleared.
@@ -34,6 +35,7 @@ from recording_tools import RecordingSession, recording_folder, microphone_choic
 from mouse_effects import MouseEffects
 from floating_vocabulary import FloatingVocabulary
 from ui_shell import AppShell
+from ui_components import Toast
 from profile_ui import ProfilePage
 from ui_grid import UIGrid
 from minigames import MiniGamesMixin
@@ -1205,7 +1207,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         tags=('highlight','underline','bold','text_color','foreground','annotation','teacher_highlight')
         affected=[(w,t) for w in texts for t in tags if t in w.tag_names() and w.tag_ranges(t)]
         if not affected: return
-        if not messagebox.askyesno('Xóa tất cả đánh dấu',
+        if not dialogs.askyesno('Xóa tất cả đánh dấu',
                 'Xóa các phần tô màu, gạch chân và đánh dấu trên bài đọc?\nNội dung chữ không bị xóa.',
                 icon='warning',parent=self):return
         for w,t in affected:w.tag_remove(t,'1.0','end')
@@ -1397,14 +1399,14 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
 
     def play_learning_audio(self,path):
         if not path:
-            messagebox.showwarning('Âm thanh','Chưa tìm thấy file âm thanh của câu hỏi / block.')
+            dialogs.showwarning('Âm thanh','Chưa tìm thấy file âm thanh của câu hỏi / block.')
             return
         try:
             self.learning_audio.stop()
             old=getattr(self,'_waveform_window',None)
             if old and old.winfo_exists():old.close()
             self._waveform_window=WaveformPlayer(self,path)
-        except Exception as exc:messagebox.showerror('Không phát được âm thanh',str(exc))
+        except Exception as exc:dialogs.showerror('Không phát được âm thanh',str(exc))
 
     def _animate_drawer(self, drawer, target, duration=390, on_complete=None):
         """Interruptible, eased drawer motion driven by Tk's event loop."""
@@ -1817,10 +1819,10 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
             is_owned=avatar in owned
             label='Đang dùng' if selected==avatar else ('Sử dụng' if is_owned else f'💎 {price} ngọc')
             def choose(icon=avatar,title=name,cost=price,has_it=is_owned):
-                if not has_it and not messagebox.askyesno('Mở khóa icon',f'Dùng {cost} ngọc để mở khóa icon {title} {icon}?'):
+                if not has_it and not dialogs.askyesno('Mở khóa icon',f'Dùng {cost} ngọc để mở khóa icon {title} {icon}?'):
                     return
                 ok,message=self.db.buy_or_select_avatar(sid,icon)
-                if not ok:messagebox.showwarning('Không thể đổi icon',message)
+                if not ok:dialogs.showwarning('Không thể đổi icon',message)
                 self.avatar_shop_page()
             tk.Button(line,text=label,command=choose,state='disabled' if selected==avatar else 'normal',bg=PALE,fg=DARK,bd=0,padx=13,pady=7,cursor='hand2').pack(side='right')
 
@@ -1842,7 +1844,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
             button=tk.Button(frame,text='Đã nhận' if claimed else ('Nhận ngọc' if count>=required else f'{count}/{required}'),state='disabled' if claimed or count<required else 'normal',bg=GREEN,fg='white',bd=0,padx=12,pady=7)
             button.pack(side='right')
             def claim(k=key,r=required):
-                if self.db.claim_achievement(sid,k,r):messagebox.showinfo('Thành tựu','Bạn nhận được 1 viên ngọc!')
+                if self.db.claim_achievement(sid,k,r):Toast(self,'Bạn nhận được 1 viên ngọc!')
                 self.achievement_page()
             button.configure(command=claim)
         self.label(body,'Lưu ý: 3 thành tựu là mẫu; lượt hoàn thành bài tập được tính mỗi lần nộp bài hoàn chỉnh. Kết quả level cần tích hợp sự kiện hoàn thành từ bộ máy Level.',10,color='#64748B').pack(anchor='w',pady=12)
@@ -1967,12 +1969,12 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
 
     def choose_recording_device(self):
         if self.recording_session or self.recording_busy:
-            messagebox.showinfo('Đang ghi', 'Hãy dừng bản ghi trước khi thay đổi thiết bị.')
+            dialogs.showinfo('Đang ghi', 'Hãy dừng bản ghi trước khi thay đổi thiết bị.')
             return
         try:
             devices = microphone_choices()
         except Exception as exc:
-            messagebox.showerror('Thiết bị ghi âm', 'Không đọc được danh sách micro. Cài soundcard trước.\n' + str(exc))
+            dialogs.showerror('Thiết bị ghi âm', 'Không đọc được danh sách micro. Cài soundcard trước.\n' + str(exc))
             return
         dialog = tk.Toplevel(self)
         dialog.title('Chọn thiết bị ghi âm')
@@ -2013,7 +2015,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
                 messagebox.showerror('Không lưu được thiết bị', str(exc), parent=dialog)
                 return
             dialog.destroy()
-            messagebox.showinfo('Đã chọn micro', 'Thiết bị ghi âm đã được lưu. Các bản ghi tiếp theo sẽ dùng lựa chọn này.')
+            dialogs.showinfo('Đã chọn micro', 'Thiết bị ghi âm đã được lưu. Các bản ghi tiếp theo sẽ dùng lựa chọn này.')
 
         def test():
             try:
@@ -2055,21 +2057,21 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
 
     def _start_recording(self,kind):
         if self.recording_session or self.recording_busy:
-            messagebox.showinfo('Đang ghi','Hãy dừng bản ghi hiện tại trước.');return
+            dialogs.showinfo('Đang ghi','Hãy dừng bản ghi hiện tại trước.');return
         name='ghi giọng bằng micro' if kind=='voice' else 'quay cửa sổ ứng dụng kèm tiếng hệ thống và micro'
-        if not messagebox.askyesno('Xác nhận ghi',f'Bắt đầu {name}?\n\nCó thể thu âm lời nói và nội dung cá nhân trên màn hình. Chỉ ghi khi bạn đồng ý.'):
+        if not dialogs.askyesno('Xác nhận ghi',f'Bắt đầu {name}?\n\nCó thể thu âm lời nói và nội dung cá nhân trên màn hình. Chỉ ghi khi bạn đồng ý.'):
             return
         try:
             if resolve_microphone(self.get_recording_microphone_id()) is None:
                 raise RuntimeError('Không tìm thấy micro. Hãy kết nối micro và chọn trong menu + > Thiết bị ghi âm.')
         except Exception as exc:
-            messagebox.showerror('Không tìm thấy thiết bị ghi âm', str(exc))
+            dialogs.showerror('Không tìm thấy thiết bị ghi âm', str(exc))
             return
         session=RecordingSession(self,kind='video' if kind=='video' else 'voice', microphone_id=self.get_recording_microphone_id())
         try:
             session.start()
         except Exception as exc:
-            messagebox.showerror('Không thể bắt đầu ghi',str(exc));return
+            dialogs.showerror('Không thể bắt đầu ghi',str(exc));return
         self.recording_session=session
         self.update_record_status()
         self._recording_tick()
@@ -2093,21 +2095,21 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
     def _done_recording(self,path,warnings,error):
         self.recording_busy=False
         self.update_record_status()
-        if error: messagebox.showerror('Lỗi lưu bản ghi',error);return
-        messagebox.showinfo('Đã lưu bản ghi',f'File: {path}'+ ('\n\nLưu ý: '+str(warnings) if warnings else ''))
+        if error: dialogs.showerror('Lỗi lưu bản ghi',error);return
+        dialogs.showinfo('Đã lưu bản ghi',f'File: {path}'+ ('\n\nLưu ý: '+str(warnings) if warnings else ''))
 
     def open_recording_folder(self):
         import os
         folder=recording_folder()
         if sys.platform=='win32':os.startfile(str(folder))
-        else:messagebox.showinfo('Thư mục bản ghi',str(folder))
+        else:dialogs.showinfo('Thư mục bản ghi',str(folder))
 
     def destroy(self):
         if self.recording_session:
-            if not messagebox.askyesno('Đang ghi','Đang có bản ghi chưa lưu. Bạn muốn dừng để lưu trước khi thoát?'):
+            if not dialogs.askyesno('Đang ghi','Đang có bản ghi chưa lưu. Bạn muốn dừng để lưu trước khi thoát?'):
                 return
             try:self.recording_session.finish()
-            except Exception as exc:messagebox.showwarning('Bản ghi',str(exc))
+            except Exception as exc:dialogs.showwarning('Bản ghi',str(exc))
             self.recording_session=None
         super().destroy()
 
@@ -2158,7 +2160,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         def current():
             r=getattr(self,'_v8_active_reader',None)
             if not alive(r):
-                messagebox.showinfo('Công cụ','Mở bài đọc để sử dụng công cụ tương tác.',parent=self);return None
+                dialogs.showinfo('Công cụ','Mở bài đọc để sử dụng công cụ tương tác.',parent=self);return None
             return r
         def refresh():
             for key,b in tool_buttons.items():
@@ -2220,7 +2222,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
             if name=='undo':r.undo()
             elif name=='redo':r.redo_action()
             elif name=='clear':
-                if messagebox.askyesno('Xóa hết','Xóa toàn bộ nét vẽ, ghi chú và đánh dấu trong phiên này?',parent=self):r.clear()
+                if dialogs.askyesno('Xóa hết','Xóa toàn bộ nét vẽ, ghi chú và đánh dấu trong phiên này?',parent=self):r.clear()
             elif name=='zoom+':r.set_zoom(.1)
             elif name=='zoom-':r.set_zoom(-.1)
             elif name=='speak':r.read_aloud()
@@ -2310,7 +2312,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         name = simpledialog.askstring('Đổi tên tài khoản','Tên tài khoản mới:',initialvalue=student['name'],parent=self)
         if name is None:return
         try:self.db.rename_student(student['id'],name)
-        except ValueError as error:messagebox.showwarning('Tên không hợp lệ',str(error));return
+        except ValueError as error:dialogs.showwarning('Tên không hợp lệ',str(error));return
         self.show_profiles()
 
     def _quest_themes(self):
@@ -2490,10 +2492,10 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
     def quest_notifications_page(self):
         quests=self._claimable_quests()
         if not quests:
-            messagebox.showinfo('Thông báo','Hiện chưa có phần thưởng Achievement nào sẵn sàng nhận.',parent=self)
+            dialogs.showinfo('Thông báo','Hiện chưa có phần thưởng Achievement nào sẵn sàng nhận.',parent=self)
             return
         self.level_achievements_page()
-        messagebox.showinfo('🎁 Quà đang chờ',f'Bạn có {len(quests)} phần thưởng đủ điều kiện nhận! Hãy chọn chủ đề để nhận ngọc.',parent=self)
+        dialogs.showinfo('🎁 Quà đang chờ',f'Bạn có {len(quests)} phần thưởng đủ điều kiện nhận! Hãy chọn chủ đề để nhận ngọc.',parent=self)
 
     def level_achievements_page(self):
         """Game-style quest hub, organized by the actual subject themes."""
@@ -2542,7 +2544,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
                 self.label(line,f"{title}   •   {count}/{q['required']} lượt   •   < {q['max_seconds']} giây",10,True).pack(side='left',fill='x',expand=True)
                 def claim(item=q):
                     if self.db.claim_level_achievement(sid,item):
-                        messagebox.showinfo('🎁 Nhận thưởng',f"Chúc mừng! Bạn nhận được {item['gems']} ngọc!",parent=self)
+                        dialogs.showinfo('🎁 Nhận thưởng',f"Chúc mừng! Bạn nhận được {item['gems']} ngọc!",parent=self)
                     self._open_quest_theme(theme,name)
                 color='#F2B400' if ready else '#96A7A0'
                 bg='#FFF0B5' if ready else '#E7EEE9'
@@ -2624,11 +2626,11 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         import threading
         from exam_pygame import run_exam
         if getattr(self, '_exam_thread', None) and self._exam_thread.is_alive():
-            messagebox.showinfo('Kiểm tra', 'Cửa sổ kiểm tra đang mở.')
+            dialogs.showinfo('Kiểm tra', 'Cửa sổ kiểm tra đang mở.')
             return
         import pygame_session_guard as guard
         if not guard.launch(run_exam, (self.data_dir, self.student['id'] if self.student else None), 'TuHocExamSDL'):
-            messagebox.showinfo('Kiểm tra', 'Một cửa sổ bài tập hoặc kiểm tra đang mở.')
+            dialogs.showinfo('Kiểm tra', 'Một cửa sổ bài tập hoặc kiểm tra đang mở.')
 
     #def exam_bank_editor(self):
        # from exam_editor import open_editor
@@ -2675,7 +2677,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         self._focus_exercise=exercise(self,ex)
 
     def save_vocab(self,w):
-        self.db.save_word(self.student['id'],self.learning.wordkey(w['word']),w.get('meaning',''));messagebox.showinfo('Sổ từ','Đã lưu từ vào Flashcard.')
+        self.db.save_word(self.student['id'],self.learning.wordkey(w['word']),w.get('meaning',''));dialogs.showinfo('Sổ từ','Đã lưu từ vào Flashcard.')
 
     def result(self,ex,correct,seconds):
         from exercise_focus_ui import result
@@ -2702,12 +2704,12 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         if name is None:return
         try:self.db.rename_deck(self.student['id'],group,name)
         except ValueError as error:
-            messagebox.showwarning('Tên không hợp lệ',str(error),parent=self);return
+            dialogs.showwarning('Tên không hợp lệ',str(error),parent=self);return
         self.flashcards()
 
     def delete_flashcard_deck(self,group):
         title=self._flashcard_source_name(group)
-        if not messagebox.askyesno('Xóa bộ Flashcard',
+        if not dialogs.askyesno('Xóa bộ Flashcard',
                 f'Xóa bộ thẻ “{title}” khỏi thư viện?\n\n'
                 'Các từ còn thuộc bộ thẻ khác vẫn được giữ lại. '
                 'Từ chỉ thuộc bộ này sẽ chuyển sang mục Từ đã lưu trước đây để tránh mất dữ liệu.',

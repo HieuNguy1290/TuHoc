@@ -1,4 +1,5 @@
 """Read-only, paginated history UI using existing learning_sessions records."""
+from ui_components import EmptyState
 from ui_tokens import COLORS as TOKEN_COLORS, font_at
 from question_prompt import display_prompt
 import datetime
@@ -476,10 +477,10 @@ def show_exam_detail(parent, record, library_dir=None):
                     if os.name == 'nt':
                         os.startfile(str(p))
                     else:
-                        from tkinter import messagebox
+                        import ui_dialogs as messagebox
                         messagebox.showinfo('File nghe', f'Đường dẫn: {p}', parent=dialog)
                 except (OSError, AttributeError) as exc:
-                    from tkinter import messagebox
+                    import ui_dialogs as messagebox
                     messagebox.showerror('Không mở được âm thanh', str(exc), parent=dialog)
             button = tk.Button(detail, text='▶ Nghe âm thanh', command=play,
                                bg='#EFF8EF', fg='#173E2B', relief='solid', bd=1,
@@ -649,7 +650,8 @@ def show_exam_detail(parent, record, library_dir=None):
     weakest_button.configure(command=focus_weakest)
 
     def export_csv():
-        from tkinter import filedialog, messagebox
+        from tkinter import filedialog
+        import ui_dialogs as messagebox
         filename = filedialog.asksaveasfilename(
             parent=dialog, title='Xuất chi tiết bài kiểm tra',
             defaultextension='.csv', filetypes=[('CSV UTF-8', '*.csv')])
@@ -870,8 +872,7 @@ def show_history(parent, conn, student_id, on_back=None):
                 widget.bind('<Leave>', update_hover)
                 bind_wheel(widget)
         if not records:
-            empty = tk.Label(rows_container, text='Chưa có bài tập hoàn thành',
-                             bg=BG, fg=MUTED, font=(font, 11), pady=35)
+            empty = EmptyState(rows_container, 'Chưa có bài tập hoàn thành', background=BG)
             empty.pack(fill='x')
             bind_wheel(empty)
         start = page[0] * PAGE_SIZE + 1 if count else 0

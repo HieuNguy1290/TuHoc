@@ -1,5 +1,6 @@
 'Read-only incorrect-answer review using existing attempts and curriculum.'
 from question_prompt import display_prompt
+from ui_components import EmptyState
 import tkinter as tk
 from tkinter import ttk
 
@@ -73,7 +74,7 @@ def show_wrong_answers(parent,conn,student_id,curriculum,on_back=None,on_retry=N
             subset.append(item)
         counter.config(text=f'{len(subset)} lần trả lời sai · {len({r["id"] for r in subset})} câu khác nhau')
         if not subset:
-            tk.Label(content,text='Không có câu trả lời sai phù hợp.',bg=BG,fg=MUTED,font=(FONT,11)).pack(pady=22)
+            EmptyState(content,'Không có câu trả lời sai phù hợp.',background=BG).pack(fill='x',pady=22)
         for idx,item in enumerate(subset):
             q=item['question']
             card=tk.Frame(content,bg=PALE if idx%2==0 else YELLOW,padx=16,pady=12)

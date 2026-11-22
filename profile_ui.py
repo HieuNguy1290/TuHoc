@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 import time
 from ui_motion import MotionJobs, smoothstep
+from ui_components import EmptyState
 from theme_config import UI_COLORS as C
 
 BG=C['background']; INK=C['text']; MUTED=C['muted']; GREEN=C['primary']; ERR=C['error']
@@ -62,7 +63,7 @@ class ProfilePage:
         tk.Label(head,text='Hãy tạo tài khoản nếu chưa có',font=font_at(13),fg=MUTED,bg=BG).pack()
         tk.Label(head,text='Phần mềm được phát triển by HiHieu Ver 1.0',font=font_at(8),fg=MUTED,bg=BG).pack(pady=(15,4))
         people=list(self.app.db.students())
-        if not people:tk.Label(self.root,text='Chào bạn! Hãy tạo tài khoản để bắt đầu.',font=font_at(13),fg=MUTED,bg=BG).pack(pady=(0,12))
+        if not people:EmptyState(self.root,'Chào bạn! Hãy tạo tài khoản để bắt đầu.',background=BG).pack()
         holder=tk.Frame(self.root,bg=BG);holder.pack(fill='x',padx=24)
         canvas=tk.Canvas(holder,bg=BG,height=355,highlightthickness=0)
         canvas.pack(fill='x',expand=True)

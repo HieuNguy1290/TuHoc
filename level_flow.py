@@ -5,6 +5,7 @@ from pathlib import Path
 from card_motion import animate_card
 from icon_animations import register as register_icon, play as play_icon
 from tkinter import messagebox, simpledialog, filedialog, colorchooser
+import ui_dialogs as dialogs
 from lesson_display_names import display_name, breadcrumb
 from theme_config import load as load_themes, save as save_themes, tuples as theme_tuples, max_level as theme_max, normalize_code, icon_file, lesson_count as theme_lesson_count
 
@@ -286,9 +287,9 @@ class LevelFlowMixin:
         def save():
             try:word=textbox.get('sel.first','sel.last').strip()
             except tk.TclError:word=''
-            if not word:messagebox.showinfo('Chọn từ','Hãy bôi đen từ/cụm từ trong nội dung.');return
+            if not word:dialogs.showinfo('Chọn từ','Hãy bôi đen từ/cụm từ trong nội dung.');return
             meaning=simpledialog.askstring('Lưu từ',f'Nghĩa của “{word}”:',parent=self)
-            if meaning is not None:self.db.save_word_in_source(self.student['id'],self.learning.wordkey(word),meaning or 'Từ trong bài học','manual');messagebox.showinfo('Đã lưu','Đã lưu vào Flashcard.')
+            if meaning is not None:self.db.save_word_in_source(self.student['id'],self.learning.wordkey(word),meaning or 'Từ trong bài học','manual');dialogs.showinfo('Đã lưu','Đã lưu vào Flashcard.')
         self.action_button(parent,'☆ Lưu từ đã bôi đen',save).pack(anchor='w',pady=8)
     def _level_navigation(self,body,theme,level,mode='lesson'):
         """Persistent, immediately visible back/previous/next controls."""
@@ -330,7 +331,7 @@ class LevelFlowMixin:
         def open_expanded_lesson():
             from pygame_lesson_window import available, launch
             if not available():
-                messagebox.showerror('Thieu pygame', 'Hay cai pygame de mo Lesson Studio.', parent=self)
+                dialogs.showerror('Thieu pygame', 'Hay cai pygame de mo Lesson Studio.', parent=self)
                 return
             rows = self._row('lessons', theme, level)
             lesson = rows[0] if rows else {'title': 'Bai hoc', 'content': ''}
@@ -377,10 +378,10 @@ class LevelFlowMixin:
                             self.db.save_word_in_source(
                                 self.student['id'], self.learning.wordkey(phrase),
                                 meaning.strip(), 'lesson', theme, level)
-                            messagebox.showinfo('Đã lưu',
+                            dialogs.showinfo('Đã lưu',
                                                 f'Đã thêm “{phrase}” vào Flashcard.', parent=self)
                         except Exception as exc:
-                            messagebox.showerror('Lỗi lưu từ vựng', str(exc), parent=self)
+                            dialogs.showerror('Lỗi lưu từ vựng', str(exc), parent=self)
                 finally:
                     if self.winfo_exists() and (not vocabulary_requests.empty() or
                             getattr(self, '_lesson_vocab_poll_until', 0) > time.monotonic()):
@@ -390,7 +391,7 @@ class LevelFlowMixin:
             started = launch(self._lesson_breadcrumb(theme, level, getattr(self, '_selected_lesson', 1) or 1), lesson, resolved,
                              getattr(self, 'data_dir', None), launch_settings)
             if not started:
-                messagebox.showinfo('Lesson Studio', 'Mot cua so Pygame khac dang mo.', parent=self)
+                dialogs.showinfo('Lesson Studio', 'Mot cua so Pygame khac dang mo.', parent=self)
         expand_button = tk.Button(banner, text='⛶  MỞ RỘNG TOÀN MÀN HÌNH', command=open_expanded_lesson,
                   font=font_at(10, 'bold'), bg='#405ED5', fg='white',
                   bd=0, padx=12, pady=8, cursor='hand2')
@@ -422,7 +423,7 @@ class LevelFlowMixin:
                 except tk.TclError:
                     continue
             if not word:
-                messagebox.showinfo('Chọn từ', 'Hãy bôi đen một từ hoặc cụm từ trong nội dung bài học trước khi thêm.')
+                dialogs.showinfo('Chọn từ', 'Hãy bôi đen một từ hoặc cụm từ trong nội dung bài học trước khi thêm.')
                 return
             if getattr(self, 'lang', 'en') == 'vi':
                 meaning = ''
@@ -431,7 +432,7 @@ class LevelFlowMixin:
                 if meaning is None:
                     return
             self.db.save_word_in_source(self.student['id'],self.learning.wordkey(word),meaning.strip(),'lesson',theme,level)
-            messagebox.showinfo('Đã lưu',f'Đã thêm “{word}” vào Flashcard.')
+            dialogs.showinfo('Đã lưu',f'Đã thêm “{word}” vào Flashcard.')
         # Fixed overlay on root: independent of the scrollable lesson canvas.
         # The recorder remains its own control in the upper-right corner.
         self.show_floating_vocabulary(add_vocabulary)
@@ -548,7 +549,7 @@ class LevelFlowMixin:
     def _v8_open_reading(self,theme,level,item):
         from pygame_embedded_reader import EmbeddedReader, available
         if not available():
-            messagebox.showerror('Thiếu thư viện','Cài pygame và Pillow: py -m pip install pygame pillow',parent=self)
+            dialogs.showerror('Thiếu thư viện','Cài pygame và Pillow: py -m pip install pygame pillow',parent=self)
             return
         body=self.layout(f'{self._theme(theme)[1]} · Bài đọc tương tác {level}')
         self._level_navigation(body,theme,level,'reading')
@@ -692,7 +693,7 @@ class LevelFlowMixin:
             w.insert(last, '  📝 ' + message.strip() + ' ', (tag,))
             w.configure(state='disabled')
             w.tag_configure(tag, foreground='#1459A0', background='#E6F1FF')
-            w.tag_bind(tag,'<Button-1>',lambda e, m=message: messagebox.showinfo('Giải thích',m,parent=self))
+            w.tag_bind(tag,'<Button-1>',lambda e, m=message: dialogs.showinfo('Giải thích',m,parent=self))
         def remove_one():
             w = state['active']
             if w is None: return
@@ -732,7 +733,7 @@ class LevelFlowMixin:
                     continue
             status.set('Không còn nét vẽ để hoàn tác')
         def clear_everything():
-            if not messagebox.askyesno('Xóa toàn bộ ghi chú', 'Xóa tất cả nét vẽ, hộp chữ và đánh dấu trong bài đọc này?', parent=self): return
+            if not dialogs.askyesno('Xóa toàn bộ ghi chú', 'Xóa tất cả nét vẽ, hộp chữ và đánh dấu trong bài đọc này?', parent=self): return
             for w in readers:
                 for tag in list(w.tag_names()):
                     if tag in ('underline', 'bold') or tag.startswith(('highlight_', 'color_', 'teacher_note_')):
@@ -800,7 +801,7 @@ class LevelFlowMixin:
             try:
                 from pygame_embedded_reader import EmbeddedReader, available
                 if not available():
-                    messagebox.showinfo('Pygame', 'Cài pygame và Pillow: py -m pip install pygame pillow', parent=self)
+                    dialogs.showinfo('Pygame', 'Cài pygame và Pillow: py -m pip install pygame pillow', parent=self)
                     return
                 media=self.media_file(item.get('image','')) if item.get('image') else None
                 for child in list(body.winfo_children()):child.destroy()
@@ -818,7 +819,7 @@ class LevelFlowMixin:
                 studio=EmbeddedReader(host,item,media)
                 studio.pack(fill='both',expand=True)
             except Exception as exc:
-                messagebox.showerror('Bài đọc tương tác',str(exc),parent=self)
+                dialogs.showerror('Bài đọc tương tác',str(exc),parent=self)
         self._level_navigation(body,theme,level,'reading')
         entries = self._row('reading',theme,level)
         if not entries:
@@ -930,7 +931,7 @@ class LevelFlowMixin:
                 if meaning is None:return
                 self.db.save_word_in_source(self.student['id'],self.learning.wordkey(word),meaning.strip(),
                                             'reading',theme,level)
-                messagebox.showinfo('Đã lưu','Từ đã được lưu vào Flashcard của bài đọc này.',parent=self)
+                dialogs.showinfo('Đã lưu','Từ đã được lưu vào Flashcard của bài đọc này.',parent=self)
             self.bind_selection_plus(text,save_reading_selection)
             text.bind('<ButtonRelease-1>',lambda e,w=text:state.__setitem__('active',w),add='+')
             text.bind('<FocusIn>',lambda e,w=text:state.__setitem__('active',w),add='+')
@@ -1004,7 +1005,7 @@ class LevelFlowMixin:
         self.button(body,'→ Bài tập level này',lambda:self.level_quiz(theme,level)).pack(anchor='w',pady=14)
     def _save_vocab(self,item,theme='',level=0):
         self.db.save_word_in_source(self.student['id'],self.learning.wordkey(item['word']),item.get('meaning',''),'lesson',theme,level)
-        messagebox.showinfo('Từ vựng','Đã lưu vào Flashcard của bài học.')
+        dialogs.showinfo('Từ vựng','Đã lưu vào Flashcard của bài học.')
     def level_quiz(self,theme,level):
         """Run the unified v2 quiz; do not invoke the removed level_question renderer."""
         # Filter the complete Level question bank BEFORE limiting to 50.
@@ -1019,7 +1020,7 @@ class LevelFlowMixin:
             items=[q for q in items if str(q.get('lesson') or '1').strip()==str(selected_lesson)]
         items=sorted(items,key=lambda q:self.learning.mastery(self.student['id'],q.get('answer',''))+random.random()*.15,reverse=True)[:50]
         if not items:
-            messagebox.showinfo('Chưa có câu hỏi','Chủ đề / level này chưa có câu hỏi. Hãy nhập dữ liệu qua Quản lý levels hoặc Excel.')
+            dialogs.showinfo('Chưa có câu hỏi','Chủ đề / level này chưa có câu hỏi. Hãy nhập dữ liệu qua Quản lý levels hoặc Excel.')
             return
         self._lesson_quiz_active=True
         self._quiz_generation=getattr(self,'_quiz_generation',0)+1
