@@ -1,6 +1,10 @@
 """Tự Học 2.0 — service layer + interactive Tkinter learning experience.
 Compatible with historical 1.5.1 content and student database.
 """
+from strings_vi import t
+from ui_components import Badge, LoadingState
+from ui_tokens import font_at
+
 import json, random, time, datetime, re, shutil, math, os, sys
 from pathlib import Path
 import tkinter as tk
@@ -275,6 +279,8 @@ class GameAppMixin:
         tk.Checkbutton(c,text='Giảm chuyển động',variable=reduced,bg='white').pack(anchor='w',pady=4)
         auto=tk.BooleanVar(value=bool(settings.get('auto_next',False)))
         tk.Checkbutton(c,text='Tự động sang câu khi trả lời đúng',variable=auto,bg='white',font=('Segoe UI',12)).pack(anchor='w',pady=10)
+        sound=tk.BooleanVar(value=bool(settings.get('feedback_sound',False)))
+        tk.Checkbutton(c,text='Âm báo khi trả lời',variable=sound,bg='white').pack(anchor='w',pady=4)
         dragon_enabled=tk.BooleanVar(value=bool(settings.get('dragon_feedback_enabled',False)))
         tk.Checkbutton(c,text='Rồng Lân Ú: hiệu ứng mây ngũ sắc và mưa sao khi trả lời',
                        variable=dragon_enabled,bg='white',font=('Segoe UI',12)).pack(anchor='w',pady=(4,10))
@@ -288,8 +294,9 @@ class GameAppMixin:
             self.reduce_motion=settings['reduce_motion']=reduced.get()
             settings['auto_next']=auto.get()
             settings['dragon_feedback_enabled']=dragon_enabled.get()
+            settings['feedback_sound']=sound.get()
             self._save_display_settings()
-            messagebox.showinfo('Đã lưu','Đã lưu cỡ chữ và màu riêng cho Title/Content. Mở lại bài học để xem thay đổi.')
+            messagebox.showinfo('Đã lưu',t('settings_saved'))
         self.action_button(c,'LƯU THIẾT LẬP',save).pack(anchor='w',pady=8)
     def choose_language(self):
         try:
@@ -443,7 +450,9 @@ class GameAppMixin:
             self._draft_store().save(*self._draft_key(), self.s_questions,
                                      [(a, ok) for _q, a, ok in self.s_answers],
                                      max(0.0, time.monotonic()-self._quiz_timer_started))
+            self._draft_saved_ok=True
         except (OSError, ValueError, TypeError, RuntimeError) as exc:
+            self._draft_saved_ok=False
             print('Không lưu được tiến độ bài tập:', exc)
 
     def start_session(self,theme,level,quiz_only=False):
@@ -711,6 +720,16 @@ class GameAppMixin:
         else:
             self.home()
 
+    def _clear_quiz_busy(self):
+        loading=getattr(self,'_quiz_loading',None)
+        if loading is not None and loading.winfo_exists():
+            loading.destroy()
+        self._quiz_loading=None
+
+    def _sound_answer_feedback(self):
+        if getattr(self,'_display_settings',{}).get('feedback_sound',False):
+            self.bell()
+
     def _quiz_back_to_lesson(self):
         """Leave an unfinished quiz explicitly, invalidating delayed callbacks."""
         answers = len(getattr(self, 's_answers', []))
@@ -727,6 +746,7 @@ class GameAppMixin:
         self._save_quiz_draft()
         review_mode=getattr(self,'_wrong_review_mode',False)
         self._lesson_quiz_active=False
+        self._clear_quiz_busy()
         # A queued Pygame answer/retry must not resurrect the abandoned quiz.
         self._quiz_generation = getattr(self, '_quiz_generation', 0) + 1
         self._quiz_pending_index = None
@@ -792,6 +812,7 @@ class GameAppMixin:
                     ok=self._quiz_correct(question,answer)
                     self._quiz_launch_retries=0
                     self.s_answers.append((question,answer,ok))
+                    self._sound_answer_feedback()
                     self._save_quiz_draft()
                     if ok:self.s_combo+=1;self.s_xp+=10+min(self.s_combo,5)*2
                     else:self.s_combo=0
@@ -814,13 +835,17 @@ class GameAppMixin:
                     else:
                         self._quiz_exit_results()
                 if pg_launch(self,pg_q,on_answer,on_cancel=on_cancel):
+                    self._clear_quiz_busy()
                     self._quiz_pending_index=(generation,index)
                     return
-                pygame_status = 'Cửa sổ bài tập đang bận. Đang thử kết nối lại…'
+                pygame_status = t('quiz_busy')
                 # SDL is busy or the renderer failed to launch. Do not silently
                 # replace the question with Tk and reset the quiz sequence.
                 if getattr(self,'_quiz_launch_retries',0)<12:
                     self._quiz_launch_retries=getattr(self,'_quiz_launch_retries',0)+1
+                    if self._quiz_launch_retries==3 and isinstance(self,tk.Misc):
+                        self._quiz_loading=LoadingState(self,t('quiz_busy_title'))
+                        self._quiz_loading.place(relx=.5,rely=.9,anchor='center')
                     self._quiz_pending_index=(generation,index)
                     def retry():
                         if getattr(self,'_quiz_generation',0)!=generation:return
@@ -833,11 +858,16 @@ class GameAppMixin:
         except Exception as exc:
             import traceback
             traceback.print_exc()
-            pygame_status = 'Không thể tải giao diện Pygame cho câu này. Đã chuyển sang giao diện dự phòng.'
+            pygame_status = t('quiz_fallback')
+        self._clear_quiz_busy()
         body=self.layout('🧠  Thử thách kiến thức')
         if index==0 and (not hasattr(self,'_quiz_timer_started') or getattr(self,'_quiz_saved',False)):
             self._quiz_timer_started=time.monotonic()
         self._quiz_timer_header(body,index,len(items))
+        if self.s_answers:
+            ok=self.s_answers[-1][2]
+            Badge(body,t('correct_feedback' if ok else 'incorrect_feedback'),
+                  tone='success' if ok else 'danger').pack(anchor='w',pady=(0,5))
         # Provide an explicit, recoverable exit in the Tk fallback UI.
         self.button(body, '←  QUAY VỀ BÀI HỌC', self._quiz_back_to_lesson).pack(anchor='w', pady=(0, 8))
         bar=ttk.Progressbar(body,maximum=max(len(items),1),value=index+1,length=670)
@@ -953,6 +983,7 @@ class GameAppMixin:
                 if not answer:notice.config(text='Hãy nhập hoặc chọn đáp án trước khi tiếp tục.');return
             ok=self._quiz_correct(q,answer)
             self.s_answers.append((q,answer,ok))
+            self._sound_answer_feedback()
             self._save_quiz_draft()
             if ok:self.s_combo+=1;self.s_xp+=10+min(self.s_combo,5)*2
             else:self.s_combo=0
@@ -996,11 +1027,11 @@ class GameAppMixin:
         correct = sum(bool(row[2]) for row in getattr(self, 's_answers', ()))
         body = self.layout('Kết quả bài tập')
         card = self._card(body)
-        tk.Label(card, text=f'Đã trả lời {completed}/{total} câu', bg='white', fg=INK,
+        tk.Label(card, text=t('quiz_completed',completed=completed,total=total), bg='white', fg=INK,
                  font=('Segoe UI', 19, 'bold')).pack(anchor='w', pady=(4, 10))
         tk.Label(card, text=f'Đúng: {correct}  |  Sai: {completed-correct}  |  Chưa làm: {total-completed}',
                  bg='white', fg=MUTED, font=('Segoe UI', 13)).pack(anchor='w', pady=(0, 8))
-        tk.Label(card, text='Bài chưa hoàn thành. Tiến độ đã lưu; chưa chấm điểm tổng kết.',
+        tk.Label(card, text=t('draft_saved' if getattr(self,'_draft_saved_ok',False) else 'draft_unsaved'),
                  bg='white', fg=MUTED, font=('Segoe UI', 11)).pack(anchor='w', pady=(0, 12))
         self.button(card, 'Tiếp tục làm bài', lambda: self._resume_quiz_from_results()).pack(anchor='w', pady=5)
         self.button(card, 'Về danh sách bài học', self._return_to_home_lessons).pack(anchor='w', pady=5)

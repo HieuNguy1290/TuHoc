@@ -1,4 +1,5 @@
 """Persistent navigation shell with scrollable, hoverable sidebar."""
+from strings_vi import t
 import time
 import tkinter as tk
 from theme_config import UI_COLORS, UI_FONTS
@@ -6,7 +7,7 @@ from ui_components import Tooltip
 from ui_keys import keyboard_button
 from ui_components import bind_hover
 
-NAV = [('⌂','Trang chủ','home'),('▤','Bài học','topic_page'),('▣','Tập đọc','reading_menu'),('▦','Flashcard','flashcards'),('✎','Chính tả','dictation_page'),('★','Trò chơi','games_page'),('▣','Kiểm tra','exam_page'),('♛','Phần thưởng','reward_shop'),('▤','Lịch sử làm bài','quiz_history_page'),('▥','Báo cáo học tập','report_page'),('◷','Thống kê thời gian','time_statistics_page')]
+NAV = [('⌂',t('home'),'home'),('▤',t('lessons'),'topic_page'),('▣',t('reading'),'reading_menu'),('▦','Flashcard','flashcards'),('✎','Chính tả','dictation_page'),('★','Trò chơi','games_page'),('▣','Kiểm tra','exam_page'),('♛','Phần thưởng','reward_shop'),('▤',t('history'),'quiz_history_page'),('▥','Báo cáo học tập','report_page'),('◷','Thống kê thời gian','time_statistics_page')]
 
 
 class AppShell:
@@ -21,7 +22,7 @@ class AppShell:
         self.content.pack(fill='both', expand=True)
         self.buttons = []
         self._width = None
-        self._active_title = 'Trang chủ'
+        self._active_title = t('home')
         self.app.bind('<Configure>', self._resize, add='+')
         self._build_top()
         self._resize()
@@ -461,18 +462,18 @@ class AppShell:
         back=tk.Button(self.top,text='←',command=self.app.navigation_back,
                        bg=UI_COLORS['surface'],bd=0,font=UI_FONTS['card'],width=3)
         back.pack(side='left',padx=(12,6),pady=8)
-        Tooltip(back,'Quay lại · Alt + ←')
+        Tooltip(back,t('back_tooltip'))
         keyboard_button(back)
-        self.crumb = tk.Label(self.top, text='Trang chủ', bg=UI_COLORS['surface'],
+        self.crumb = tk.Label(self.top, text=t('home'), bg=UI_COLORS['surface'],
                               fg=UI_COLORS['text'], font=UI_FONTS['body'])
         self.crumb.pack(side='left', padx=8)
-        self.account = tk.Button(self.top, text='Tài khoản ▾', command=self._account,
+        self.account = tk.Button(self.top, text=t('account'), command=self._account,
                                  bg=UI_COLORS['surface'], bd=0, font=UI_FONTS['small'])
         self.account.pack(side='right', padx=12)
         self.bell = tk.Button(self.top, text='🔔', command=self.app._click_notification_icon,
                               bg=UI_COLORS['surface'], bd=0, font=UI_FONTS['body'])
         self.bell.pack(side='right', padx=8)
-        Tooltip(self.bell,'Thông báo')
+        Tooltip(self.bell,t('notifications'))
         keyboard_button(self.bell)
         keyboard_button(self.account)
         self.tools = tk.Frame(self.top, bg=UI_COLORS['surface'])
@@ -480,12 +481,12 @@ class AppShell:
 
     def _account(self):
         menu = tk.Menu(self.top, tearoff=False)
-        for label, name in [('Lịch sử làm bài', 'quiz_history_page'),
+        for label, name in [(t('history'), 'quiz_history_page'),
                             ('Báo cáo học tập', 'report_page'),
                             ('Thống kê thời gian', 'time_statistics_page'),
                             ('Đổi tài khoản', 'show_profiles'),
                             ('Donate', 'toggle_donate_panel'),
-                            ('Phím tắt', '_show_shortcut_guide')]:
+                            (t('shortcuts'), '_show_shortcut_guide')]:
             fn = getattr(self.app, name, None)
             if callable(fn):
                 menu.add_command(label=label, command=fn)
@@ -503,7 +504,7 @@ class AppShell:
             self.app._teaching_header = self.tools
         for label, btn in self.buttons:
             selected = (label.casefold() in str(title).casefold()
-                        or (label == 'Trang chủ' and title == 'Trang chủ'))
+                        or (label == t('home') and title == t('home')))
             btn._nav_selected = selected
             btn.configure(bg=UI_COLORS['primary'] if selected else UI_COLORS['surface'],
                           fg='white' if selected else UI_COLORS['text'])

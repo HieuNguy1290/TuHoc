@@ -1,4 +1,5 @@
 """Five themes, three modes and ten levels per theme. User content overrides bundled demo."""
+from strings_vi import t
 from ui_tokens import COLORS as TOKEN_COLORS, font_at
 import json, random, time, tkinter as tk
 from pathlib import Path
@@ -133,7 +134,7 @@ class LevelFlowMixin:
         LessonMap(self, False)
 
     def _mode_cards(self):
-        defaults=[('lesson','Bài học','📖'),('quiz','Bài tập','✎'),('vocab','Từ vựng','☆'),('reading','Đọc / Reading','📖')]
+        defaults=[('lesson',t('lessons'),'📖'),('quiz',t('exercises'),'✎'),('vocab',t('vocab'),'☆'),('reading','Đọc / Reading','📖')]
         path=self.curriculum.data_dir/'mode_cards.json'
         try:
             saved=json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
@@ -240,7 +241,7 @@ class LevelFlowMixin:
                 widget.bind('<Button-1>',open_mode)
         self.button(body,'← Về danh sách chủ đề',self.topic_page).pack(anchor='w',pady=15)
     def level_list(self,theme,mode):
-        names={'lesson':'Bài học','quiz':'Bài tập','vocab':'Từ vựng','reading':'Đọc' if getattr(self,'lang','en')=='vi' else 'Reading'}
+        names={'lesson':t('lessons'),'quiz':t('exercises'),'vocab':t('vocab'),'reading':'Đọc' if getattr(self,'lang','en')=='vi' else 'Reading'}
         body=self.layout(self._theme(theme)[1]+' / '+names[mode]);grid=tk.Frame(body,bg=body['bg']);grid.pack(fill='x')
         for col in range(5):grid.grid_columnconfigure(col,weight=1,uniform='levels')
         for level in range(1,self._max_level(theme)+1):
@@ -403,7 +404,7 @@ class LevelFlowMixin:
         content_size=int(settings.get('content_size',settings.get('text_size',18)))
         title_color=settings.get('title_color','#285D40')
         content_color=settings.get('content_color','#233C2A')
-        tk.Label(body,text=item.get('title','Bài học'),font=('Segoe UI',title_size,'bold'),
+        tk.Label(body,text=item.get('title',t('lessons')),font=('Segoe UI',title_size,'bold'),
                  fg=title_color,bg=body['bg'],anchor='w',justify='left',wraplength=950).pack(fill='x',pady=(0,8))
         if item.get('instructions'):
             self.label(body,item['instructions'],11,color='#607464').pack(anchor='w',pady=(0,12))
@@ -1005,7 +1006,7 @@ class LevelFlowMixin:
         self.button(body,'→ Bài tập level này',lambda:self.level_quiz(theme,level)).pack(anchor='w',pady=14)
     def _save_vocab(self,item,theme='',level=0):
         self.db.save_word_in_source(self.student['id'],self.learning.wordkey(item['word']),item.get('meaning',''),'lesson',theme,level)
-        dialogs.showinfo('Từ vựng','Đã lưu vào Flashcard của bài học.')
+        dialogs.showinfo(t('vocab'),'Đã lưu vào Flashcard của bài học.')
     def level_quiz(self,theme,level):
         """Run the unified v2 quiz; do not invoke the removed level_question renderer."""
         # Filter the complete Level question bank BEFORE limiting to 50.
@@ -2263,7 +2264,7 @@ class LevelFlowMixin:
             filters = tk.Frame(body, bg=body['bg'])
             filters.pack(fill='x', pady=(8, 4))
             filter_vars = {}
-            for field, label in (('theme', 'Chủ đề'), ('lesson', 'Bài học'), ('level', 'Level')):
+            for field, label in (('theme', 'Chủ đề'), ('lesson', t('lessons')), ('level', 'Level')):
                 tk.Label(filters, text=label, bg=body['bg']).pack(side='left', padx=(8, 3))
                 values = sorted({str(obj.get(field, 1 if field == 'lesson' else '')) for _, obj in all_rows},
                                 key=lambda v: (int(v) if v.isdigit() else float('inf'), v))

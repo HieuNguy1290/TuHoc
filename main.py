@@ -1,4 +1,5 @@
 """Tu Hoc v1.0 - offline desktop prototype (Python standard library)."""
+from strings_vi import t
 from ui_tokens import COLORS as TOKEN_COLORS, font_at, set_font_scale
 import json
 import os
@@ -36,6 +37,7 @@ from mouse_effects import MouseEffects
 from floating_vocabulary import FloatingVocabulary
 from ui_shell import AppShell
 from ui_components import Toast
+from ui_errors import record_error
 from ui_keys import HELP as KEY_HELP, action_for, allow_shell, focus_first, keyboard_button
 from profile_ui import ProfilePage
 from ui_grid import UIGrid
@@ -679,7 +681,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         item = getattr(self, '_sidebar_slide_window', None)
         if self.reduce_motion or not direction or canvas is None or item is None:
             return
-        if getattr(self, '_admin_page', '') in ('Lịch sử làm bài', 'Lịch sử'):
+        if getattr(self, '_admin_page', '') in (t('history'), 'Lịch sử'):
             return
         try:
             if not canvas.winfo_exists():
@@ -843,18 +845,8 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         return None
 
     def report_callback_exception(self, exc, value, tb):
-        """Expose Tkinter button errors to users and save technical details."""
-        details = ''.join(traceback.format_exception(exc, value, tb))
-        try:
-            logfile = DATA / 'loi_ung_dung.log'
-            with logfile.open('a', encoding='utf-8') as f:
-                f.write(f"\n[{datetime.datetime.now().isoformat(timespec='seconds')}]\n{details}\n")
-            messagebox.showerror('Ứng dụng gặp lỗi',
-                'Không thể thực hiện thao tác.\n\n'
-                f'Chi tiết lỗi đã lưu tại:\n{logfile}\n\n'
-                f'{value}')
-        except Exception:
-            print(details, file=sys.stderr)
+        code=record_error(DATA/'loi_ung_dung.log',(exc,value,tb))
+        dialogs.showerror(t('unexpected_error_title'),t('unexpected_error',code=code),parent=self)
 
     def _remove_page_fade(self):
         job = getattr(self, '_page_transition_job', None)
@@ -2511,7 +2503,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
     def quest_notifications_page(self):
         quests=self._claimable_quests()
         if not quests:
-            dialogs.showinfo('Thông báo','Hiện chưa có phần thưởng Achievement nào sẵn sàng nhận.',parent=self)
+            dialogs.showinfo(t('notifications'),'Hiện chưa có phần thưởng Achievement nào sẵn sàng nhận.',parent=self)
             return
         self.level_achievements_page()
         dialogs.showinfo('🎁 Quà đang chờ',f'Bạn có {len(quests)} phần thưởng đủ điều kiện nhận! Hãy chọn chủ đề để nhận ngọc.',parent=self)
@@ -2637,7 +2629,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
     def home(self):
         """Dashboard UI using existing progress, quest and navigation APIs."""
         from home_ui import HomeDashboard
-        body=self.layout('Trang chủ')
+        body=self.layout(t('home'))
         self._home_dashboard=HomeDashboard(self,body)
         self._shell.animate_home_entry()
 
@@ -2712,7 +2704,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         kind=group['source_type'];theme=group['theme'];level=group['level']
         subject=next((t[1] for t in self._quest_themes() if t[0]==theme),theme)
         if kind in ('lesson','reading') and level:
-            return f"{subject} · {'Bài học' if kind=='lesson' else 'Bài đọc'} Level {level}"
+            return f"{subject} · {t('lessons') if kind=='lesson' else 'Bài đọc'} Level {level}"
         return group['source_title'] or ('Từ lưu thủ công' if kind=='manual' else 'Bài học khác')
 
     def rename_flashcard_deck(self,group):

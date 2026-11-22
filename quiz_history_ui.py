@@ -1,4 +1,5 @@
 """Read-only, paginated history UI using existing learning_sessions records."""
+from strings_vi import t
 from ui_components import EmptyState
 from ui_tokens import COLORS as TOKEN_COLORS, font_at
 from question_prompt import display_prompt
@@ -698,7 +699,7 @@ def show_history(parent, conn, student_id, on_back=None):
 
     title_row = tk.Frame(outer, bg=BG)
     title_row.pack(fill='x', pady=(6, 3))
-    tk.Label(title_row, text='Lịch sử làm bài', bg=BG, fg=INK,
+    tk.Label(title_row, text=t('history'), bg=BG, fg=INK,
              font=(font, 19, 'bold')).pack(side='left')
     if on_back:
         back = tk.Button(title_row, text='← Quay lại', command=on_back,
@@ -872,13 +873,13 @@ def show_history(parent, conn, student_id, on_back=None):
                 widget.bind('<Leave>', update_hover)
                 bind_wheel(widget)
         if not records:
-            empty = EmptyState(rows_container, 'Chưa có bài tập hoàn thành', background=BG)
+            empty = EmptyState(rows_container, t('history_empty'), background=BG)
             empty.pack(fill='x')
             bind_wheel(empty)
         start = page[0] * PAGE_SIZE + 1 if count else 0
         end = min((page[0] + 1) * PAGE_SIZE, count)
         summary.config(text=f'Hiển thị {start}–{end} / {count} lượt hoàn thành' if count
-                       else 'Chưa có bài tập hoàn thành')
+                       else t('history_empty'))
         page_indicator.config(text=f'Trang {page[0] + 1} / {max(1, (count + PAGE_SIZE - 1) // PAGE_SIZE)}')
         prev_btn.config(state='normal' if page[0] > 0 else 'disabled')
         next_btn.config(state='normal' if end < count else 'disabled')

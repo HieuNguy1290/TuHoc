@@ -1,4 +1,5 @@
 """Home dashboard UI only. Reads existing storage; writes only via existing claim API."""
+from strings_vi import t
 from ui_tokens import COLORS as TOKEN_COLORS, font_at
 import datetime
 import time
@@ -174,7 +175,7 @@ class HomeDashboard:
             W['title2']=self.label(left,'Hôm nay học gì? · What to do today',16,True);W['title2'].pack(anchor='w',pady=(0,12))
             shortcuts=tk.Frame(left,bg=BG);shortcuts.pack(fill='x')
             shortcuts.grid_columnconfigure((0,1,2),weight=1,uniform='short')
-            actions=[('▤','Ôn Flashcard',f'{due} thẻ cần ôn',app.flashcards),('▣','Tập đọc','Đọc bài tiếp theo',app.reading_menu),('✎','Chép chính tả','Luyện nghe và viết',app.dictation_page)]
+            actions=[('▤','Ôn Flashcard',f'{due} thẻ cần ôn',app.flashcards),('▣',t('reading'),'Đọc bài tiếp theo',app.reading_menu),('✎','Chép chính tả','Luyện nghe và viết',app.dictation_page)]
             for i,(icon,title,sub,action) in enumerate(actions):
                 slot=tk.Frame(shortcuts,bg=BG,width=10)
                 slot.grid(row=0,column=i,sticky='nsew',padx=(0 if i==0 else 5,0 if i==2 else 5),pady=4)
