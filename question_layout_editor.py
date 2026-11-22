@@ -12,6 +12,7 @@ from question_layout_store import GEOMETRY, IMAGE_FITS, layout_v2, validate_layo
 from layout_render import DESKTOP, MOBILE, PAGE_LIMIT, fit_pixels, to_pixels, to_relative
 
 from layout_registry import DEFAULTS, controls_for
+from layout_edit_geometry import arrange, bounds, constrain, snap_axis
 
 
 def resize_rect(start, mode, dx, dy, screen, *, keep_ratio=False):
@@ -41,7 +42,7 @@ def resize_rect(start, mode, dx, dy, screen, *, keep_ratio=False):
     return {**start,'x':x,'y':y,'width':right-x,'height':bottom-y}
 
 
-def edit_layout(parent, question, initial=None, *, preview=None):
+def edit_layout(parent, question, initial=None, *, preview=None, templates=None, clipboard=None):
     """Open a modal editor. Return validated layout, or None if cancelled."""
     initial = validate_layout(initial or {})
     stored = initial
@@ -196,7 +197,14 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     ttk.Button(colors, text='Màu chữ', command=lambda: choose_color('color')).pack(side='left')
     ttk.Button(colors, text='Nền', command=lambda: choose_color('bg')).pack(side='left')
     ttk.Button(colors, text='Xóa nền', command=lambda: change_text_style(bg='')).pack(side='left')
+    pending_image = None
     active = [None]
+    selected_keys = set()
+    locked = set()
+    hidden = set()
+    group_start = {}
+    marquee = None
+    guides = []
     status = tk.StringVar(value='Đã nạp bố cục')
     scroll_job = None
     last_motion = None
@@ -277,7 +285,8 @@ def edit_layout(parent, question, initial=None, *, preview=None):
             elements_list.insert('end', label)
         if active[0] not in elements:
             active[0] = None
-        select(active[0])
+        selected_keys.intersection_update(elements)
+        select(active[0],preserve=True)
 
     def current(el):
         if el in extras:
@@ -289,7 +298,11 @@ def edit_layout(parent, question, initial=None, *, preview=None):
         base = option_defaults.get(el) or DEFAULTS[el]
         return {**base, **desktop_layout.get(el, {}), **working.get(el, {})}
 
-    def select(el, from_list=False):
+    def select(el, from_list=False, preserve=False):
+        if not preserve:
+            selected_keys.clear()
+        if el:
+            selected_keys.add(el)
         active[0] = el
         selection.set('Hộp văn bản' if el in extras else el or 'Chọn thành phần')
         for widget in (fit_select, text_tools, colors):
@@ -344,7 +357,8 @@ def edit_layout(parent, question, initial=None, *, preview=None):
         return validate_layout(result)
 
     def dirty():
-        return desktop_layout != saved_layout or mobile_layout != saved_mobile or extras != saved_extras
+        return (desktop_layout != saved_layout or mobile_layout != saved_mobile
+                or extras != saved_extras or pending_image is not None)
 
     def show_frame(size, pixels):
         nonlocal preview_image
@@ -383,7 +397,7 @@ def edit_layout(parent, question, initial=None, *, preview=None):
                 variable.set('')
 
     def apply_pixels():
-        if not active[0]:
+        if not active[0] or active[0] in locked:
             return
         try:
             values = current(active[0])
@@ -402,7 +416,7 @@ def edit_layout(parent, question, initial=None, *, preview=None):
         redraw()
 
     def capture():
-        return deepcopy(desktop_layout), deepcopy(mobile_layout), deepcopy(extras)
+        return deepcopy(desktop_layout), deepcopy(mobile_layout), deepcopy(extras), locked.copy(), hidden.copy(), image_path, pending_image
 
     def snapshot():
         nonlocal preview_image
@@ -412,6 +426,8 @@ def edit_layout(parent, question, initial=None, *, preview=None):
         if len(history) > 50:
             history.pop(0)
 
+
+    original_image = image_path
 
     def set_geometry(key, values):
         if key in extras:
@@ -439,6 +455,11 @@ def edit_layout(parent, question, initial=None, *, preview=None):
                      bold=False, italic=False, color='#1e293b', bg='', align='left',
                      z=max((item['z'] for item in extras.values()),default=-1)+1)
         if copy is not None:
+            source = current(copy['id'])
+            step_x,step_y=constrain(source,8/page_w,8/page_h)
+            rect = fit_pixels(to_pixels({k:source[k] for k in GEOMETRY}|{
+                'x':source['x']+step_x,'y':source['y']+step_y},tuple(dims)),tuple(dims))
+            extra['desktop'] = rect if working is desktop_layout else deepcopy(copy['desktop'])
             extra.update({k: copy[k] for k in ('text','font_size','bold','italic','color','bg','align')})
         if working is mobile_layout:
             extra['mobile'] = rect
@@ -457,7 +478,7 @@ def edit_layout(parent, question, initial=None, *, preview=None):
 
     def change_text_style(**values):
         key = active[0]
-        if key in extras and any(extras[key][field] != value for field, value in values.items()):
+        if key in extras and key not in locked and any(extras[key][field] != value for field, value in values.items()):
             snapshot()
             extras[key].update(values)
             sync_elements()
@@ -470,9 +491,12 @@ def edit_layout(parent, question, initial=None, *, preview=None):
                 change_text_style(**{field: value})
 
     def delete_text(_event=None):
-        if active[0] in extras:
+        keys = (selected_keys & extras.keys()) - locked
+        if keys:
             snapshot()
-            del extras[active[0]]
+            for key in keys:
+                del extras[key]
+                hidden.discard(key)
             sync_elements()
             redraw()
         return 'break'
@@ -480,7 +504,7 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     def edit_text(event):
         nonlocal edit_widget
         key, _ = hit(canvas.canvasx(event.x), canvas.canvasy(event.y))
-        if key not in extras or edit_widget is not None:
+        if key not in extras or key in locked or edit_widget is not None:
             return 'break'
         release()
         x1,y1,x2,y2 = boxes[key]
@@ -526,7 +550,7 @@ def edit_layout(parent, question, initial=None, *, preview=None):
                 (page_origin_x+(x+w)*page_w)*scale, (page_origin_y+(y+h)*page_h)*scale)
         a,b,c,d = rect
         boxes[el] = rect
-        selected = active[0] == el
+        selected = el in selected_keys
         tag = 'block:'+el
         extra = extras.get(el)
         fill = '' if live else (extra['bg'] if extra else '#eff6ff' if selected else '#f8fafc')
@@ -577,7 +601,7 @@ def edit_layout(parent, question, initial=None, *, preview=None):
                      width=max(40,c-a-16),fill='#1e293b')
             if not extra:
                 text(a+4,b-4,el,9,anchor='sw',fill='#2563eb')
-        if selected:
+        if selected and len(selected_keys)==1 and el not in locked:
             for rx,ry in handles.values():
                 px,py=a+(c-a)*rx,b+(d-b)*ry
                 canvas.create_rectangle(px-4,py-4,px+4,py+4,fill='#2563eb',outline='white',tags=tag)
@@ -613,7 +637,7 @@ def edit_layout(parent, question, initial=None, *, preview=None):
                 canvas.create_line(ox,oy+y*scale,ox+w,oy+y*scale,fill='#e2e8f0')
         canvas.create_line(ox,oy+h,ox+w,oy+h,fill='#f59e0b',dash=(6,4))
         draw_rulers()
-        block_order = tuple(elements)
+        block_order = tuple(el for el in elements if el not in hidden)
         for el in block_order:
             draw_block(el,live)
         if not live:
@@ -648,7 +672,7 @@ def edit_layout(parent, question, initial=None, *, preview=None):
 
     def hit(x,y):
         selected = active[0]
-        if selected in boxes:
+        if len(selected_keys)==1 and selected in boxes and selected not in locked:
             a,b,c,d=boxes[selected]
             for name,(rx,ry) in handles.items():
                 if abs(x-(a+rx*(c-a)))<=8 and abs(y-(b+ry*(d-b)))<=8:
@@ -656,7 +680,7 @@ def edit_layout(parent, question, initial=None, *, preview=None):
         for el in reversed(block_order):
             a,b,c,d=boxes[el]
             if a<=x<=c and b<=y<=d:
-                return el,('se' if x>=c-12 and y>=d-12 else 'move')
+                return el,('se' if len(selected_keys)<=1 and el not in locked and x>=c-12 and y>=d-12 else 'move')
         return None,None
 
     def hover(event):
@@ -666,16 +690,34 @@ def edit_layout(parent, question, initial=None, *, preview=None):
             canvas.configure(cursor=cursor)
 
     def down(event):
-        nonlocal registered_motion
+        nonlocal registered_motion, marquee
         canvas.focus_set()
-        el, mode = hit(canvas.canvasx(event.x), canvas.canvasy(event.y))
-        select(el)
-        registered_motion = False
+        x,y=canvas.canvasx(event.x),canvas.canvasy(event.y)
+        el, mode = hit(x,y)
+        if event.state&1 and el:
+            if el in selected_keys:
+                selected_keys.discard(el)
+                select(next(iter(selected_keys),None),preserve=True)
+            else:
+                select(el,preserve=True)
+            redraw()
+            return 'break'
         if el:
-            drag[0] = (el, mode, canvas.canvasx(event.x), canvas.canvasy(event.y), deepcopy(current(el)))
+            select(el,preserve=el in selected_keys)
         else:
-            drag[0] = None
+            if not event.state&1:
+                select(None)
+            redraw()
+            marquee=(x,y,canvas.create_rectangle(x,y,x,y,outline='#2563eb',dash=(3,3),tags='marquee'))
+            return 'break'
+        registered_motion = False
+        group_start.clear()
+        if el not in locked:
+            drag[0]=(el,mode,x,y,deepcopy(current(el)))
+            if mode=='move':
+                group_start.update({key:current(key) for key in selected_keys-hidden-locked})
         redraw()
+        return 'break'
 
     def repeat_motion():
         nonlocal scroll_job
@@ -683,13 +725,26 @@ def edit_layout(parent, question, initial=None, *, preview=None):
         if drag[0] and last_motion is not None:
             move(last_motion)
 
-    def release(_event=None):
-        nonlocal scroll_job, last_motion, drag_visual
+    def release(event=None):
+        nonlocal scroll_job, last_motion, drag_visual, marquee
         if drag_visual is not None:
             canvas.after_cancel(drag_visual)
             drag_visual = None
             if drag[0]:
                 update_drag(drag[0][0], drag[0][1])
+        if marquee is not None:
+            x,y,item=marquee
+            if event is not None:
+                x2,y2=canvas.canvasx(event.x),canvas.canvasy(event.y)
+                a,c=sorted((x,x2));b,d=sorted((y,y2))
+                selected_keys.update(key for key,rect in boxes.items()
+                                     if a<=rect[0] and b<=rect[1] and c>=rect[2] and d>=rect[3])
+                select(next(iter(selected_keys),None),preserve=True)
+            canvas.delete(item)
+            marquee=None
+            redraw()
+        canvas.delete('guides')
+        guides.clear()
         drag[0] = None
         last_motion = None
         if scroll_job is not None:
@@ -699,6 +754,10 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     def move(event):
         nonlocal scroll_job, last_motion, registered_motion
         last_motion = event
+        if marquee is not None:
+            x,y,item=marquee
+            canvas.coords(item,x,y,canvas.canvasx(event.x),canvas.canvasy(event.y))
+            return
         if not drag[0] or not dims[0] or not dims[1]:
             return
         el, mode, ox, oy, start = drag[0]
@@ -723,25 +782,36 @@ def edit_layout(parent, question, initial=None, *, preview=None):
         if snap.get():
             dx = round(dx*page_w/8)*8/page_w
             dy = round(dy*page_h/8)*8/page_h
-        vertical_limit = max_page_h / page_h
+        values = {}
+        guides.clear()
         if mode == 'move':
-            v['x'] = max(0., min(1.-v['width'], start['x']+dx))
-            v['y'] = max(0., min(vertical_limit-v['height'], start['y']+dy))
+            group = bounds(list(group_start.values()))
+            if not event.state & (0x0008 | 0x0080 | 0x20000):
+                nearby = [current(key) for key in block_order if key not in group_start]
+                page = int((group['y']+dy)*page_h)//page_h
+                dx,gx,distance_x=snap_axis(group,'x',dx,nearby,6/(page_w*zoom[0]),(0,.5,1))
+                dy,gy,distance_y=snap_axis(group,'y',dy,nearby,6/(page_h*zoom[0]),(page,page+.5,page+1))
+                guides.extend((axis,value,distance) for axis,value,distance in
+                              [('x',gx,distance_x),('y',gy,distance_y)] if value is not None)
+            dx,dy=constrain(group,dx,dy)
+            values={key:{**rect,'x':rect['x']+dx,'y':rect['y']+dy}
+                    for key,rect in group_start.items()}
         else:
-            v = resize_rect(start, mode, dx, dy, tuple(dims),
-                            keep_ratio=el == 'question_image' and len(mode)==2 and not event.state&1)
-        if v != start and not registered_motion:
+            values[el]=resize_rect(start,mode,dx,dy,tuple(dims),
+                                   keep_ratio=el=='question_image' and len(mode)==2 and not event.state&1)
+        if any(value!=current(key) for key,value in values.items()) and not registered_motion:
             had_preview = preview_image is not None
             snapshot()
             registered_motion = True
             if had_preview:
                 redraw()
         if registered_motion:
-            set_geometry(el,v)
+            for key,value in values.items():
+                set_geometry(key,value)
+                expand_to(value)
         auto = event.y >= view_h-edge or event.y <= edge or event.x >= view_w-edge or event.x <= edge
         if auto and scroll_job is None:
             scroll_job = canvas.after(60,repeat_motion)
-        expand_to(v)
         schedule_drag(el,mode)
 
     def schedule_drag(el,mode):
@@ -755,22 +825,37 @@ def edit_layout(parent, question, initial=None, *, preview=None):
         if el not in block_items:
             return
         if mode == 'move':
-            a,b,c,d = boxes[el]
-            value = current(el)
-            x = (page_origin_x + value['x']*page_w)*zoom[0]
-            y = (page_origin_y + value['y']*page_h)*zoom[0]
-            canvas.move(block_items[el],x-a,y-b)
-            boxes[el] = (x,y,c+x-a,d+y-b)
+            for key in group_start:
+                a,b,c,d=boxes[key]
+                value=current(key)
+                x=(page_origin_x+value['x']*page_w)*zoom[0]
+                y=(page_origin_y+value['y']*page_h)*zoom[0]
+                canvas.move(block_items[key],x-a,y-b)
+                boxes[key]=(x,y,c+x-a,d+y-b)
         else:
-            index = elements.index(el)
+            index = block_order.index(el)
             canvas.delete(block_items[el])
             draw_block(el,False)
-            if index+1<len(elements):
-                canvas.tag_lower(block_items[el],block_items[elements[index+1]])
+            if index+1<len(block_order):
+                canvas.tag_lower(block_items[el],block_items[block_order[index+1]])
             canvas.tag_raise('locked')
         a,b,c,_ = canvas.coords(page_background)
         canvas.coords(page_background,a,b,c,(page_origin_y+extended_h[0])*zoom[0])
         canvas.configure(scrollregion=(0,0,(page_w+40)*zoom[0],(extended_h[0]+40)*zoom[0]))
+        canvas.delete('guides')
+        if guides:
+            ox,oy=page_origin_x*zoom[0],page_origin_y*zoom[0]
+            for axis,value,distance in guides:
+                if axis=='x':
+                    x=ox+value*page_w*zoom[0]
+                    canvas.create_line(x,oy,x,(page_origin_y+extended_h[0])*zoom[0],fill='#ea580c',tags='guides')
+                    canvas.create_text(x+4,canvas.canvasy(8),text=f'{abs(distance)*page_w:.0f} px',
+                                       anchor='nw',fill='#9a3412',tags='guides')
+                else:
+                    y=oy+value*page_h*zoom[0]
+                    canvas.create_line(ox,y,ox+page_w*zoom[0],y,fill='#ea580c',tags='guides')
+                    canvas.create_text(canvas.canvasx(8),y+4,text=f'{abs(distance)*page_h:.0f} px',
+                                       anchor='nw',fill='#9a3412',tags='guides')
         show_pixels()
         draw_rulers()
         status.set('Có thay đổi chưa lưu' if dirty() else 'Đã nạp bố cục')
@@ -792,11 +877,16 @@ def edit_layout(parent, question, initial=None, *, preview=None):
             redraw()
 
     def restore(state):
-        nonlocal preview_image
+        nonlocal preview_image, image_path, pending_image
         preview_image = None
         for target, values in zip((desktop_layout, mobile_layout, extras), state):
             target.clear()
             target.update(deepcopy(values))
+        locked.clear()
+        locked.update(state[3])
+        hidden.clear()
+        hidden.update(state[4])
+        image_path,pending_image=state[5:7]
         sync_elements()
         for el in elements:
             expand_to(current(el))
@@ -813,16 +903,152 @@ def edit_layout(parent, question, initial=None, *, preview=None):
             history.append(capture())
             restore(future.pop())
 
+    def apply_many(values):
+        if values and any(value!=current(key) for key,value in values.items()):
+            snapshot()
+            for key,value in values.items():
+                set_geometry(key,value)
+                expand_to(value)
+            show_pixels()
+            redraw()
+
+    def nudge(event):
+        keys=selected_keys-hidden-locked
+        if keys:
+            rects={key:current(key) for key in keys}
+            step=8 if event.state&1 else 1
+            dx,dy={'Left':(-step/page_w,0),'Right':(step/page_w,0),
+                   'Up':(0,-step/page_h),'Down':(0,step/page_h)}[event.keysym]
+            dx,dy=constrain(bounds(list(rects.values())),dx,dy)
+            apply_many({key:{**rect,'x':rect['x']+dx,'y':rect['y']+dy}
+                        for key,rect in rects.items()})
+        return 'break'
+
+    def cycle(event):
+        keys=[key for key in elements if key not in hidden]
+        if keys:
+            delta=-1 if event.state&1 else 1
+            index=keys.index(active[0]) if active[0] in keys else (-1 if delta>0 else 0)
+            select(keys[(index+delta)%len(keys)])
+            redraw()
+        return 'break'
+
+    def escape_canvas(_event):
+        if selected_keys:
+            select(None)
+            redraw()
+            return 'break'
+
+    def duplicate(_event):
+        if len(selected_keys)==1 and active[0] in extras:
+            add_text(deepcopy(extras[active[0]]))
+        return 'break'
+
+    def show_menu(event):
+        key,_=hit(canvas.canvasx(event.x),canvas.canvasy(event.y))
+        if key and key not in selected_keys:
+            select(key)
+            redraw()
+        key=active[0]
+        old=getattr(win,'_studio_menu',None)
+        if old is not None:
+            old.destroy()
+        menu=win._studio_menu=tk.Menu(win,tearoff=False)
+        if key in extras:
+            for label,sign in (('Đưa lên trước',1),('Đưa xuống sau',-1)):
+                def change_layer(sign=sign):
+                    snapshot()
+                    at=(max if sign>0 else min)(entry['z'] for entry in extras.values())
+                    extras[key]['z']=at+sign
+                    sync_elements()
+                    redraw()
+                menu.add_command(label=label,command=change_layer)
+        if key:
+            def toggle_lock():
+                snapshot()
+                if key in locked:locked.discard(key)
+                else:locked.add(key)
+                redraw()
+            def hide_element():
+                snapshot()
+                hidden.add(key)
+                select(None)
+                redraw()
+            menu.add_command(label='Mở khóa' if key in locked else 'Khóa',command=toggle_lock)
+            menu.add_command(label='Ẩn khi chỉnh',command=hide_element)
+        if hidden:
+            def reveal():
+                snapshot()
+                hidden.clear()
+                redraw()
+            menu.add_command(label='Hiện mọi phần tử',command=reveal)
+        if len(selected_keys-hidden-locked)>1:
+            menu.add_separator()
+            for axis,labels in (('x',('Căn trái','Căn giữa ngang','Căn phải','Dàn đều ngang')),
+                                ('y',('Căn trên','Căn giữa dọc','Căn dưới','Dàn đều dọc'))):
+                for position,label in zip((0,.5,1,'space'),labels):
+                    menu.add_command(label=label,command=lambda a=axis,p=position:apply_many(
+                        arrange({key:current(key) for key in selected_keys-hidden-locked},a,p)))
+        if menu.index('end') is not None:
+            try:
+                menu.tk_popup(event.x_root,event.y_root)
+            finally:
+                menu.grab_release()
+        return 'break'
+
     def apply_template():
-        from layout_templates import template_for
-        preset = template_for(question.get('type'))['desktop']
-        snapshot()
-        working.clear()
-        working.update({el: to_relative(rect, DESKTOP) for el, rect in preset.items()})
-        for el in elements:
-            expand_to(current(el))
-        show_pixels()
-        redraw()
+        from layout_templates import template_for, read_template
+        try:
+            preset = read_template(templates,question.get('type'))
+            snapshot()
+            if preset is not None:
+                preset = layout_v2(preset)
+                restore((
+                    {el:to_relative(rect,DESKTOP) for el,rect in preset['desktop'].items()},
+                    {el:to_relative(rect,MOBILE) for el,rect in preset.get('mobile',{}).items()},
+                    {extra['id']:extra for extra in preset.get('extras',[])},set(),set(),image_path,pending_image))
+                return
+            working.clear()
+            working.update({el:to_relative(rect,DESKTOP) for el,rect in
+                            template_for(question.get('type'))['desktop'].items()})
+            for el in elements:
+                expand_to(current(el))
+            show_pixels()
+            redraw()
+        except (OSError,ValueError) as exc:
+            messagebox.showerror('Không nạp được mẫu',str(exc),parent=win)
+
+    def save_as_template():
+        from layout_templates import save_template
+        try:
+            save_template(templates,question['type'],draft())
+            status.set('Đã lưu mẫu cho dạng câu hỏi này.')
+        except (OSError,ValueError,KeyError) as exc:
+            messagebox.showerror('Không lưu được mẫu',str(exc),parent=win)
+
+    def paste_image(_event=None):
+        nonlocal image_path, pending_image
+        from PIL import Image, ImageGrab
+        try:
+            image=ImageGrab.grabclipboard()
+            if not isinstance(image,Image.Image):
+                status.set('Clipboard chưa có ảnh.')
+                return 'break'
+            if image.width*image.height > 16_000_000:
+                status.set('Ảnh dán phải nhỏ hơn 16 megapixel.')
+                return 'break'
+            candidate=clipboard.with_name(uuid4().hex+'.png')
+            image.convert('RGBA').save(candidate,format='PNG')
+            if candidate.stat().st_size > 16*1024*1024:
+                candidate.unlink()
+                raise ValueError('Ảnh PNG vượt quá 16 MB.')
+            snapshot()
+            image_path=pending_image=candidate
+            select('question_image')
+            redraw()
+        except (OSError,ValueError) as exc:
+            status.set(str(exc))
+        return 'break'
 
     def reset():
         if messagebox.askyesno('Khôi phục', 'Khôi phục bố cục mặc định của câu hỏi này?', parent=win):
@@ -834,7 +1060,7 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     def restore_saved():
         if dirty():
             snapshot()
-            restore((saved_layout, saved_mobile, saved_extras))
+            restore((saved_layout,saved_mobile,saved_extras,set(),set(),original_image,None))
 
     def cancel():
         if dirty() and not messagebox.askyesno('Chưa lưu bố cục',
@@ -905,6 +1131,16 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     canvas.bind('<Motion>', hover)
     canvas.bind('<Double-Button-1>',edit_text)
     canvas.bind('<Key-t>',lambda _event:add_text())
+    canvas.bind('<Control-d>',duplicate)
+    if clipboard is not None and 'question_image' in system_elements:
+        canvas.bind('<Control-v>',paste_image)
+        ttk.Button(toolbar,text='Dán ảnh',command=paste_image).pack(side='left',padx=4)
+    canvas.bind('<Escape>',escape_canvas)
+    canvas.bind('<Tab>',cycle)
+    canvas.bind('<ISO_Left_Tab>',cycle)
+    canvas.bind('<Button-3>',show_menu)
+    for key in ('Left','Right','Up','Down'):
+        canvas.bind('<'+key+'>',nudge)
     canvas.bind('<Delete>',delete_text)
     font_spin.bind('<Return>', font_change)
     font_spin.bind('<FocusOut>', font_change)
@@ -913,8 +1149,15 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     for label, command in (('Dùng mẫu', apply_template), ('Mặc định', reset),
                            ('Hoàn tác', undo), ('Làm lại', redo), ('Khôi phục đã lưu', restore_saved)):
         ttk.Button(edit_controls, text=label, command=command).pack(fill='x', pady=2)
-    win.bind('<Control-z>', lambda _e: undo())
-    win.bind('<Control-y>', lambda _e: redo())
+    def history_key(event, action):
+        if isinstance(event.widget,(tk.Entry,tk.Text,ttk.Entry,ttk.Combobox,ttk.Spinbox)):
+            return
+        action()
+        return 'break'
+    if templates is not None:
+        ttk.Button(edit_controls,text='Lưu làm mẫu',command=save_as_template).pack(fill='x',pady=2)
+    win.bind('<Control-z>',lambda e:history_key(e,undo))
+    win.bind('<Control-y>',lambda e:history_key(e,redo))
     footer = ttk.Frame(win, padding=10)
     footer.pack(fill='x')
     ttk.Label(footer, textvariable=status).pack(side='left')
@@ -930,6 +1173,9 @@ def edit_layout(parent, question, initial=None, *, preview=None):
         expand_to(current(el))
     redraw()
     win.wait_window()
+    if result[0] is not None and pending_image is not None:
+        from shutil import copyfile
+        copyfile(pending_image, clipboard)
     return result[0]
 
 

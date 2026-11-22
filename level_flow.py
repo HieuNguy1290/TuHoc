@@ -1877,15 +1877,68 @@ class LevelFlowMixin:
                     question['options'] = [get(entries['left_%d' % i]) + ' = ' + get(entries['right_%d' % i])
                                            for i in range(20) if 'left_%d' % i in entries and 'right_%d' % i in entries
                                            and get(entries['left_%d' % i]) and get(entries['right_%d' % i])]
-                updated = edit_layout(self, question, pending_layout['value'], preview=preview)
-                if updated is not None:
-                    pending_layout['value'] = updated
-            except (ValueError, tk.TclError) as exc:
+                from shutil import which
+                from tempfile import TemporaryDirectory
+                from uuid import uuid4
+                import sys
+
+                if 'image' in entries:
+                    question['image'] = get(entries['image'])
+                templates = self.data_dir / 'canvas_templates.json'
+                can_paste = 'image' in entries and (
+                    sys.platform in ('win32','darwin') or which('xclip') or which('wl-paste'))
+                with TemporaryDirectory(prefix='tuhoc-clipboard-') as scratch:
+                    clipboard = Path(scratch) / f'clipboard-{uuid4().hex}.png' if can_paste else None
+                    updated = edit_layout(self,question,pending_layout['value'],
+                                          preview=preview,templates=templates,clipboard=clipboard)
+                    if updated is not None:
+                        if clipboard is not None and clipboard.is_file():
+                            put(entries['image'],store_media(clipboard))
+                        pending_layout['value'] = updated
+            except (OSError, ValueError, tk.TclError) as exc:
                 messagebox.showwarning('Chỉnh bố cục', str(exc), parent=self)
+
+        def apply_type_template():
+            from layout_templates import apply_lesson_layout, read_template
+            from safe_storage import commit_json
+            typ=kind_var.get()
+            theme=get(controls['theme'])
+            location=question_location
+            level=location['level'].get(get(controls['level']))
+            lesson=location['lesson'].get(get(controls['lesson']))
+            if not theme or level is None or lesson is None:
+                messagebox.showwarning('Thiếu thông tin','Hãy chọn chủ đề, Level và Lesson.',parent=self)
+                return
+            try:
+                layout=read_template(self.data_dir/'canvas_templates.json',typ)
+                if layout is None:
+                    messagebox.showinfo('Chưa có mẫu','Trong Studio, chọn Lưu làm mẫu trước.',parent=self)
+                    return
+                path=library_file(self.curriculum.data_dir,'questions')
+                rows=load_rows(self.curriculum.data_dir,'questions',None)
+                updated,matches,changes=apply_lesson_layout(rows,(str(theme),str(level),str(lesson),typ),layout)
+                if not changes:
+                    messagebox.showinfo('Áp dụng mẫu',f'Không có thay đổi trong {matches} câu phù hợp.',parent=self)
+                    return
+                if not messagebox.askyesno('Áp dụng mẫu',
+                    f'Ghi đè bố cục của {changes}/{matches} câu cùng dạng trong Lesson này? '
+                    'Hệ thống sẽ lưu bản sao trước khi ghi.',parent=self):
+                    return
+                if path.is_file():
+                    from datetime import datetime
+                    from shutil import copy2
+                    backup=path.with_name(path.name+'.'+datetime.now().strftime('%Y%m%d%H%M%S%f')+'.bak')
+                    copy2(path,backup)
+                commit_json({path:updated})
+                self.curriculum.reload()
+                self.question_editor()
+            except (OSError,ValueError,TypeError) as exc:
+                messagebox.showerror('Không áp dụng được mẫu',str(exc),parent=self)
 
         self.action_button(actions, 'Lưu bài tập', save).pack(side='left', padx=(0,8))
         self.action_button(actions, '👁 Xem trước', preview).pack(side='left', padx=6)
         self.action_button(actions, '↔ Chỉnh bố cục', edit_visual_layout).pack(side='left', padx=6)
+        self.action_button(actions, 'Áp dụng mẫu cho Lesson', apply_type_template).pack(side='left',padx=6)
         self.action_button(actions, '＋ Tạo câu mới', reset).pack(side='left')
         # Filter the existing in-memory question collection; never rebuild the editor
         # when changing filters. Limit visible rows to keep Tk widget destruction cheap.
