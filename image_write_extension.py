@@ -66,11 +66,15 @@ def run(question):
     if text_layout and text_layout.get('font_size'):
         font=_cached_font(None,text_layout['font_size'],False)
     picture=None
+    authored_rect=authored_frame=None
     path=question.get('_pygame_image')
     if path:
         try:
-            bounds=(max(1,image_layout.get('width',480)),max(1,image_layout.get('height',300))) if image_layout else (480,300)
-            picture=_image(path,bounds)
+            if image_layout:
+                from layout_images import pygame_image
+                picture, authored_rect, authored_frame = pygame_image(path,image_layout,(0,0,480,300))
+            else:
+                picture=_image(path,(480,300))
         except (pygame.error,OSError,ValueError):pass
     from exercise_layout import Page, wrap, block_top, image_message
     from layout_scroll_extent import content_bottom as layout_content_bottom
@@ -106,13 +110,9 @@ def run(question):
             for i,text in enumerate(lines):draw_rich(screen,font,text,navy,prompt_x,prompt_y+i*32)
             zoom_hit=None
             if picture:
-                if image_layout:
-                    image_rect=picture.get_rect(topleft=(image_layout.get('x',0),image_layout.get('y',0)))
-                    screen.blit(picture,image_rect)
-                else:
-                    image_rect=picture.get_rect(midtop=(480,group_top))
-                    screen.blit(picture,image_rect)
-                if path:zoom_hit=draw_zoom_icon(screen,image_rect)
+                image_rect=authored_rect or picture.get_rect(midtop=(480,group_top))
+                screen.blit(picture,image_rect)
+                if path:zoom_hit=draw_zoom_icon(screen,authored_frame or image_rect)
             elif note:screen.blit(small.render(note,True,(140,90,90)),(70,group_top))
             screen.blit(small.render('Nhập câu trả lời:',True,navy),(field_x,field_y-29))
             field=pygame.Rect(field_x,field_y,field_width,field_height)

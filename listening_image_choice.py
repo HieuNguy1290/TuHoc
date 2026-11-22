@@ -105,10 +105,17 @@ def _run(question):
     f_small = host._cached_font(font_path, 16, False)
 
     question_picture = None
+    image_rect = image_frame = None
     question_picture_path = str(question.get('_pygame_image') or '').strip()
     if question_picture_path and Path(question_picture_path).is_file():
         try:
-            question_picture = host._image(question_picture_path, (110, 70))
+            geometry = layout_element(question, 'question_image')
+            if geometry:
+                from layout_images import pygame_image
+                question_picture, image_rect, image_frame = pygame_image(
+                    question_picture_path, geometry, (802, 137, 110, 70))
+            else:
+                question_picture = host._image(question_picture_path, (110, 70))
         except (pygame.error, OSError, ValueError):
             pass
     from exercise_image_zoom import draw_zoom_icon, draw as draw_zoom
@@ -390,9 +397,9 @@ def _run(question):
         # Zoom controls for both question and answer illustrations.
         zoom_hits=[]
         if question_picture is not None:
-            qr=question_picture.get_rect(bottomright=(912,207))
+            qr=image_rect or question_picture.get_rect(bottomright=(912,207))
             screen.blit(question_picture,qr)
-            zoom_hits.append((draw_zoom_icon(screen,qr),question_picture_path))
+            zoom_hits.append((draw_zoom_icon(screen,image_frame or qr),question_picture_path))
         # the hinh
         for i, (r, (ref, label)) in enumerate(zip(cards, options)):
             rect = pygame.Rect(r)

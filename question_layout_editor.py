@@ -4,9 +4,11 @@ Does not modify Pygame drawing or input hitboxes. Coordinates are relative
 and stored by the caller only after explicit confirmation.
 """
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, colorchooser
 from copy import deepcopy
-from question_layout_store import layout_v2, validate_layout
+from pathlib import Path
+from uuid import uuid4
+from question_layout_store import GEOMETRY, IMAGE_FITS, layout_v2, validate_layout
 from layout_render import DESKTOP, MOBILE, PAGE_LIMIT, fit_pixels, to_pixels, to_relative
 
 DEFAULTS = {
@@ -20,6 +22,33 @@ DEFAULTS = {
 }
 
 
+def resize_rect(start, mode, dx, dy, screen, *, keep_ratio=False):
+    """Resize on the anchored edges using logical pixels for minimum size."""
+    sw, sh = screen
+    x,y,w,h = (start[field] for field in ('x','y','width','height'))
+    right,bottom = x+w,y+h
+    if keep_ratio and w > 0 and h > 0:
+        direction_x = -1 if 'w' in mode else 1
+        direction_y = -1 if 'n' in mode else 1
+        cap_w = right if direction_x < 0 else 1-x
+        cap_h = bottom if direction_y < 0 else PAGE_LIMIT-y
+        dx_scale,dy_scale=direction_x*dx/w,direction_y*dy/h
+        change=dx_scale if abs(dx_scale)>=abs(dy_scale) else dy_scale
+        scale=max(1/min(w*sw,h*sh),min(cap_w/w,cap_h/h,1+change))
+        nw,nh=w*scale,h*scale
+        return {**start,'x':right-nw if direction_x<0 else x,
+                'y':bottom-nh if direction_y<0 else y,'width':nw,'height':nh}
+    if 'w' in mode:
+        x=max(0,min(right-1/sw,x+dx))
+    if 'e' in mode:
+        right=min(1,max(x+1/sw,right+dx))
+    if 'n' in mode:
+        y=max(0,min(bottom-1/sh,y+dy))
+    if 's' in mode:
+        bottom=min(PAGE_LIMIT,max(y+1/sh,bottom+dy))
+    return {**start,'x':x,'y':y,'width':right-x,'height':bottom-y}
+
+
 def edit_layout(parent, question, initial=None, *, preview=None):
     """Open a modal editor. Return validated layout, or None if cancelled."""
     initial = validate_layout(initial or {})
@@ -30,6 +59,8 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     saved_layout = deepcopy(initial)
     mobile_layout = {key: to_relative(rect, MOBILE) for key, rect in stored.get('mobile', {}).items()}
     saved_mobile = deepcopy(mobile_layout)
+    extras = {entry['id']: deepcopy(entry) for entry in stored.get('extras', [])}
+    saved_extras = deepcopy(extras)
     desktop_layout = working
     history = []
     future = []
@@ -59,6 +90,7 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     view.pack(side='left', padx=(0, 8))
     view.bind('<<ComboboxSelected>>', lambda _event: switch_view())
     snap = tk.BooleanVar(value=False)
+    ttk.Button(toolbar, text='+ Văn bản', command=lambda: add_text()).pack(side='left', padx=4)
     ttk.Checkbutton(toolbar, text='Bám lưới 8 px', variable=snap, command=lambda: redraw()).pack(side='left')
     main = ttk.Frame(win, padding=(12, 0, 12, 8))
     main.pack(fill='both', expand=True)
@@ -100,10 +132,10 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     canvas.configure(scrollregion=(0, 0, (page_w+40)*zoom[0], (extended_h[0]+40)*zoom[0]))
     def scroll_x(*args):
         canvas.xview(*args)
-        redraw()
+        draw_rulers()
     def scroll_y(*args):
         canvas.yview(*args)
-        redraw()
+        draw_rulers()
     canvas.configure(xscrollcommand=xscroll.set, yscrollcommand=yscroll.set)
     def wheel(event):
         # Stop Tk's global/all wheel bindings from reaching the underlying app.
@@ -112,10 +144,10 @@ def edit_layout(parent, question, initial=None, *, preview=None):
             change_zoom(zoom[0] + step * .1)
         elif event.state & 0x0001:  # Shift + wheel: horizontal
             canvas.xview_scroll(-3 if (event.delta > 0 or event.num == 4) else 3, 'units')
-            redraw()
+            draw_rulers()
         else:
             canvas.yview_scroll(-3 if (event.delta > 0 or event.num == 4) else 3, 'units')
-            redraw()
+            draw_rulers()
         return 'break'
 
     def isolate_wheel(event):
@@ -152,6 +184,26 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     ttk.Button(fields, text='Áp dụng (px)', command=lambda: apply_pixels()).grid(row=4, columnspan=2, sticky='ew')
     ttk.Label(sidebar, text='Khung 960 × 640 px. Nội dung có thể kéo xuống đến Y = 2560 px.',
               wraplength=180, foreground='#475569').pack(anchor='w', pady=6)
+    fit_var = tk.StringVar(value='contain')
+    fit_select = ttk.Combobox(sidebar, values=IMAGE_FITS, textvariable=fit_var,
+                              state='readonly', width=10)
+    fit_select.bind('<<ComboboxSelected>>', lambda _e: change_fit())
+    text_tools = ttk.Frame(sidebar)
+    bold_var = tk.BooleanVar()
+    italic_var = tk.BooleanVar()
+    align_var = tk.StringVar(value='left')
+    ttk.Checkbutton(text_tools, text='Đậm', variable=bold_var,
+                    command=lambda: change_text_style(bold=bold_var.get())).pack(side='left')
+    ttk.Checkbutton(text_tools, text='Nghiêng', variable=italic_var,
+                    command=lambda: change_text_style(italic=italic_var.get())).pack(side='left')
+    align_select = ttk.Combobox(text_tools, values=('left', 'center', 'right'),
+                                textvariable=align_var, state='readonly', width=7)
+    align_select.pack(side='left')
+    align_select.bind('<<ComboboxSelected>>', lambda _e: change_text_style(align=align_var.get()))
+    colors = ttk.Frame(sidebar)
+    ttk.Button(colors, text='Màu chữ', command=lambda: choose_color('color')).pack(side='left')
+    ttk.Button(colors, text='Nền', command=lambda: choose_color('bg')).pack(side='left')
+    ttk.Button(colors, text='Xóa nền', command=lambda: change_text_style(bg='')).pack(side='left')
     active = [None]
     status = tk.StringVar(value='Đã nạp bố cục')
     scroll_job = None
@@ -161,6 +213,17 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     canvas_image = None
     drag = [None]
     boxes = {}
+    images = {}
+    edit_widget = None
+    block_items = {}
+    block_order = ()
+    page_background = None
+    drag_visual = None
+    image_ref = question.get('_pygame_image') or question.get('image')
+    image_path = None
+    if image_ref:
+        resolve = getattr(parent, 'media_file', None)
+        image_path = Path((resolve(image_ref) if resolve else None) or image_ref)
     dims = [page_w, page_h]
     option_defaults = {}
     image_options = question.get('image_options') or []
@@ -212,17 +275,44 @@ def edit_layout(parent, question, initial=None, *, preview=None):
             option_defaults[key] = dict(x=.12, y=min(.91, .46+i*.095),
                                         width=.76, height=.075, font_size=18)
 
-    elements = [*area_keys, *option_defaults]
-    for el in elements:
-        elements_list.insert('end', el)
+    system_elements = [*area_keys, *option_defaults]
+    elements = []
+
+    def sync_elements():
+        elements[:] = [*system_elements, *sorted(extras, key=lambda key: extras[key]['z'])]
+        elements_list.delete(0, 'end')
+        for key in elements:
+            label = (extras[key]['text'].replace('\n', ' ')[:32] or 'Văn bản') if key in extras else key
+            elements_list.insert('end', label)
+        if active[0] not in elements:
+            active[0] = None
+        select(active[0])
 
     def current(el):
+        if el in extras:
+            extra = extras[el]
+            is_mobile = working is mobile_layout and 'mobile' in extra
+            frame = 'mobile' if is_mobile else 'desktop'
+            screen = MOBILE if is_mobile else DESKTOP
+            return to_relative(extra[frame], screen)
         base = option_defaults.get(el) or DEFAULTS[el]
         return {**base, **desktop_layout.get(el, {}), **working.get(el, {})}
 
     def select(el, from_list=False):
         active[0] = el
-        selection.set(el or 'Chọn thành phần')
+        selection.set('Hộp văn bản' if el in extras else el or 'Chọn thành phần')
+        for widget in (fit_select, text_tools, colors):
+            widget.pack_forget()
+        if el == 'question_image':
+            fit_var.set(current(el).get('image_fit', 'contain'))
+            fit_select.pack(anchor='w', pady=2)
+        if el in extras:
+            extra = extras[el]
+            bold_var.set(extra['bold'])
+            italic_var.set(extra['italic'])
+            align_var.set(extra['align'])
+            text_tools.pack(anchor='w')
+            colors.pack(anchor='w', pady=2)
         if not from_list:
             elements_list.selection_clear(0, 'end')
             if el:
@@ -230,7 +320,7 @@ def edit_layout(parent, question, initial=None, *, preview=None):
                 elements_list.selection_set(row)
                 elements_list.see(row)
         if el:
-            font_var.set(int(current(el).get('font_size', 24)))
+            font_var.set(int(extras[el]['font_size'] if el in extras else current(el).get('font_size', 24)))
         show_pixels()
 
     def select_from_list():
@@ -258,12 +348,12 @@ def edit_layout(parent, question, initial=None, *, preview=None):
         if mobile_layout or 'mobile' in stored:
             result['mobile'] = {el: fit_pixels(to_pixels(rect, MOBILE), MOBILE)
                                 for el, rect in mobile_layout.items()}
-        if stored.get('version') == 3:
-            result.update(version=3, extras=stored['extras'])
+        if stored.get('version') == 3 or extras:
+            result.update(version=3, extras=list(extras.values()))
         return validate_layout(result)
 
     def dirty():
-        return desktop_layout != saved_layout or mobile_layout != saved_mobile
+        return desktop_layout != saved_layout or mobile_layout != saved_mobile or extras != saved_extras
 
     def show_frame(size, pixels):
         nonlocal preview_image
@@ -311,17 +401,17 @@ def edit_layout(parent, question, initial=None, *, preview=None):
                 values[field] = int(variable.get()) / scale
             if values['width'] <= 0 or values['height'] <= 0:
                 raise ValueError('W và H phải lớn hơn 0.')
-            validate_layout({active[0]: values})
+            validate_layout({'question_text' if active[0] in extras else active[0]: values})
         except ValueError as exc:
             messagebox.showerror('Tọa độ không hợp lệ', str(exc), parent=win)
             return
         snapshot()
-        working[active[0]] = values
+        set_geometry(active[0], values)
         expand_to(values)
         redraw()
 
     def capture():
-        return deepcopy(desktop_layout), deepcopy(mobile_layout)
+        return deepcopy(desktop_layout), deepcopy(mobile_layout), deepcopy(extras)
 
     def snapshot():
         nonlocal preview_image
@@ -331,115 +421,258 @@ def edit_layout(parent, question, initial=None, *, preview=None):
         if len(history) > 50:
             history.pop(0)
 
+
+    def set_geometry(key, values):
+        if key in extras:
+            screen = tuple(dims)
+            frame = 'mobile' if screen == MOBILE else 'desktop'
+            rect = {k: values[k] for k in GEOMETRY}
+            extras[key][frame] = fit_pixels(to_pixels(rect, screen), screen)
+        else:
+            working[key] = values
+
+    def add_text(copy=None):
+        if len(extras) >= 20:
+            status.set('Mỗi câu có tối đa 20 hộp văn bản.')
+            return
+        snapshot()
+        key = 'text_' + uuid4().hex
+        width, height = min(225, page_w), 65
+        x = round((canvas.canvasx(canvas.winfo_width()/2)/zoom[0])-page_origin_x-width/2)
+        y = round((canvas.canvasy(canvas.winfo_height()/2)/zoom[0])-page_origin_y-height/2)
+        rect = dict(x=max(0,min(page_w-width,x)), y=max(0,min(max_page_h-height,y)),
+                    width=width, height=height)
+        desktop = rect if working is desktop_layout else fit_pixels(
+            to_pixels(to_relative(rect,MOBILE),DESKTOP),DESKTOP)
+        extra = dict(id=key, kind='text', text='Văn bản mới', desktop=desktop, font_size=22,
+                     bold=False, italic=False, color='#1e293b', bg='', align='left',
+                     z=max((item['z'] for item in extras.values()),default=-1)+1)
+        if copy is not None:
+            extra.update({k: copy[k] for k in ('text','font_size','bold','italic','color','bg','align')})
+        if working is mobile_layout:
+            extra['mobile'] = rect
+        extras[key] = extra
+        sync_elements()
+        select(key)
+        expand_to(current(key))
+        canvas.focus_set()
+        redraw()
+
+    def change_fit():
+        if active[0] == 'question_image' and current(active[0]).get('image_fit') != fit_var.get():
+            snapshot()
+            set_geometry(active[0], {**current(active[0]), 'image_fit': fit_var.get()})
+            redraw()
+
+    def change_text_style(**values):
+        key = active[0]
+        if key in extras and any(extras[key][field] != value for field, value in values.items()):
+            snapshot()
+            extras[key].update(values)
+            sync_elements()
+            redraw()
+
+    def choose_color(field):
+        if active[0] in extras:
+            _, value = colorchooser.askcolor(extras[active[0]][field] or '#ffffff', parent=win)
+            if value:
+                change_text_style(**{field: value})
+
+    def delete_text(_event=None):
+        if active[0] in extras:
+            snapshot()
+            del extras[active[0]]
+            sync_elements()
+            redraw()
+        return 'break'
+
+    def edit_text(event):
+        nonlocal edit_widget
+        key, _ = hit(canvas.canvasx(event.x), canvas.canvasy(event.y))
+        if key not in extras or edit_widget is not None:
+            return 'break'
+        release()
+        x1,y1,x2,y2 = boxes[key]
+        editor = tk.Text(canvas, wrap='word', undo=True, height=2)
+        edit_widget = editor
+        editor.insert('1.0', extras[key]['text'])
+        editor.tag_add('sel', '1.0', 'end-1c')
+        window = canvas.create_window(x1,y1,window=editor,anchor='nw',
+                                      width=max(70,x2-x1),height=max(36,y2-y1))
+        def finish(commit):
+            nonlocal edit_widget
+            if edit_widget is not editor:
+                return 'break'
+            value = editor.get('1.0','end-1c')
+            if commit and len(value) > 500:
+                status.set('Hộp văn bản có tối đa 500 ký tự.')
+                editor.after_idle(editor.focus_set)
+                return 'break'
+            edit_widget = None
+            canvas.delete(window)
+            editor.destroy()
+            if commit:
+                change_text_style(text=value)
+            canvas.focus_set()
+            return 'break'
+        editor.bind('<Return>',lambda _e:finish(True))
+        editor.bind('<Escape>',lambda _e:finish(False))
+        editor.bind('<FocusOut>',lambda _e:finish(True))
+        editor.focus_set()
+        return 'break'
+
+    handles = {'nw':(0,0), 'n':(.5,0), 'ne':(1,0), 'w':(0,.5),
+               'e':(1,.5), 'sw':(0,1), 's':(.5,1), 'se':(1,1)}
+    cursors = dict(nw='top_left_corner', n='top_side', ne='top_right_corner',
+                   w='left_side', e='right_side', sw='bottom_left_corner',
+                   s='bottom_side', se='bottom_right_corner')
+
+    def draw_block(el, live):
+        v = current(el)
+        x,y,w,h = (v[k] for k in ('x','y','width','height'))
+        scale = zoom[0]
+        rect = ((page_origin_x+x*page_w)*scale, (page_origin_y+y*page_h)*scale,
+                (page_origin_x+(x+w)*page_w)*scale, (page_origin_y+(y+h)*page_h)*scale)
+        a,b,c,d = rect
+        boxes[el] = rect
+        selected = active[0] == el
+        tag = 'block:'+el
+        extra = extras.get(el)
+        fill = '' if live else (extra['bg'] if extra else '#eff6ff' if selected else '#f8fafc')
+        canvas.create_rectangle(*rect, fill=fill, outline='#2563eb' if selected else '#cbd5e1',
+                                width=2 if selected else 1, tags=tag)
+
+        def text(x, y, value, size=12, style='normal', **options):
+            canvas.create_text(x,y,text=value,font=('Segoe UI',max(6,round(size*scale)),style),
+                               tags=tag,**options)
+
+        if not live:
+            if extra:
+                anchor = {'left':'nw','center':'n','right':'ne'}[extra['align']]
+                x = {'left':a,'center':(a+c)/2,'right':c}[extra['align']]
+                style = ' '.join(name for name in ('bold','italic') if extra[name]) or 'normal'
+                text(x,b,extra['text'],extra['font_size'],style,anchor=anchor,
+                     width=max(1,c-a),justify=extra['align'],fill=extra['color'])
+            elif el == 'question_text':
+                prompt = str(question.get('prompt') or 'Nội dung câu hỏi')
+                text(a+9,b+8,prompt,min(40,int(v['font_size'])),
+                     'bold' if '**' in prompt else 'normal',anchor='nw',width=max(40,c-a-18),fill='#1e293b')
+            elif el == 'question_image':
+                image = None
+                if image_path is not None:
+                    from layout_images import fitted_image
+                    from PIL import ImageTk
+                    try:
+                        source = fitted_image(image_path,(round(c-a),round(d-b)),v.get('image_fit','contain'))
+                        image = ImageTk.PhotoImage(source, master=canvas)
+                    except (OSError, ValueError, tk.TclError):
+                        pass
+                if image is not None:
+                    images[el] = image
+                    canvas.create_image((a+c)/2,(b+d)/2,image=image,tags=tag)
+                else:
+                    text((a+c)/2,(b+d)/2,'ẢNH CÂU HỎI\n(vùng bố cục)',justify='center',fill='#475569')
+            elif el == 'audio_player':
+                text((a+c)/2,(b+d)/2,'▶  ~  ~  ~  ~  ~  ~  ~     WAVEFORM',fill='#334155')
+            elif el in ('answer_area','input_area','dropdown_area','word_bank'):
+                labels = {'answer_area':'VÙNG ĐÁP ÁN','input_area':'Ô NHẬP',
+                          'dropdown_area':'MENU CHỌN','word_bank':'NGÂN HÀNG TỪ'}
+                text(a+8,b+8,labels[el],10,anchor='nw',fill='#64748b')
+            else:
+                i = int(el.split('_')[1])
+                label = '%s\n%s' % (chr(65+i), options[i]) if is_image_choice else '%s · Vị trí %d' % (chr(65+i),i+1)
+                text((a+c)/2 if is_image_choice else a+8,(b+d)/2,label,
+                     min(40,int(v.get('font_size',18))),anchor='center' if is_image_choice else 'w',
+                     width=max(40,c-a-16),fill='#1e293b')
+            if not extra:
+                text(a+4,b-4,el,9,anchor='sw',fill='#2563eb')
+        if selected:
+            for rx,ry in handles.values():
+                px,py=a+(c-a)*rx,b+(d-b)*ry
+                canvas.create_rectangle(px-4,py-4,px+4,py+4,fill='#2563eb',outline='white',tags=tag)
+        block_items[el] = tag
+        return rect
+
+
     def redraw(_event=None):
-        nonlocal canvas_image
+        nonlocal canvas_image, page_background, block_order
         canvas.delete('all')
+        images.clear()
+        block_items.clear()
+        boxes.clear()
         status.set('Có thay đổi chưa lưu' if dirty() else 'Đã nạp bố cục')
-        w, h = page_w, page_h
-        canvas.configure(scrollregion=(0, 0, (page_w+40)*zoom[0], (extended_h[0]+40)*zoom[0]))
-        ox, oy = page_origin_x, page_origin_y
-        canvas.create_rectangle(ox, oy, ox+w, oy+extended_h[0], fill='white', outline='#94a3b8')
+        scale = zoom[0]
+        w,h = page_w*scale,page_h*scale
+        ox,oy = page_origin_x*scale,page_origin_y*scale
+        limit = extended_h[0]*scale
+        canvas.configure(scrollregion=(0,0,(page_w+40)*scale,(extended_h[0]+40)*scale))
+        page_background = canvas.create_rectangle(ox,oy,ox+w,oy+limit,fill='white',outline='#94a3b8')
         live = preview_image is not None and viewport_var.get() == 'Máy tính'
         if live:
             from PIL import Image, ImageTk
-            size = tuple(round(value*zoom[0]) for value in preview_image.size)
-            image = preview_image.resize(size, Image.Resampling.LANCZOS)
-            canvas_image = ImageTk.PhotoImage(image, master=canvas)
-            canvas.create_image(ox, oy, image=canvas_image, anchor='nw')
+            size = tuple(round(value*scale) for value in preview_image.size)
+            canvas_image = ImageTk.PhotoImage(preview_image.resize(size,Image.Resampling.LANCZOS),master=canvas)
+            canvas.create_image(ox,oy,image=canvas_image,anchor='nw')
         else:
             canvas_image = None
         if snap.get():
-            for x in range(0, w, 16):
-                canvas.create_line(ox+x, oy, ox+x, oy+extended_h[0], fill='#e2e8f0')
-            for y in range(0, extended_h[0], 16):
-                canvas.create_line(ox, oy+y, ox+w, oy+y, fill='#e2e8f0')
-        canvas.create_line(ox, oy+h, ox+w, oy+h, fill='#f59e0b', dash=(6, 4))
+            for x in range(0,page_w,16):
+                canvas.create_line(ox+x*scale,oy,ox+x*scale,oy+limit,fill='#e2e8f0')
+            for y in range(0,extended_h[0],16):
+                canvas.create_line(ox,oy+y*scale,ox+w,oy+y*scale,fill='#e2e8f0')
+        canvas.create_line(ox,oy+h,ox+w,oy+h,fill='#f59e0b',dash=(6,4))
+        draw_rulers()
+        block_order = tuple(elements)
+        for el in block_order:
+            draw_block(el,live)
+        if not live:
+            canvas.create_text(ox+w-18*scale,oy+22*scale,text='Câu: --/--  (khóa)',
+                               anchor='e',fill='#475569',font=('Segoe UI',max(6,round(11*scale)),'bold'),tags='locked')
+            canvas.create_rectangle(ox+w-155*scale,oy+h-64*scale,ox+w-24*scale,oy+h-22*scale,
+                                    fill='#176347',outline='',tags='locked')
+            canvas.create_text(ox+w-89*scale,oy+h-43*scale,text='Hoàn thành (khóa)',fill='white',
+                               font=('Segoe UI',max(6,round(10*scale)),'bold'),tags='locked')
+
+    def draw_rulers():
+        scale = zoom[0]
+        ox,oy = page_origin_x*scale,page_origin_y*scale
         ruler_top.delete('all')
         ruler_left.delete('all')
-        ruler_top.create_text(7, 13, anchor='w', text='px', fill='#64748b', font=('Segoe UI', 8))
-        x0, x1 = canvas.canvasx(0), canvas.canvasx(canvas.winfo_width())
-        y0, y1 = canvas.canvasy(0), canvas.canvasy(canvas.winfo_height())
-        for n in range(0, w+1, 25):
-            xx = (ox+n)*zoom[0]-x0
-            if 0 <= xx <= ruler_top.winfo_width():
-                major = n % 100 == 0
-                ruler_top.create_line(xx, 28, xx, 8 if major else 19, fill='#64748b')
+        ruler_top.create_text(7,13,anchor='w',text='px',fill='#64748b',font=('Segoe UI',8))
+        x0,y0=canvas.canvasx(0),canvas.canvasy(0)
+        for n in range(0,page_w+1,25):
+            xx=ox+n*scale-x0
+            if 0<=xx<=ruler_top.winfo_width():
+                major=n%100==0
+                ruler_top.create_line(xx,28,xx,8 if major else 19,fill='#64748b')
                 if major:
-                    ruler_top.create_text(xx+3, 3, anchor='nw', text=str(n), font=('Segoe UI', 8), fill='#475569')
-        for n in range(0, extended_h[0]+1, 25):
-            yy = (oy+n)*zoom[0]-y0
-            if 0 <= yy <= ruler_left.winfo_height():
-                major = n % 100 == 0
-                ruler_left.create_line(38, yy, 16 if major else 29, yy, fill='#64748b')
+                    ruler_top.create_text(xx+3,3,anchor='nw',text=str(n),font=('Segoe UI',8),fill='#475569')
+        for n in range(0,extended_h[0]+1,25):
+            yy=oy+n*scale-y0
+            if 0<=yy<=ruler_left.winfo_height():
+                major=n%100==0
+                ruler_left.create_line(38,yy,16 if major else 29,yy,fill='#64748b')
                 if major:
-                    ruler_left.create_text(2, yy+2, anchor='nw', text=str(n), font=('Segoe UI', 8), fill='#475569')
-        if not live:
-            canvas.create_text(ox+w-18, oy+22, text='Câu: --/--  (khóa)', anchor='e', fill='#475569', font=('Segoe UI', 11, 'bold'))
-        boxes.clear()
-        for el in elements:
-            v = current(el)
-            x, y, width, height = [v[k] for k in ('x', 'y', 'width', 'height')]
-            rect = (ox+x*w, oy+y*h, ox+(x+width)*w, oy+(y+height)*h)
-            boxes[el] = rect
-            selected = active[0] == el
-            canvas.create_rectangle(*rect, fill='' if live else '#eff6ff' if selected else '#f8fafc', outline='#2563eb' if selected else '#cbd5e1', width=2 if selected else 1)
-            if live and not selected:
-                continue
-            if live:
-                canvas.create_rectangle(rect[2]-9, rect[3]-9, rect[2]+3, rect[3]+3, fill='#2563eb', outline='white')
-                continue
-            if el == 'question_text':
-                prompt = str(question.get('prompt') or 'Nội dung câu hỏi')
-                canvas.create_text(rect[0]+9, rect[1]+8, text=prompt, anchor='nw', width=max(40, rect[2]-rect[0]-18), font=('Segoe UI', min(40, int(v['font_size'])), 'bold' if '**' in prompt else 'normal'), fill='#1e293b')
-            elif el == 'question_image':
-                canvas.create_text((rect[0]+rect[2])/2, (rect[1]+rect[3])/2, text='ẢNH CÂU HỎI\n(vùng bố cục)', justify='center', fill='#475569', font=('Segoe UI', 12))
-            elif el == 'audio_player':
-                canvas.create_text((rect[0]+rect[2])/2, (rect[1]+rect[3])/2, text='▶  ~  ~  ~  ~  ~  ~  ~     WAVEFORM', fill='#334155', font=('Segoe UI', 12))
-            elif el in ('answer_area', 'input_area', 'dropdown_area', 'word_bank'):
-                labels = {'answer_area': 'VÙNG ĐÁP ÁN', 'input_area': 'Ô NHẬP', 'dropdown_area': 'MENU CHỌN', 'word_bank': 'NGÂN HÀNG TỪ'}
-                canvas.create_text(rect[0]+8, rect[1]+8, text=labels[el], anchor='nw', fill='#64748b', font=('Segoe UI', 10))
-            else:
-                i = int(el.split('_')[1])
-                if is_image_choice:
-                    canvas.create_text((rect[0]+rect[2])/2, (rect[1]+rect[3])/2,
-                                       text='%s\n%s' % (chr(65+i), options[i]),
-                                       justify='center', width=max(40,rect[2]-rect[0]-16),
-                                       fill='#1e293b', font=('Segoe UI', min(40,int(v.get('font_size',18)))))
-                else:
-                    canvas.create_text(rect[0]+8, (rect[1]+rect[3])/2,
-                                       text='%s · Vị trí %d' % (chr(65+i), i+1),
-                                       anchor='w', width=max(40,rect[2]-rect[0]-16),
-                                       fill='#1e293b', font=('Segoe UI', min(40,int(v.get('font_size',18)))))
-            canvas.create_text(rect[0]+4, rect[1]-4, text=el, anchor='sw', fill='#2563eb', font=('Segoe UI', 9))
-            if selected:
-                canvas.create_rectangle(rect[2]-9, rect[3]-9, rect[2]+3, rect[3]+3, fill='#2563eb', outline='white')
-        if not live:
-            canvas.create_rectangle(ox+w-155, oy+h-64, ox+w-24, oy+h-22, fill='#176347', outline='')
-            canvas.create_text(ox+w-89, oy+h-43, text='Hoàn thành (khóa)', fill='white', font=('Segoe UI', 10, 'bold'))
-        # Scale the complete design in view only. Saved layout remains unchanged.
-        if zoom[0] != 1:
-            canvas.scale('all', 0, 0, zoom[0], zoom[0])
-            for item in canvas.find_all():
-                if canvas.type(item) == 'text':
-                    f = canvas.itemcget(item, 'font').split()
-                    if len(f) >= 2:
-                        try:
-                            old_size = int(f[-2] if f[-1] in ('bold', 'normal', 'italic') else f[-1])
-                            family = ' '.join(f[:-2] if f[-1] in ('bold', 'normal', 'italic') else f[:-1])
-                            style = f[-1] if f[-1] in ('bold', 'normal', 'italic') else ''
-                            canvas.itemconfigure(item, font=(family or 'Segoe UI', max(6, round(old_size*zoom[0])), style))
-                        except (ValueError, tk.TclError):
-                            pass
-            for key, rect in list(boxes.items()):
-                boxes[key] = tuple(v * zoom[0] for v in rect)
+                    ruler_left.create_text(2,yy+2,anchor='nw',text=str(n),font=('Segoe UI',8),fill='#475569')
 
+    def hit(x,y):
+        selected = active[0]
+        if selected in boxes:
+            a,b,c,d=boxes[selected]
+            for name,(rx,ry) in handles.items():
+                if abs(x-(a+rx*(c-a)))<=8 and abs(y-(b+ry*(d-b)))<=8:
+                    return selected,name
+        for el in reversed(block_order):
+            a,b,c,d=boxes[el]
+            if a<=x<=c and b<=y<=d:
+                return el,('se' if x>=c-12 and y>=d-12 else 'move')
+        return None,None
 
-    def hit(x, y):
-        for el in reversed(list(boxes)):
-            a,b,c,d = boxes[el]
-            if a <= x <= c and b <= y <= d:
-                return el, ('resize' if x >= c-18 and y >= d-18 else 'move')
-        return None, None
+    def hover(event):
+        _, mode = hit(canvas.canvasx(event.x),canvas.canvasy(event.y))
+        cursor = cursors.get(mode,'fleur' if mode=='move' else '')
+        if canvas.cget('cursor') != cursor:
+            canvas.configure(cursor=cursor)
 
     def down(event):
         nonlocal registered_motion
@@ -460,7 +693,12 @@ def edit_layout(parent, question, initial=None, *, preview=None):
             move(last_motion)
 
     def release(_event=None):
-        nonlocal scroll_job, last_motion
+        nonlocal scroll_job, last_motion, drag_visual
+        if drag_visual is not None:
+            canvas.after_cancel(drag_visual)
+            drag_visual = None
+            if drag[0]:
+                update_drag(drag[0][0], drag[0][1])
         drag[0] = None
         last_motion = None
         if scroll_job is not None:
@@ -499,28 +737,65 @@ def edit_layout(parent, question, initial=None, *, preview=None):
             v['x'] = max(0., min(1.-v['width'], start['x']+dx))
             v['y'] = max(0., min(vertical_limit-v['height'], start['y']+dy))
         else:
-            v['width'] = min(1.-v['x'], max(1/page_w, start['width']+dx))
-            v['height'] = min(vertical_limit-v['y'], max(1/page_h, start['height']+dy))
+            v = resize_rect(start, mode, dx, dy, tuple(dims),
+                            keep_ratio=el == 'question_image' and len(mode)==2 and not event.state&1)
         if v != start and not registered_motion:
+            had_preview = preview_image is not None
             snapshot()
             registered_motion = True
+            if had_preview:
+                redraw()
         if registered_motion:
-            working[el] = v
+            set_geometry(el,v)
         auto = event.y >= view_h-edge or event.y <= edge or event.x >= view_w-edge or event.x <= edge
         if auto and scroll_job is None:
-            scroll_job = canvas.after(60, repeat_motion)
+            scroll_job = canvas.after(60,repeat_motion)
         expand_to(v)
+        schedule_drag(el,mode)
+
+    def schedule_drag(el,mode):
+        nonlocal drag_visual
+        if drag_visual is None:
+            drag_visual = canvas.after(16,lambda:update_drag(el,mode))
+
+    def update_drag(el,mode):
+        nonlocal drag_visual
+        drag_visual = None
+        if el not in block_items:
+            return
+        if mode == 'move':
+            a,b,c,d = boxes[el]
+            value = current(el)
+            x = (page_origin_x + value['x']*page_w)*zoom[0]
+            y = (page_origin_y + value['y']*page_h)*zoom[0]
+            canvas.move(block_items[el],x-a,y-b)
+            boxes[el] = (x,y,c+x-a,d+y-b)
+        else:
+            index = elements.index(el)
+            canvas.delete(block_items[el])
+            draw_block(el,False)
+            if index+1<len(elements):
+                canvas.tag_lower(block_items[el],block_items[elements[index+1]])
+            canvas.tag_raise('locked')
+        a,b,c,_ = canvas.coords(page_background)
+        canvas.coords(page_background,a,b,c,(page_origin_y+extended_h[0])*zoom[0])
+        canvas.configure(scrollregion=(0,0,(page_w+40)*zoom[0],(extended_h[0]+40)*zoom[0]))
         show_pixels()
-        redraw()
+        draw_rulers()
+        status.set('Có thay đổi chưa lưu' if dirty() else 'Đã nạp bố cục')
 
     def font_change(_event=None):
-        if active[0] != 'question_text' and active[0] not in option_defaults:
+        if active[0] != 'question_text' and active[0] not in option_defaults and active[0] not in extras:
             return
         try:
             value = int(font_var.get())
         except (ValueError, tk.TclError):
             return
-        if 8 <= value <= 96:
+        if active[0] in extras:
+            if 8 <= value <= 96:
+                change_text_style(font_size=value)
+            return
+        if 8 <= value <= 96 and value != current(active[0]).get('font_size'):
             snapshot()
             working[active[0]] = {**current(active[0]), 'font_size': value}
             redraw()
@@ -528,9 +803,10 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     def restore(state):
         nonlocal preview_image
         preview_image = None
-        for target, values in zip((desktop_layout, mobile_layout), state):
+        for target, values in zip((desktop_layout, mobile_layout, extras), state):
             target.clear()
             target.update(deepcopy(values))
+        sync_elements()
         for el in elements:
             expand_to(current(el))
         show_pixels()
@@ -567,7 +843,7 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     def restore_saved():
         if dirty():
             snapshot()
-            restore((saved_layout, saved_mobile))
+            restore((saved_layout, saved_mobile, saved_extras))
 
     def cancel():
         if dirty() and not messagebox.askyesno('Chưa lưu bố cục',
@@ -616,8 +892,8 @@ def edit_layout(parent, question, initial=None, *, preview=None):
 
     ttk.Button(toolbar, text='Mở rộng trang +500 px', command=grow_page).pack(side='right', padx=4)
     canvas.bind('<Configure>', redraw)
-    ruler_top.bind('<Configure>', redraw)
-    ruler_left.bind('<Configure>', redraw)
+    ruler_top.bind('<Configure>', lambda _e:draw_rulers())
+    ruler_left.bind('<Configure>', lambda _e:draw_rulers())
     def toggle_fullscreen():
         # Maximize within the OS work area, leaving the taskbar accessible.
         # Avoid -fullscreen, which covers the taskbar on Windows.
@@ -635,6 +911,10 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     canvas.bind('<ButtonPress-1>', down)
     canvas.bind('<B1-Motion>', move)
     canvas.bind('<ButtonRelease-1>', release)
+    canvas.bind('<Motion>', hover)
+    canvas.bind('<Double-Button-1>',edit_text)
+    canvas.bind('<Key-t>',lambda _event:add_text())
+    canvas.bind('<Delete>',delete_text)
     font_spin.bind('<Return>', font_change)
     font_spin.bind('<FocusOut>', font_change)
     edit_controls = ttk.Frame(sidebar)
@@ -654,6 +934,10 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     # ESC closes the modal editor as before; maximize is not exclusive fullscreen.
     win.bind('<Escape>', lambda e: cancel())
     win.protocol('WM_DELETE_WINDOW', cancel)
+    sync_elements()
+    for el in elements:
+        expand_to(current(el))
+    redraw()
     win.wait_window()
     return result[0]
 

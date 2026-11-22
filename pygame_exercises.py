@@ -515,12 +515,24 @@ def _run(question):
     typed='';chosen=[];selected_option=None;drag=None;hover=-1;particles=[];answer=None
     # Load once per question, not once per animation frame.
     question_image = None
+    image_layout = None
+    image_frame = image_destination = None
     image_path = str(question.get('_pygame_image') or '').strip()
     if image_path and Path(image_path).is_file():
         try:
             question_image = _image(image_path, (420, 220) if kind in ('listening_choice', 'listening_fill') else (600, 230) if kind == 'matching' else (290, 125))
         except (pygame.error, OSError, ValueError):
             question_image = None
+    if question_image is not None:
+        from question_layout_runtime import element
+        from layout_images import pygame_image
+        image_layout = element(question, 'question_image')
+        if image_layout:
+            try:
+                question_image, image_destination, image_frame = pygame_image(
+                    image_path, image_layout, (66, 165, *question_image.get_size()))
+            except (OSError, ValueError, pygame.error):
+                image_layout = None
     zoom_open = False
     zoom_hit = None
     stop_pressed_until = 0.0
@@ -688,7 +700,7 @@ def _run(question):
         gap = min(71, (515 - base_top) / n)
         top, btn_y = base_top, 545
         if question_image is not None:
-            top = max(base_top, max(165, ref + 8) + question_image.get_height() + 16)
+            top = max(base_top, (image_frame.bottom if image_frame else max(165, ref + 8) + question_image.get_height()) + 16)
             btn_y = int(top + (n - 1) * gap + min(62, gap - 7) + 18)
         return base_top, top, gap, btn_y
     mini_fade = 0.0      # 0..1 fade of the floating mini player
@@ -699,9 +711,11 @@ def _run(question):
             display_screen = screen
             prompt_lines = wrapped_lines(question.get('prompt','Hoàn thành bài tập'), fonts[1], 825)
             prompt_end = 123 + len(prompt_lines) * (fonts[1].get_height()+7) - 7
-            lis_img = (question_image.get_height() + 12) if (question_image is not None and is_listening) else 0
+            lis_img = (question_image.get_height() + 12) if (question_image is not None and is_listening and not image_frame) else 0
             answer_top = max(210, prompt_end + (105 if (waveform is not None or waveform_pending) else 85 if is_listening else 24)) + lis_img
-            if question_image is not None and not is_listening:
+            if image_frame:
+                answer_top = max(answer_top, image_frame.bottom + 12)
+            elif question_image is not None and not is_listening:
                 answer_top = max(answer_top, max(165, prompt_end+8) + question_image.get_height()+12)
             # Every question type needs a defined scroll extent before any
             # optional per-answer geometry extends it. Previously the choice
@@ -851,7 +865,10 @@ def _run(question):
                 waveform_rects = waveform.draw(screen, _audio_player_bounds,fonts[3])
                 if audio_error: draw_text(audio_error,fonts[3],(174,58,58),65,play_rect.y+114,800)
             y=max(210, prompt_bottom + (105 if (waveform is not None or waveform_pending) else 85 if is_listening else 24)) + lis_img
-            if question_image is not None and not is_listening:
+            if image_frame:
+                screen.blit(question_image, image_destination)
+                y = max(y, image_frame.bottom + 12)
+            elif question_image is not None and not is_listening:
                 image_y = max(165, prompt_bottom + 8)
                 image_x = (960 - question_image.get_width()) // 2 if kind == 'matching' else 66
                 screen.blit(question_image, (image_x, image_y))
@@ -859,12 +876,14 @@ def _run(question):
             zoom_hit = None
             matching_zoom_hits = []
             if question_image is not None:
-                if is_listening:
+                if is_listening and not image_frame:
                     # Listening: image goes BELOW the player; no gap when there is none.
                     image_y = y - lis_img
                     screen.blit(question_image, (66, image_y))
                 from exercise_image_zoom import draw_zoom_icon
-                zoom_hit = draw_zoom_icon(screen, pygame.Rect((960 - question_image.get_width()) // 2 if kind == 'matching' else 66, image_y, *question_image.get_size()))
+                zoom_hit = draw_zoom_icon(screen, image_frame or pygame.Rect(
+                    (960 - question_image.get_width()) // 2 if kind == 'matching' else 66,
+                    image_y, *question_image.get_size()))
             cells=[]
             matching_cells = []
             matching_buttons = {}
