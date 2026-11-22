@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 import tkinter as tk
 from tkinter import ttk
 import unittest
+from unittest.mock import patch
 
 from PIL import Image
 
@@ -80,6 +81,37 @@ class StudioV3(unittest.TestCase):
             self.assertTrue(draft['extras'][0]['bold'])
             self.assertTrue(draft['extras'][0]['italic'])
             self.assertEqual(run(asset,draft), draft)
+
+
+    def test_clipboard_image_can_be_undone_before_saving(self):
+        root=tk.Tk()
+        self.addCleanup(root.destroy)
+        errors=[]
+        with TemporaryDirectory() as tmp:
+            target=Path(tmp)/'selected.png'
+            image=Image.new('RGB',(80,40),'blue')
+            def drive():
+                win=next(widgets(root,tk.Toplevel))
+                try:
+                    buttons={w.cget('text'):w for w in widgets(win,ttk.Button)}
+                    buttons['Dán ảnh'].invoke()
+                    self.assertFalse(target.exists())
+                    buttons['Hoàn tác'].invoke()
+                    buttons['Làm lại'].invoke()
+                    buttons['Lưu bố cục'].invoke()
+                except BaseException as exc:
+                    errors.append(exc)
+                    win.destroy()
+
+            root.after(50,drive)
+            with patch('PIL.ImageGrab.grabclipboard',return_value=image):
+                result=edit_layout(root,{'type':'picture_choice'},clipboard=target)
+            if errors:
+                raise errors[0]
+            self.assertIsNotNone(result)
+            with Image.open(target) as pasted:
+                self.assertEqual(pasted.size,image.size)
+                self.assertEqual(pasted.getpixel((0,0)),(0,0,255,255))
 
 
 if __name__ == '__main__':

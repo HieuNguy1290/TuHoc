@@ -20,13 +20,13 @@ def _lines(text, size, bold, italic, width, color):
                                       for line in wrap(text, font, width))
 
 
-def draw_extras(screen, question, screen_size=DESKTOP, *, offset=(0, 0)):
+def draw_extras(screen, question, screen_size=DESKTOP, *, offset=(0, 0), mobile=None):
     layout = question.get('layout')
     if not isinstance(layout, dict) or not layout.get('extras'):
         return
     clip = screen.get_clip()
     try:
-        for extra in pixel_extras(layout, screen_size):
+        for extra in pixel_extras(layout, screen_size, mobile=mobile):
             g = extra['rect']
             rect = pygame.Rect(g['x'] + offset[0], g['y'] + offset[1], g['width'], g['height'])
             visible = rect.clip(clip)

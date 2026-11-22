@@ -158,13 +158,15 @@ def layout_v3(layout):
     return validate_layout({**checked, 'version': 3, 'extras': checked.get('extras', [])})
 
 
-def pixel_extras(layout, screen=DESKTOP):
+def pixel_extras(layout, screen=DESKTOP, *, mobile=None):
     """Project decorative text without mixing it into system-element lookup."""
     if not isinstance(layout, dict) or layout.get('version') != 3:
         return []
     result = []
+    if mobile is None:
+        mobile = screen[0] < screen[1]
     for extra in _validate_extras(layout.get('extras', [])):
-        use_mobile = screen[0] < screen[1] and 'mobile' in extra
+        use_mobile = mobile and 'mobile' in extra
         source = 'mobile' if use_mobile else 'desktop'
         rect = extra[source]
         if screen != SCREENS[source]:

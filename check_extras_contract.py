@@ -31,6 +31,9 @@ class ExtrasContract(unittest.TestCase):
         override['extras'][0]['mobile'] = dict(x=11, y=24, width=100, height=40)
         self.assertEqual(pixel_extras(override, MOBILE)[0]['rect'], override['extras'][0]['mobile'])
         self.assertGreater(content_bottom(question, 640), 720)
+        exam_column=(350,640)
+        self.assertEqual(pixel_extras(override,exam_column,mobile=False)[0]['rect'],
+                         dict(x=35,y=640,width=70,height=80))
 
     def test_invalid_values(self):
         for patch in (dict(id='complete_button'), dict(id='option_2'), dict(text='a'*501),

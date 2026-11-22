@@ -1,8 +1,9 @@
+"""Responsive Pygame exam with independently scrollable reading and answer panels."""
 from extras_render import draw_extras
-from question_layout_store import pixel_extras
+from layout_images import pygame_image
+from question_layout_store import pixel_elements, pixel_extras
 from question_prompt import display_prompt
 from pygame_session_guard import shutdown as _app_shutdown
-"""Responsive Pygame exam with independently scrollable reading and answer panels."""
 import random
 import datetime
 import copy
@@ -43,6 +44,16 @@ def wrap(font,text,width):
 def _decorations_bottom(question):
     return max((box['rect']['y'] + box['rect']['height']
                 for box in pixel_extras(question.get('layout'))), default=0)
+
+
+def _position(geometry, default):
+    values=dict(zip(('x','y','width','height'),default))
+    values.update(geometry)
+    return pygame.Rect(values['x'],values['y'],max(1,values['width']),max(1,values['height']))
+
+
+def _layout_bottom(layout):
+    return max((value.get('y',0)+value.get('height',0)+16 for value in layout.values()),default=0)
 
 
 class ExamUI:
@@ -445,9 +456,10 @@ class ExamUI:
         except (pygame.error,OSError,ValueError) as exc:
             self._audio_error='Không thể phát file nghe: '+str(exc)[:90]
 
-    def _audio_button(self,s,q,x,y,local=False):
+    def _audio_button(self,s,q,x,y,local=False,rect=None):
         path=str(q.get('audio',''))
-        rect=pygame.Rect(x,y,255,49)
+        rect=rect or pygame.Rect(x,y,255,49)
+        x,y=rect.topleft
         pygame.draw.rect(s,(225,238,253),rect,border_radius=8)
         pygame.draw.rect(s,BLUE,rect,2,border_radius=8)
         self._text(s,'▶ Phát lại âm thanh',x+12,y+10,self.small,INK)
@@ -466,25 +478,51 @@ class ExamUI:
         # This keeps all fields accessible regardless of question length.
         original_buttons=self.buttons
         self.buttons=[]
+        layout=pixel_elements(q.get('layout'),(self.read_area.width,640))
+        pg=layout.get('question_text',{})
+        px,py=pg.get('x',x),pg.get('y',y)
+        pw=max(1,pg.get('width',645))
+        font=self._font(pg['font_size'],True) if 'font_size' in pg else self.bold
+        area=layout.get('answer_area',{})
+        input_geometry=layout.get('input_area',area)
         count=len(q.get('gap_answers',[]))
         pairs=len(q.get('pairs',[]))
         words=len(q.get('sequence',[]))
-        prompt_height=len(wrap(self.bold,str(display_prompt(q)),645))*(self.bold.get_linesize()+5)+50
-        estimated=max(self.read_area.height, prompt_height+max(count*62+80,pairs*46+115,((words+3)//4)*60+230,380 if kind=='picture_missing_letters' else 180))
-        estimated=max(estimated,_decorations_bottom(q))
+        prompt_height=len(wrap(font,str(display_prompt(q)),pw))*(font.get_linesize()+5)+50+(py-y)
+        body_height=max(count*(max(1,area.get('height',50))+12)+80,pairs*46+115,
+                        ((words+3)//4)*60+230,380 if kind=='picture_missing_letters' else 180)
+        estimated=max(self.read_area.height,prompt_height+body_height,_decorations_bottom(q),_layout_bottom(layout))
+        if 'y' in area:
+            estimated=max(estimated,area['y']+body_height)
+        image=layout.get('question_image',{})
+        if 'y' in image:
+            estimated=max(estimated,image['y']+image.get('height',160)+body_height)
         canvas=pygame.Surface((self.read_area.width,estimated),pygame.SRCALPHA)
         self._interactive_target=s
         s=canvas
-        y=self._text(s,str(display_prompt(q)),x,y,self.bold,INK,width=645)+18
+        y=self._text(s,str(display_prompt(q)),px,py,font,INK,width=pw)+18
+        image_geometry=layout.get('question_image')
+        if image_geometry and q.get('image'):
+            try:
+                picture,destination,frame=pygame_image(q['image'],image_geometry,(x,y,400,160))
+                s.blit(picture,destination)
+                y=max(y,frame.bottom+12)
+            except (OSError,ValueError,pygame.error):
+                self._text(s,'Không thể tải hình minh họa',x,y,self.small,MUTED)
+        x=area.get('x',x)
         if kind=='listening_fill':
-            self._audio_button(s,q,x,y,local=True);y+=75
+            rect=_position(layout.get('audio_player',{}),(x,y,255,49))
+            self._audio_button(s,q,x,y,local=True,rect=rect)
+            y=max(y+75,rect.bottom+26)
         if kind in ('sentence_gaps','conversation_gaps','passage_gaps'):
             count=len(q.get('gap_answers',[]));values=self.answers.get(qid,[])
             if not isinstance(values,list) or len(values)!=count:values=['']*count
             self._text(s,'Nhấn vào ô để nhập; Tab chuyển ô tiếp theo.',x,y,self.small,MUTED)
-            y+=36
+            y=area.get('y',y+36)
+            row_height=max(1,area.get('height',50))
             for i in range(count):
-                rect=pygame.Rect(x,y+i*62,615,50)
+                rect=_position(layout.get(f'option_{i}',{}),
+                               (x,y+i*(row_height+12),area.get('width',615),row_height))
                 pygame.draw.rect(s,WHITE,rect,border_radius=8)
                 pygame.draw.rect(s,BLUE if i==self.gap_focus else BORDER,rect,3 if i==self.gap_focus else 1,border_radius=8)
                 label=f'{i+1}.  '+values[i]+(' |' if i==self.gap_focus else '')
@@ -497,9 +535,9 @@ class ExamUI:
                 y=self._text(s,'Từ / cụm từ sai: '+str(q.get('wrong','')),x,y,self.font,MUTED)+16
             self._text(s,'Nhập đáp án bằng bàn phím (Backspace để xóa):',x,y,self.small,MUTED)
             value=str(self.answers.get(qid,''))
-            rect=pygame.Rect(x,y+40,635,62)
+            rect=_position(input_geometry,(x,y+40,635,62))
             pygame.draw.rect(s,WHITE,rect,border_radius=9);pygame.draw.rect(s,BLUE,rect,2,border_radius=9)
-            self._text(s,value+' |',x+15,y+53,self.font,INK,width=600)
+            self._text(s,value+' |',rect.x+15,rect.y+13,self.font,INK,width=max(1,rect.w-35))
             draw_extras(s,q,(self.read_area.width,640))
             self._finish_interactive(s,original_buttons,estimated);return
         if kind=='order':
@@ -511,7 +549,10 @@ class ExamUI:
             for i,word in enumerate(sequence):
                 if word in picked:continue
                 col=i%4;row=i//4
-                self._button(s,str(word),(x+col*160,y+row*60,150,50),lambda w=word:self._pick_order(q,w),small=True)
+                left=area.get('x',x)
+                top=area.get('y',y)
+                rect=_position(layout.get(f'option_{i}',{}),(left+col*160,top+row*60,150,50))
+                self._button(s,str(word),rect,lambda w=word:self._pick_order(q,w),small=True)
             self._button(s,'Làm lại',(x,y+155,160,43),lambda:self._reset_order(qid),small=True)
             draw_extras(s,q,(self.read_area.width,640))
             self._finish_interactive(s,original_buttons,estimated);return
@@ -522,15 +563,15 @@ class ExamUI:
             matched=self.answers.get(qid,{})
             if not isinstance(matched,dict):matched={}
             self._text(s,'Chọn một mục bên trái, sau đó chọn mục tương ứng bên phải.',x,y,self.small,MUTED)
-            y+=40
+            y=area.get('y',y+40)
             for i,word in enumerate(left):
                 active=self.match_pending==(qid,word)
                 label=('✓ ' if word in matched else '→ ' if active else '')+word
-                self._button(s,label,(x,y+i*46,285,40),lambda w=word:self._select_match_left(qid,w),small=True)
+                self._button(s,label,_position(layout.get(f'option_{i}',{}),(x,y+i*46,285,40)),lambda w=word:self._select_match_left(qid,w),small=True)
             for i,word in enumerate(right):
                 linked=next((a for a,b in matched.items() if b==word),None)
                 label=('✓ ' if linked else '')+word
-                self._button(s,label,(x+327,y+i*46,285,40),lambda w=word:self._select_match_right(qid,w),small=True)
+                self._button(s,label,_position(layout.get(f'option_{len(left)+i}',{}),(x+327,y+i*46,285,40)),lambda w=word:self._select_match_right(qid,w),small=True)
             self._button(s,'Xóa các cặp',(x,y+len(pairs)*46+9,190,37),lambda:self._clear_match(qid),small=True)
         draw_extras(s,q,(self.read_area.width,640))
         self._finish_interactive(s,original_buttons,estimated)
@@ -795,8 +836,8 @@ class ExamUI:
                 if clipped.width and clipped.height:
                     self.buttons.append((clipped,lambda val=opt,key=qid:self._choose_reading_option(key,val)))
         for child in children:
-            draw_extras(answers_surface, child, (right_w,640),
-                        offset=(0, child_tops[child['id']]-gs))
+            draw_extras(answers_surface,child,(right_w,640),
+                        offset=(0,child_tops[child['id']]-gs),mobile=False)
         s.blit(answers_surface,(right_x,outer.y))
         # Lightweight scroll indicators; scrolling uses the mouse wheel over each pane.
         for area,offset,limit in ((self.group_passage_area,ps,self._passage_scroll_limit),(self.group_answer_area,gs,self._group_scroll_limit)):
@@ -807,7 +848,12 @@ class ExamUI:
 
     def _draw_reading(self,s,q):
         """Render all text to an offscreen surface; clip and scroll without overlap."""
-        w=self.read_area.width-28;line_h=self.font.get_linesize()+6
+        w=self.read_area.width-28
+        layout=pixel_elements(q.get('layout'),(self.read_area.width,640))
+        question_geo=layout.get('question_text',{})
+        image_geo=layout.get('question_image',{})
+        answer_geo=layout.get('answer_area',{})
+        audio_geo=layout.get('audio_player',{})
         blocks=[];height=10
         passage=q.get('passage') or q.get('reading') or ''
         if passage:
@@ -818,58 +864,86 @@ class ExamUI:
             blocks.append(('audio',str(q.get('audio',''))))
             _img=str(q.get('image','')).strip()
             if _img and os.path.isfile(_img):blocks.append(('picture',_img))  # optional: no image -> no space
-        if q.get('type')=='picture_choice':
+        if q.get('type')=='picture_choice' or image_geo and q.get('image') and not any(kind=='picture' for kind,_ in blocks):
             blocks.append(('picture',str(q.get('image',''))))
         blocks.append(('heading',f'CÂU {q.get("reading_index")}/{q.get("reading_total")} TRONG BÀI ĐỌC' if q.get('reading_group') else 'CHỌN ĐÁP ÁN ĐÚNG'))
         blocks.append(('question',str(display_prompt(q))))
         items=[]
         for kind,text in blocks:
             if kind=='audio':
-                items.append((kind,text,height,None));height+=82;continue
+                rect=_position(audio_geo,(12,height,255,49))
+                items.append((kind,rect,height,None))
+                height=max(height+82,rect.bottom+33)
+                continue
             if kind=='picture':
-                items.append((kind,text,height,None));height+=200;continue
+                items.append((kind,text,height,None))
+                height=max(height+200,image_geo.get('y',height)+image_geo.get('height',0)+16)
+                continue
             font=self.small if kind=='heading' else self.bold if kind=='question' else self.font
-            lines=wrap(font,text,w-20)
+            geo=question_geo if kind=='question' else {}
+            if geo.get('font_size'):
+                font=self._font(geo['font_size'],True)
+            y=geo.get('y',height)
+            lines=wrap(font,text,max(1,geo.get('width',w-20)))
             block_height=max(1,len(lines))*(font.get_linesize()+5)+15
-            items.append((kind,lines,height,font));height+=block_height
+            items.append((kind,lines,y,font))
+            height=max(height,y+block_height)
         options=q.get('options',[])
+        cursor=answer_geo.get('y',height)
         for i,opt in enumerate(options):
+            geo=layout.get(f'option_{i}',{})
+            width=geo.get('width',answer_geo.get('width',w))
+            x=answer_geo.get('x',8)
             if q.get('type')=='image_multi_choice':
-                items.append(('image_option',(i,str(opt)),height,None));height+=152
+                rect=_position(geo,(x,cursor,width,141))
+                items.append(('image_option',(i,str(opt),rect,bool(geo or answer_geo)),cursor,None))
             else:
                 label=f'{chr(65+i)}. {opt}'
-                lines=wrap(self.font,label,w-38)
-                card_h=max(50,len(lines)*line_h+22)
-                items.append(('option',(i,str(opt),lines),height,None));height+=card_h+9
-        height=max(height+16,_decorations_bottom(q))
+                face=self._font(geo['font_size']) if 'font_size' in geo else self.font
+                step=face.get_linesize()+6
+                lines=wrap(face,label,max(1,width-38))
+                card_h=max(50,len(lines)*step+22)
+                rect=_position(geo,(x,cursor,width,card_h))
+                items.append(('option',(i,str(opt),lines,rect,step,bool(geo or answer_geo)),cursor,face))
+            cursor=max(cursor,rect.bottom+(11 if q.get('type')=='image_multi_choice' else 9))
+            height=max(height,cursor)
+        height=max(height+16,_decorations_bottom(q),_layout_bottom(layout))
         self.scroll_limit=max(0,height-self.read_area.height)
         self.scroll=max(0,min(self.scroll,self.scroll_limit))
         surface=pygame.Surface((self.read_area.width,max(self.read_area.height,height)),pygame.SRCALPHA)
         for kind,value,y,font in items:
             if kind=='option':
-                i,opt,lines=value;h=max(50,len(lines)*line_h+22)
+                i,opt,lines,rect,step,custom=value
                 selected=self.answers.get(q['id'])==opt
-                rect=pygame.Rect(8,y,w,h)
                 pygame.draw.rect(surface,(220,235,255) if selected else WHITE,rect,border_radius=8)
                 pygame.draw.rect(surface,BLUE if selected else BORDER,rect,2 if selected else 1,border_radius=8)
-                yy=y+10
-                for line in lines:
-                    surface.blit(self.font.render(line,True,INK),(rect.x+14,yy));yy+=line_h
+                yy=rect.y+10
+                original_clip=surface.get_clip()
+                if custom:
+                    surface.set_clip(rect.clip(original_clip))
+                try:
+                    for line in lines:
+                        surface.blit(font.render(line,True,INK),(rect.x+14,yy));yy+=step
+                finally:
+                    surface.set_clip(original_clip)
                 screen_rect=pygame.Rect(self.read_area.x+rect.x,self.read_area.y+rect.y-self.scroll,rect.w,rect.h)
                 clipped=screen_rect.clip(self.read_area)
                 if clipped.width and clipped.height:self.buttons.append((clipped,lambda val=opt,qid=q['id']:self.answers.__setitem__(qid,val)))
             elif kind=='image_option':
-                i,opt=value;rect=pygame.Rect(8,y,w,141)
+                i,opt,rect,custom=value
                 selected=self.answers.get(q['id'])==opt
                 pygame.draw.rect(surface,(220,235,255) if selected else WHITE,rect,border_radius=8)
                 pygame.draw.rect(surface,BLUE if selected else BORDER,rect,3 if selected else 1,border_radius=8)
                 surface.blit(self.small.render(chr(65+i)+'.',True,INK),(rect.x+13,rect.y+12))
                 try:
-                    if opt not in self._image_cache:
+                    cache_key=(opt,rect.size) if custom else opt
+                    if cache_key not in self._image_cache:
                         img=pygame.image.load(opt).convert_alpha()
-                        scale=min((w-75)/max(1,img.get_width()),124/max(1,img.get_height()),1)
-                        self._image_cache[opt]=pygame.transform.smoothscale(img,(max(1,int(img.get_width()*scale)),max(1,int(img.get_height()*scale))))
-                    img=self._image_cache[opt]
+                        scale=min(max(1,rect.w-75)/max(1,img.get_width()),
+                                  max(1,rect.h-17)/max(1,img.get_height()),1)
+                        self._image_cache[cache_key]=pygame.transform.smoothscale(
+                            img,(max(1,int(img.get_width()*scale)),max(1,int(img.get_height()*scale))))
+                    img=self._image_cache[cache_key]
                     surface.blit(img,(rect.x+45,rect.y+max(8,(rect.h-img.get_height())//2)))
                 except (pygame.error,OSError,ValueError):
                     surface.blit(self.small.render('Không thể tải ảnh đáp án',True,(176,57,57)),(rect.x+45,rect.y+52))
@@ -877,22 +951,31 @@ class ExamUI:
                 clipped=screen_rect.clip(self.read_area)
                 if clipped.width and clipped.height:self.buttons.append((clipped,lambda val=opt,qid=q['id']:self.answers.__setitem__(qid,val)))
             elif kind=='audio':
-                self._audio_button(surface,q,12,y)
+                self._audio_button(surface,q,12,y,rect=value)
             elif kind=='picture':
                 try:
-                    if value not in self._image_cache:
-                        img=pygame.image.load(value).convert_alpha()
-                        scale=min((w-24)/max(1,img.get_width()),180/max(1,img.get_height()))
-                        self._image_cache[value]=pygame.transform.smoothscale(img,(max(1,int(img.get_width()*scale)),max(1,int(img.get_height()*scale))))
-                    img=self._image_cache[value]
-                    surface.blit(img,(max(10,(w-img.get_width())//2),y+5))
+                    if image_geo:
+                        key=(value,tuple(image_geo.items()),y)
+                        if key not in self._image_cache:
+                            img,rect,_frame=pygame_image(value,image_geo,(12,y,max(1,w-24),180))
+                            self._image_cache[key]=(img,rect)
+                        img,rect=self._image_cache[key]
+                        surface.blit(img,rect)
+                    else:
+                        if value not in self._image_cache:
+                            img=pygame.image.load(value).convert_alpha()
+                            scale=min((w-24)/max(1,img.get_width()),180/max(1,img.get_height()))
+                            self._image_cache[value]=pygame.transform.smoothscale(img,(max(1,int(img.get_width()*scale)),max(1,int(img.get_height()*scale))))
+                        img=self._image_cache[value]
+                        surface.blit(img,(max(10,(w-img.get_width())//2),y+5))
                 except (pygame.error,OSError,ValueError):
                     surface.blit(self.small.render('Không thể tải hình minh họa',True,(176,57,57)),(12,y+20))
             else:
                 color=MUTED if kind=='heading' else INK
                 yy=y
+                x=question_geo.get('x',12) if kind=='question' else 12
                 for line in value:
-                    if line:surface.blit(font.render(line,True,color),(12,yy))
+                    if line:surface.blit(font.render(line,True,color),(x,yy))
                     yy+=font.get_linesize()+5
         visible=pygame.Rect(0,int(self.scroll),self.read_area.width,self.read_area.height)
         draw_extras(surface,q,(self.read_area.width,640))
