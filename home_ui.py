@@ -28,7 +28,10 @@ class HomeDashboard:
     def schedule(self,ms,fn):
         if not self.alive:return
         # Clock remains active in reduced-motion mode; animations do not.
-        job=self.app.after(ms,lambda:self._safe(fn))
+        def run():
+            self._timers.discard(job)
+            self._safe(fn)
+        job=self.app.after(ms,run)
         self._timers.add(job)
         return job
 
@@ -36,7 +39,7 @@ class HomeDashboard:
         if self.alive and self.body.winfo_exists():fn()
 
     def label(self,parent,text,size=12,bold=False,fg=DARK,bg=None,**kw):
-        return tk.Label(parent,text=text,font=('Segoe UI',size,'bold' if bold else 'normal'),fg=fg,bg=bg or parent.cget('bg'),**kw)
+        return tk.Label(parent,text=text,font=font_at(size,'bold' if bold else 'normal'),fg=fg,bg=bg or parent.cget('bg'),**kw)
 
     def button(self,parent,text,command,primary=True):
         button=tk.Button(parent,text=text,command=command,font=font_at(11, 'bold'),bg=GREEN if primary else 'white',fg='white' if primary else GREEN,activebackground=TOKEN_COLORS['primary_dark'] if primary else TOKEN_COLORS['tint'],activeforeground='white' if primary else GREEN,relief='flat',bd=0,padx=12,pady=10,cursor='hand2',takefocus=True,highlightthickness=2,highlightcolor=GREEN)

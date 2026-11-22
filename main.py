@@ -51,7 +51,7 @@ from ui_motion import animate_position, add_hover
 from panel_animations import animate_magnetic_cascade, animate_reverse_cascade_left
 from icon_animations import micro_rotation
 from content_manager import ContentManager, read_custom_lessons, user_content_dir
-from navigation_profiler import install as install_navigation_profiler, record as navigation_record
+from navigation_profiler import flush as flush_navigation_log, install as install_navigation_profiler, record as navigation_record
 
 BASE = Path(__file__).resolve().parent
 CONTENT = BASE / 'content_library' / 'vi_VN_south'
@@ -589,6 +589,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         deadline = time.monotonic() + 2.0
         def finish_when_idle():
             if not guard.active() or time.monotonic() >= deadline:
+                flush_navigation_log()
                 self.destroy()
             else:
                 self.after(40, finish_when_idle)
@@ -1103,7 +1104,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
                     except (tk.TclError, RuntimeError):
                         pass
             click_start = time.perf_counter()
-            self.after(125, navigate)
+            self.after(0 if self.reduce_motion else 125,navigate)
         # Match the soft green hover treatment used in subject selection.
         button.bind('<Enter>',lambda e,b=button: b.configure(bg='#257B56') if not getattr(b,'_selection_pending',False) else None,add='+')
         button.bind('<Leave>',lambda e,b=button: b.configure(bg=GREEN) if not getattr(b,'_selection_pending',False) else None,add='+')
@@ -2318,6 +2319,8 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
     def choose_language(self):
         """Subject selection without the study sidebar; loading remains in switch_language."""
         from subject_ui import SubjectPage
+        from subject_loading_screen import preload_async
+        preload_async((self.winfo_width(),self.winfo_height()))
         self.clear()
         if self._shell is not None:
             self._shell.pack_forget()

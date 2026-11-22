@@ -4,6 +4,7 @@ The supplied reference is the static visual layer. Percent, progress bar and
 orbit highlights are dynamic Tk canvas items. No Pygame/SDL is involved.
 Requires Pillow (already used by earlier logo-loading variants).
 """
+from functools import lru_cache
 import math
 import os
 import threading
@@ -18,32 +19,44 @@ except ImportError as exc:
 _ASSET = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       'subject_loading_background.png')
 
-# The 1.9 MB background is decoded once per process (optionally ahead of time on a
-# worker thread) instead of on the Tk thread every time a subject is opened.
-_SOURCE = None
-_SOURCE_LOCK = threading.Lock()
+_IMAGE_LOCK = threading.Lock()
 
 
-def _source_image():
-    global _SOURCE
-    with _SOURCE_LOCK:
-        if _SOURCE is None:
-            with Image.open(_ASSET) as raw:
-                _SOURCE = raw.convert('RGB')
-        return _SOURCE
+@lru_cache(maxsize=1)
+def _native_size():
+    with Image.open(_ASSET) as raw:
+        return raw.size
 
 
-def preload_async():
-    """Decode the background off the UI thread; safe to call repeatedly."""
-    if _SOURCE is None:
-        threading.Thread(target=lambda: _safe_preload(), daemon=True).start()
+@lru_cache(maxsize=2)
+def _scaled_background(width,height):
+    with Image.open(_ASSET) as raw:
+        return raw.resize((width,height),Image.Resampling.BICUBIC,reducing_gap=2.0).convert('RGB')
 
 
-def _safe_preload():
-    try:
-        _source_image()
-    except Exception:
-        pass
+def _target_size(w,h):
+    sw,sh=_native_size()
+    scale=min(w/sw,h/sh)
+    return max(1,round(sw*scale)),max(1,round(sh*scale)),scale
+
+
+def _background(width,height):
+    with _IMAGE_LOCK:
+        return _scaled_background(width,height)
+
+
+def preload_async(viewport=None):
+    if viewport is None or min(viewport)<30:
+        return
+
+    def preload():
+        try:
+            w,h,_scale=_target_size(*viewport)
+            _background(w,h)
+        except OSError:
+            pass
+
+    threading.Thread(target=preload,name='TuHocBackground',daemon=True).start()
 
 
 class _Dyn:
@@ -71,7 +84,7 @@ class SubjectLoadingScreen(tk.Frame):
         self.progress = 0.0
         self.target_progress = 0.0
         self._started = time.monotonic()
-        self._duration = 2.0
+        self._duration = 0.0 if getattr(master,'reduce_motion',False) else 2.0
         self._ready = False
         self._completed = False
         self._on_complete = None
@@ -82,7 +95,6 @@ class SubjectLoadingScreen(tk.Frame):
         self._last_tick = time.monotonic()
         self._photo = None
         self._cached_size = None
-        self._source = _source_image()
         self._bg_item = None
         self.canvas.bind('<Configure>', self._resize)
         self.bind('<Destroy>', self._destroy, add='+')
@@ -99,7 +111,7 @@ class SubjectLoadingScreen(tk.Frame):
                 pass
             self.job = None
         self._photo = None
-        self._bg_item = None   # shared source image stays open for the next subject
+        self._bg_item = None
 
     def set_progress(self, percent, status):
         """Backward-compatible status update; percent is now clock-driven."""
@@ -124,12 +136,13 @@ class SubjectLoadingScreen(tk.Frame):
         now = time.monotonic()
         dt = min(0.12, max(0., now - self._last_tick))
         self._last_tick = now
-        self.phase += dt * 1.25
+        if self._duration:
+            self.phase += dt * 1.25
         elapsed = now - self._started
         # Progress is based on a monotonic clock, not on loading-phase jumps.
         # Hold at 99% if preparation takes longer than two seconds.
         self.progress = min(100.0 if self._ready else 99.0,
-                            100.0 * min(1.0, elapsed / self._duration))
+                            100.0 * min(1.0, elapsed / max(.001,self._duration)))
         if self._ready and elapsed >= self._duration and not self._completed:
             self.progress = 100.0
             self._completed = True
@@ -137,7 +150,7 @@ class SubjectLoadingScreen(tk.Frame):
             self._draw()
             # Display the completed frame briefly before navigation.
             if self._on_complete is not None:
-                self.job = self.after(120, self._on_complete)
+                self.job = self.after(120 if self._duration else 0,self._on_complete)
             return
         self._draw()
         self.job = self.after(33, self._tick)
@@ -150,13 +163,11 @@ class SubjectLoadingScreen(tk.Frame):
         if w < 30 or h < 30:
             return
         # 'contain' scaling preserves the reference composition, including logo.
-        sw, sh = self._source.size
-        scale = min(w / sw, h / sh)
-        rw, rh = max(1, round(sw * scale)), max(1, round(sh * scale))
+        rw,rh,scale=_target_size(w,h)
         ox, oy = (w - rw) / 2, (h - rh) / 2
         if self._cached_size != (rw, rh) or self._bg_item is None:
             # reducing_gap makes the downscale much cheaper than a full LANCZOS pass.
-            scaled = self._source.resize((rw, rh), Image.Resampling.BICUBIC, reducing_gap=2.0)
+            scaled=_background(rw,rh)
             self._photo = ImageTk.PhotoImage(scaled, master=c)
             self._cached_size = (rw, rh)
             c.delete('all')

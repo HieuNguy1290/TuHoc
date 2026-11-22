@@ -50,6 +50,7 @@ class LessonMap:
         cv.pack(fill='x');inner=tk.Frame(cv,bg=C['background']);window=cv.create_window((0,0),window=inner,anchor='nw')
         inner.bind('<Configure>',lambda e:cv.configure(scrollregion=cv.bbox('all')))
         topic_chips=[]
+        chip_sizes=[]
         for code,title,icon,color in self.themes:
             selected=code==self.theme
             base_bg=C['primary'] if selected else C['tint']
@@ -59,13 +60,9 @@ class LessonMap:
             chip=Chip(slot,text=f'{icon}  {title}',bg=base_bg,fg=base_fg,
                       cursor='hand2',takefocus=1)
             chip.configure(bd=0,relief='flat',highlightthickness=2,highlightcolor=C['focus'])
-            chip.update_idletasks()
-            width,height=chip.winfo_reqwidth(),chip.winfo_reqheight()
-            slot_h=max(56,height+18)
-            slot.configure(width=width+4,height=slot_h)
             slot.pack_propagate(False)
             slot.pack(side='left',padx=(0,4))
-            chip.place(x=2,y=12,width=width,height=height)
+            chip_sizes.append((slot,chip))
             chip._hover_active=False
             chip._code=code
             chip._target=(base_bg,base_fg)
@@ -94,9 +91,15 @@ class LessonMap:
                     pass
             # Hover region is the fixed union of the rest/raised chip area.
             chip._hover_fn=topic_hover
-            bind_hover(slot,topic_hover,inset=(0,6,0,max(0,slot_h-(12+height))))
             chip.bind('<FocusIn>',lambda e,fn=topic_hover:fn(True),add='+')
             chip.bind('<FocusOut>',lambda e,fn=topic_hover:fn(False),add='+')
+        self.body.update_idletasks()
+        for slot,chip in chip_sizes:
+            width,height=chip.winfo_reqwidth(),chip.winfo_reqheight()
+            slot_h=max(56,height+18)
+            slot.configure(width=width+4,height=slot_h)
+            chip.place(x=2,y=12,width=width,height=height)
+            bind_hover(slot,chip._hover_fn,inset=(0,6,0,max(0,slot_h-(12+height))))
         cv.bind('<MouseWheel>',lambda e:cv.xview_scroll(-1 if e.delta>0 else 1,'units'))
         cv.configure(xscrollincrement=45)
         columns=tk.Frame(self.body,bg=C['background']);columns.pack(fill='both',expand=True)
@@ -285,8 +288,6 @@ class LessonMap:
             for child in card.winfo_children():
                 child._fade_fg=child.cget('fg')
                 child.configure(bg=C['background'],fg=C['background'])
-            card.update_idletasks()
-            slot.configure(height=card.winfo_reqheight()+9)
             card.place(in_=slot,x=-28,y=0,relwidth=1,relheight=1)
             for widget in [card,*card.winfo_children()]:
                 widget.bind('<Button-1>',lambda e,k=n:self.select(k))
@@ -302,6 +303,9 @@ class LessonMap:
             card.bind('<Return>',activate)
             card.bind('<space>',activate)
             bind_hover(card,lambda a,k=n:self._level_hover(k,a),region=slot,also=(slot,))
+        self.body.update_idletasks()
+        for (slot,_title),(card,*_rest) in zip(self._titles,cards):
+            slot.configure(height=card.winfo_reqheight()+9)
         end=self.animate_levels(cards,generation,delay)
         # Fit names once, while the cards are still at 0% opacity.
         self.body.update_idletasks()
@@ -444,10 +448,11 @@ class LessonMap:
                         elif isinstance(child,(tk.Label,tk.Frame)):
                             child.configure(bg=color)
                 except tk.TclError: pass
-            row.update_idletasks()
-            slot.configure(width=row.winfo_reqwidth()+4,height=row.winfo_reqheight())
             bind_hover(row,lambda a,fn=hover_row:fn(None,a),region=slot,also=(slot,))
             items.append((row,slot))
+        self.body.update_idletasks()
+        for row,slot in items:
+            slot.configure(width=row.winfo_reqwidth()+4,height=row.winfo_reqheight())
         def put(row,slot,x):
             if row.winfo_exists() and slot.winfo_exists():
                 row.place(in_=slot,x=x,y=0,relheight=1,relwidth=1,width=-4)
