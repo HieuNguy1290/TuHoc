@@ -17,7 +17,7 @@ DEFAULT_RATIOS = [
     [15,25,30,20,10],[10,20,30,25,15],[5,15,25,30,25],
     [0,10,20,35,35],
 ]
-SUBJECTS = {'tieng_anh': 'Tiếng Anh', 'tieng_viet': 'Tiếng Việt'}
+SUBJECTS = {'tieng_anh': 'Tiếng Anh', 'tieng_viet': 'Tiếng Việt', 'toan': 'Toán'}
 
 def subject_of(q):
     # Legacy questions belong to English until the teacher explicitly moves them.
@@ -42,6 +42,10 @@ def validate_config(cfg):
     return cfg
 
 
+class MissingExamMedia(ValueError):
+    """An exam question refers to an asset unavailable on this machine."""
+
+
 def validate_question(q):
     if not isinstance(q,dict):raise ValueError('Câu hỏi không hợp lệ.')
     if subject_of(q) not in SUBJECTS: raise ValueError('Môn học không hợp lệ.')
@@ -53,17 +57,19 @@ def validate_question(q):
     if q['type'] in {'listening_choice','listening_fill'}:
         audio=str(q.get('audio','')).strip()
         if not audio or not Path(audio).is_file() or Path(audio).suffix.lower() not in {'.mp3','.ogg','.wav'}:
-            raise ValueError('Câu hỏi nghe cần file MP3, OGG hoặc WAV đang tồn tại.')
+            raise MissingExamMedia('Câu hỏi nghe cần file MP3, OGG hoặc WAV đang tồn tại.')
     if q['type'] in {'picture_choice','picture_missing_letters'}:
         image=str(q.get('image','')).strip()
-        if not image or not Path(image).is_file():raise ValueError('Câu nhìn hình cần ảnh hợp lệ trên máy này.')
+        if not image or not Path(image).is_file():raise MissingExamMedia('Câu nhìn hình cần ảnh hợp lệ trên máy này.')
     if q['type']=='listening_choice':
         image=str(q.get('image','')).strip()
-        if image and not Path(image).is_file():raise ValueError('Ảnh minh họa của câu nghe không tồn tại trên máy này.')
+        if image and not Path(image).is_file():raise MissingExamMedia('Ảnh minh họa của câu nghe không tồn tại trên máy này.')
     if q['type']=='image_multi_choice':
         opts=q.get('options',[])
-        if not isinstance(opts,list) or not 2<=len(opts)<=4 or any(not isinstance(p,str) or not Path(p).is_file() for p in opts):
+        if not isinstance(opts,list) or not 2<=len(opts)<=4 or any(not isinstance(p,str) for p in opts):
             raise ValueError('Cần 2–4 file ảnh đáp án có tồn tại.')
+        if any(not Path(p).is_file() for p in opts):
+            raise MissingExamMedia('Cần 2–4 file ảnh đáp án có tồn tại.')
         if len(set(os.path.normcase(os.path.abspath(p)) for p in opts))!=len(opts):
             raise ValueError('Ảnh đáp án không được trùng nhau.')
         if q.get('answer') not in opts:raise ValueError('Ảnh đúng phải nằm trong các lựa chọn.')
@@ -200,6 +206,30 @@ class ExamBank:
         _atomic(self.questions_path,rows)
         return q['id']
 
+    def add_text_questions(self, questions):
+        """Add a batch of text questions, preserving existing records by ID."""
+        from safe_storage import commit_json
+
+        rows = _read(self.questions_path, [])
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise ValueError('Ngân hàng câu hỏi phải là danh sách câu hỏi.')
+        existing = {str(row.get('id', '')) for row in rows}
+        incoming = set()
+        additions = []
+        for question in questions:
+            validate_question(question)
+            qid = question.get('id')
+            if not isinstance(qid, str) or not qid.strip() or qid in incoming:
+                raise ValueError('Bộ câu hỏi có mã trùng hoặc thiếu.')
+            if question.get('image') or question.get('audio') or question['type'] == 'image_multi_choice':
+                raise ValueError('Bộ nạp câu hỏi văn bản không nhận ảnh hoặc âm thanh.')
+            incoming.add(qid)
+            if qid not in existing:
+                additions.append(dict(question, subject=subject_of(question)))
+        if additions:
+            commit_json({self.questions_path: [*rows, *additions]})
+        return len(additions)
+
     def delete_question(self,question_id):
         rows=_read(self.questions_path,[])
         if not isinstance(rows,list):raise ValueError('Ngân hàng câu hỏi phải là danh sách.')
@@ -216,6 +246,9 @@ class ExamBank:
     def save_reading(self,group):
         # Work on a deep copy: editor drafts must not be mutated on save or failure.
         group=copy.deepcopy(group)
+        if 'layout' in group:
+            from question_layout_store import validate_layout
+            group['layout'] = validate_layout(group['layout'])
         for field in ('subject','grade','lesson','title','passage'):
             if not str(group.get(field,'')).strip():raise ValueError('Bài đọc thiếu '+field)
         if group['subject'] not in SUBJECTS:raise ValueError('Môn học không hợp lệ.')
@@ -240,9 +273,6 @@ class ExamBank:
         groups=[g for g in self.reading_groups() if g.get('id')!=gid]
         groups.append(group);_atomic(self.readings_path,groups)
         return gid
-        if 'layout' in group:
-            from question_layout_store import validate_layout
-            group['layout'] = validate_layout(group['layout'])
 
     def delete_reading(self,gid):
         groups=self.reading_groups();remaining=[g for g in groups if g.get('id')!=gid]
@@ -287,7 +317,37 @@ class ExamBank:
         lessons.update(str(g['lesson']) for g in self.reading_groups() if str(g.get('grade'))==str(grade) and g.get('subject')==subject)
         return sorted(lessons,key=str.casefold)
 
-    def create_exam(self,grade,lesson,level,rng=None,subject='tieng_anh'):
+    def exam_courses(self, subject):
+        from exam_content.grade2 import LESSON
+
+        courses = {}
+        for row in (*self.questions(), *self.reading_groups()):
+            if subject_of(row) != subject:
+                continue
+            grade = str(row.get('grade', '')).strip()
+            lesson = str(row.get('lesson', '')).strip()
+            if grade and lesson:
+                courses.setdefault(grade, set()).add(lesson)
+        samples = {'tieng_anh': ('1', 'Family & Friends'), 'tieng_viet': ('2', LESSON)}
+        if subject in samples:
+            grade, lesson = samples[subject]
+            courses.setdefault(grade, set()).add(lesson)
+        return {grade: sorted(lessons, key=str.casefold)
+                for grade, lessons in sorted(courses.items(), key=lambda item: (
+                    not item[0].isdigit(), int(item[0]) if item[0].isdigit() else item[0]))}
+
+    @staticmethod
+    def _sample_questions(grade, lesson, subject):
+        if (subject, str(grade), lesson) == ('tieng_anh', '1', 'Family & Friends'):
+            from seed_family_grade1 import build_questions
+            return build_questions(lesson)
+        if subject == 'tieng_viet' and str(grade) == '2':
+            from exam_content.grade2 import LESSON, build_questions
+            if lesson == LESSON:
+                return [q for q in build_questions() if q['subject'] == subject]
+        return []
+
+    def create_exam(self,grade,lesson,level,rng=None,subject='tieng_anh', *, include_samples=False):
         if subject not in SUBJECTS: raise ValueError('Môn học không hợp lệ.')
         cfg=self.config();level=int(level)
         if not 1<=level<=10:raise ValueError('Level phải từ 1 đến 10.')
@@ -296,9 +356,17 @@ class ExamBank:
         raw=[n*p/100 for p in ratios];counts=[math.floor(x) for x in raw]
         for i in sorted(range(5),key=lambda i:(-(raw[i]-counts[i]),i))[:n-sum(counts)]:counts[i]+=1
         eligible=[q for q in self.questions() if str(q.get('grade'))==str(grade) and str(q.get('lesson'))==str(lesson) and subject_of(q)==subject]
+        if include_samples:
+            existing_ids = {q.get('id') for q in eligible}
+            eligible.extend(q for q in self._sample_questions(grade, lesson, subject) if q['id'] not in existing_ids)
         ids=set();buckets={i:[] for i in range(1,6)}
+        skipped_media = 0
         for q in eligible:
-            validate_question(q)
+            try:
+                validate_question(q)
+            except MissingExamMedia:
+                skipped_media += 1
+                continue
             qid=str(q.get('id',''))
             if not qid or qid in ids:raise ValueError('Mã câu hỏi trùng hoặc thiếu.')
             ids.add(qid);buckets[int(q['difficulty'])].append(q)
@@ -313,6 +381,8 @@ class ExamBank:
                 q=dict(child,subject=subject,grade=str(grade),lesson=str(lesson),type='choice',
                        passage=group['passage'],reading_title=group['title'],reading_group=gid,
                        id=str(child.get('id') or f'{gid}:{i+1}'),reading_index=i+1,reading_total=len(group['questions']))
+                if 'layout' in group:
+                    q['reading_layout'] = group['layout']
                 validate_question(q)
                 if q['id'] in ids:raise ValueError('Mã câu hỏi bài đọc bị trùng.')
                 ids.add(q['id']);children.append(q);vector[int(q['difficulty'])-1]+=1
@@ -335,10 +405,9 @@ class ExamBank:
         if not fit(0,counts):
             available=[len(buckets[i]) for i in range(1,6)]
             raise ValueError('Ngân hàng chưa đủ câu theo tỷ lệ M1–M5. Câu hỏi bài đọc phải lấy trọn nhóm. '
-                             +'Cần: '+str(counts)+'; câu đơn có: '+str(available)+'.')
+                             +'Cần: '+str(counts)+'; câu đơn có: '+str(available)+'.'
+                             +(f' Bỏ qua {skipped_media} câu thiếu tệp ảnh hoặc âm thanh.' if skipped_media else ''))
         remaining=counts[:]
-                if 'layout' in group:
-                    q['reading_layout'] = group['layout']
         selected=[]
         for i in chosen:
             children,vector=groups[i];selected.extend(children)

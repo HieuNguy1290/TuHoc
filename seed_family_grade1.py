@@ -87,6 +87,45 @@ M3=[
 ]
 
 
+M3 += [
+    ('Lily is my mum. Whose bag is Lily’s bag?', 'Mum’s', ['Dad’s', 'My brother’s', 'My friend’s']),
+    ('I am Leo. Jack is my brother. Who says “Jack is my brother”?', 'Leo', ['Jack', 'Mum', 'Dad']),
+    ('Mum says “This is your dad.” Who is she talking about?', 'My father', ['My sister', 'My mother', 'My cousin']),
+    ('Ben is my brother. Mia is my sister. Who are Ben and Mia?', 'My family', ['My teachers', 'My pets', 'My neighbours']),
+    ('I have a new baby sister. Who is younger?', 'My sister', ['Me', 'My mum', 'My dad']),
+]
+
+M4 = [
+    'This is my mother', 'I love my family', 'My brother likes apples',
+    'Her dad can swim', 'That is our grandma', 'His sister has pencils',
+    'Our family reads together', 'My uncle plays football', 'Grandpa has a hat',
+    'Your cousin looks happy', 'I help my dad', 'She hugs her grandma',
+    'We visit our cousins', 'My sister draws stars', 'Dad makes fresh juice',
+    'Their baby likes music', 'I see my aunt', 'My friend knows Grandma',
+]
+
+M5 = [
+    ('Tina lives with Mum and Dad. Gran lives nearby. Tina visits Gran on Sundays.', 'Who does Tina visit?', 'Gran', 'Dad', 'Mum', 'Her teacher'),
+    ('Sam has two brothers. One is called Ben. The other is called Tom.', 'Who is Ben to Tom?', 'His brother', 'His sister', 'His dad', 'His uncle'),
+    ('Mum is reading. Dad is washing the cups. Lily helps with the cups.', 'Who is Lily helping?', 'Dad', 'Mum', 'Grandma', 'Her sister'),
+    ('Amy makes a card for her mum. Then Amy makes one for her aunt.', 'How many cards does Amy make?', 'Two', 'One', 'Three', 'Four'),
+    ('Dad gives a blue cup to his son, Max, and a green cup to his daughter, May.', 'Whose cup is green?', 'May’s', 'Max’s', 'Mum’s', 'Dad’s'),
+    ('Ben has a sister named Mia. Mia has a friend named Zoe.', 'Who is in Ben’s family?', 'Mia', 'Zoe', 'Mia’s teacher', 'Zoe’s brother'),
+    ('Gran and I can sing. My sister can dance. Dad plays the piano.', 'Who can dance?', 'My sister', 'Gran', 'My dad', 'I can'),
+    ('Maya puts Mum’s hat near the door. Then Mum leaves with the hat.', 'Who takes the hat?', 'Mum', 'Maya', 'Dad', 'Grandpa'),
+    ('There are five chairs. Mum, Dad, and I sit down.', 'How many chairs are still empty?', 'Two', 'One', 'Three', 'Five'),
+    ('Mr. Lam is Mum’s dad. He gives me a ball.', 'Who gives me a ball?', 'Grandpa', 'My brother', 'My uncle', 'My dad'),
+    ('Rita visits Alex. Alex has a cat. Rita has a dog at home.', 'Whose pet is a cat?', 'Alex’s', 'Rita’s', 'Both pets', 'Neither pet'),
+    ('My dad is taller than my brother. My brother is taller than me.', 'Who is the tallest?', 'Dad', 'My brother', 'Me', 'We are the same height'),
+    ('The small box is for my sister. The big box is for my grandpa.', 'Who gets the big box?', 'Grandpa', 'My sister', 'My aunt', 'My mum'),
+    ('I visit my uncle on Monday. I visit Grandma the next day.', 'Who do I visit after my uncle?', 'Grandma', 'My uncle again', 'My brother', 'My dad'),
+    ('My sister has a book and a pen. I lend her a red pencil.', 'What do I give her?', 'A pencil', 'A pen', 'A book', 'A ruler'),
+    ('Nina lives with her parents and has no brothers. Her sister is called Lola.', 'Who is Lola to Nina?', 'Her sister', 'Her mum', 'Her brother', 'Her dad'),
+    ('Dad puts three plates on the table. Mum adds one plate for Grandma.', 'How many plates are on the table now?', 'Four', 'Two', 'Three', 'Five'),
+    ('Mia and her grandpa are looking at a photo. The girl in it is Mia’s mum as a child.', 'Who is the girl in the photo?', 'Mia’s mum', 'Mia', 'Mia’s friend', 'Mia’s grandma'),
+]
+
+
 def build_questions(lesson='Family & Friends'):
     questions=[]
     for difficulty,rows in ((1,M1),(2,M2),(3,M3)):
@@ -107,7 +146,19 @@ def build_questions(lesson='Family & Friends'):
                     4:'There are four people in my family: Dad, Mom, my brother and me. We love each other.'}
                 q['passage']=passages[i]
                 q['prompt']={1:'Who is Mai’s father?',2:'Who is Amy?',3:'How many parents are named?',4:'How many people are in the family?'}[i]
-            validate_question(q);questions.append(q)
+            questions.append(q)
+    for index, sentence in enumerate(M4, 1):
+        questions.append(dict(id=f'DEMO_EN_G1_FAMILY_M4_{index:03d}', subject='tieng_anh',
+            grade='1', lesson=lesson, difficulty=4, type='order',
+            prompt='Put the words in order to make a sentence.', sequence=sentence.split()))
+    for index, (passage, prompt, answer, *others) in enumerate(M5, 1):
+        options = [answer, *others]
+        offset = index % len(options)
+        questions.append(dict(id=f'DEMO_EN_G1_FAMILY_M5_{index:03d}', subject='tieng_anh',
+            grade='1', lesson=lesson, difficulty=5, type='choice', passage=passage,
+            prompt=prompt, answer=answer, options=options[offset:] + options[:offset]))
+    for question in questions:
+        validate_question(question)
     return questions
 
 
@@ -116,14 +167,7 @@ def install(root,lesson=None):
     if lesson is None:
         found=[name for name in bank.lessons('1','tieng_anh') if 'family' in name.casefold()]
         lesson=found[0] if found else 'Family & Friends'
-    existing=bank.questions();generated=build_questions(lesson)
-    # Replace only our demo IDs; preserve all teacher questions and other subjects.
-    prefix='DEMO_EN_G1_FAMILY_'
-    rows=[q for q in existing if not str(q.get('id','')).startswith(prefix)]
-    rows.extend(generated)
-    from exam_bank import _atomic
-    _atomic(bank.questions_path,rows)
-    return lesson,len(generated)
+    return lesson, bank.add_text_questions(build_questions(lesson))
 
 
 if __name__=='__main__':

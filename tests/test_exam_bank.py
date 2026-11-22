@@ -121,7 +121,6 @@ def test_exam_can_use_bank_with_audio(bank_with_audio):
     assert len(bank.create_exam("3", "L1", 1, rng=random.Random(1))["questions"]) == 5
 
 
-@pytest.mark.xfail(strict=True, raises=ValueError, reason="EX.3: a missing audio asset currently blocks the whole exam")
 def test_missing_audio_skips_only_broken_question(bank_with_audio):
     from pathlib import Path
 

@@ -20,9 +20,8 @@ def exam_records(conn, student_id, subject=None):
             if not isinstance(row, dict) or str(row.get('student_id')) != str(student_id):
                 continue
             kind = row.get('subject', 'tieng_anh')
-            if subject == 'vi' and kind not in ('tieng_viet', 'vi'):
-                continue
-            if subject == 'en' and kind in ('tieng_viet', 'vi'):
+            aliases = {'tieng_viet': 'vi', 'tieng_anh': 'en'}
+            if subject and aliases.get(kind, kind) != aliases.get(subject, subject):
                 continue
             try:
                 stamp = datetime.datetime.fromisoformat(str(row['submitted_at'])).timestamp()

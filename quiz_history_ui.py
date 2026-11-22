@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 from exam_history_bridge import exam_records, exam_detail
+from exam_bank import SUBJECTS as EXAM_SUBJECTS
 import tkinter as tk
 from tkinter import ttk
 
@@ -735,7 +736,7 @@ def show_history(parent, conn, student_id, on_back=None, on_retry=None):
     tk.Label(filters, text='Môn học', bg=BG, fg=INK,
              font=(font, 10, 'bold')).pack(side='left', padx=(0, 12))
     selected = tk.StringVar(value='Tất cả')
-    options = {'Tất cả': None, 'Tiếng Anh': 'en', 'Tiếng Việt': 'vi'}
+    options = {'Tất cả': None, 'Tiếng Anh': 'en', 'Tiếng Việt': 'vi', 'Toán': 'toan'}
     style = ttk.Style()
     style.configure('LearningHistory.TCombobox', padding=6,
                     fieldbackground=WHITE, background=PALE_GREEN,
@@ -829,13 +830,13 @@ def show_history(parent, conn, student_id, on_back=None, on_retry=None):
             where = "AND theme NOT LIKE 'vi:%'"
         else:
             where = ''
-        db_records = conn.execute(
+        db_records = [] if language == 'toan' else conn.execute(
             'SELECT id,theme,level,started,seconds,correct,total FROM learning_sessions '
             'WHERE student_id=? '+where+' ORDER BY started DESC,id DESC', (student_id,)).fetchall()
         exams = exam_records(conn, student_id, language)
-        exam_rows = [('exam:'+item[0], ('vi:' if item[1] in ('tieng_viet','vi') else '') +
-                      '[Kiểm tra] '+item[2], item[3], item[4], None, item[5], item[6])
-                     for item in exams]
+        exam_subjects = {'exam:'+item[0]: item[1] for item in exams}
+        exam_rows = [('exam:'+item[0], '[Kiểm tra] '+item[2], item[3], item[4], None,
+                      item[5], item[6]) for item in exams]
         combined = sorted(list(db_records) + exam_rows, key=lambda r: float(r[3] or 0), reverse=True)
         combined=history_window(combined,periods[period.get()])
         count = len(combined)
@@ -848,7 +849,10 @@ def show_history(parent, conn, student_id, on_back=None, on_retry=None):
             total = int(total or 0)
             correct = int(correct or 0)
             percent = correct * 100 / total if total else None
-            values = (_date(started), 'Tiếng Việt' if is_vi else 'Tiếng Anh',
+            exam_subject = exam_subjects.get(_id)
+            subject_label = EXAM_SUBJECTS.get(
+                exam_subject, 'Tiếng Việt' if is_vi or exam_subject == 'vi' else 'Tiếng Anh')
+            values = (_date(started), subject_label,
                       clean_theme, str(level), f'{correct}/{total}',
                       f'{percent:.0f}%' if percent is not None else '—',
                       _duration(seconds))

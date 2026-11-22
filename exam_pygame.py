@@ -65,6 +65,7 @@ class ExamUI:
         self.bank=ExamBank(root);self.student_id=student_id
         self.running=True;self.mode='select';self.subject='tieng_anh';self.grade='';self.lesson='';self.level=1
         self.exam=None;self.answers={};self.index=0;self.deadline=0
+        self.courses = {}
         self.scroll=0;self.dropdown=None;self.buttons=[];self.mouse=(-1,-1)
         self.resolution=(1280,720);self.window=None;self.error=None
         self.flagged=set();self.nav_page=0;self.nav_filter='all';self.nav_page_size=40;self.nav_area=pygame.Rect(791,202,254,404);self.read_scroll={};self.scroll_limit=0;self.read_area=pygame.Rect(0,0,0,0)
@@ -80,9 +81,7 @@ class ExamUI:
             self._set_mode(self.resolution)
             self.font=self._font(22);self.bold=self._font(24,True)
             self.big=self._font(36,True);self.small=self._font(18)
-            self.grade=next(iter(self.bank.grades()),'')
-            self.lesson=next(iter(self.bank.lessons(self.grade,self.subject)),'')
-            self._ensure_family_demo()
+            self._refresh_courses()
             clock=pygame.time.Clock()
             while self.running and not _app_shutdown.is_set():
                 for ev in pygame.event.get():
@@ -237,50 +236,54 @@ class ExamUI:
         self._text(s,'TRUNG TÂM KIỂM TRA',65,53,self.big)
         self._text(s,'Chọn môn học, lớp, bài học và Level',65,105,self.font,MUTED)
         self._select(s,'1. Môn học',SUBJECTS[self.subject],(65,192,292,54),list(SUBJECTS.values()),self._subject_changed)
-        self._select(s,'2. Chọn lớp',self.grade,(400,192,292,54),self.bank.grades(),self._grade_changed)
-        self._select(s,'3. Chọn bài học',self.lesson,(735,192,292,54),self.bank.lessons(self.grade,self.subject),self._lesson_changed)
+        self._select(s,'2. Chọn lớp',self.grade,(400,192,292,54),self.courses,self._grade_changed)
+        self._select(s,'3. Chọn bài học',self.lesson,(735,192,292,54),self.courses.get(self.grade, ()),self._lesson_changed)
         self._select(s,'4. Chọn Level',f'Level {self.level}',(65,319,292,54),[f'Level {i}' for i in range(1,11)],self._level_changed)
         self._select(s,'Độ phân giải',f'{self.resolution[0]} x {self.resolution[1]}',(735,319,292,54),[f'{w} x {h}' for w,h in RESOLUTIONS],lambda v:self._set_mode(tuple(map(int,v.split(' x ')))))
         cfg=self.bank.config();self._text(s,f'Số câu: {cfg["question_count"]}    |    Thời gian: {cfg["minutes"]} phút',65,425,self.bold)
         self._text(s,'Đề ngẫu nhiên theo tỷ lệ độ khó. Tất cả Level đều mở tự do.',65,472,self.font,MUTED)
         if self.error:self._text(s,self.error,65,513,self.small,(180,50,50),width=950)
-        self._button(s,'Làm bài',(390,573,320,65),self._start,True)
+        if self.lesson:
+            self._button(s,'Làm bài',(390,573,320,65),self._start,True)
+        elif not self.error:
+            self._text(s,'Môn này chưa có bài kiểm tra. Hãy thêm câu hỏi trong Ngân hàng kiểm tra.',
+                       65,513,self.small,MUTED,width=950)
         self._button(s,'Thoát',(65,573,180,65),lambda:setattr(self,'running',False))
 
+    def _refresh_courses(self):
+        self.courses = {}
+        try:
+            self.courses = self.bank.exam_courses(self.subject)
+        except (ValueError, OSError, TypeError) as exc:
+            self.error = 'Không đọc được ngân hàng kiểm tra: ' + str(exc)
+        if self.grade not in self.courses:
+            self.grade = next(iter(self.courses), '')
+        lessons = self.courses.get(self.grade, ())
+        if self.lesson not in lessons:
+            self.lesson = next(iter(lessons), '')
+
     def _subject_changed(self,label):
-        self.subject=next((k for k,v in SUBJECTS.items() if v==label),'tieng_anh')
-        self.lesson=next(iter(self.bank.lessons(self.grade,self.subject)),'');self.error=None
+        subject = next((key for key, title in SUBJECTS.items() if title == label), self.subject)
+        if subject != self.subject:
+            self.subject = subject
+            self.lesson = ''
+        self.error = None
+        self._refresh_courses()
+
     def _grade_changed(self,grade):
-        self.grade=grade;self.lesson=next(iter(self.bank.lessons(grade,self.subject)),'');self.error=None
+        self.grade = grade
+        self.lesson = next(iter(self.courses.get(grade, ())), '')
+        self.error = None
+
     def _lesson_changed(self,lesson):self.lesson=lesson;self.error=None
     def _level_changed(self,level):self.level=int(level.split()[-1]);self.error=None
-
-    def _ensure_family_demo(self):
-        """One-time, additive Grade 1 English Family demo setup for Patch 02.
-
-        Never remove teacher-created questions; never touch other subjects.
-        """
-        if self.subject != 'tieng_anh' or str(self.grade) != '1' or 'family' not in self.lesson.casefold():
-            return
-        try:
-            from seed_family_grade1 import install
-            rows=self.bank.questions()
-            demo=[q for q in rows if str(q.get('id','')).startswith('DEMO_EN_G1_FAMILY_') and
-                  str(q.get('grade'))=='1' and str(q.get('lesson'))==str(self.lesson) and
-                  str(q.get('subject','tieng_anh'))=='tieng_anh']
-            if len(demo)<75:
-                install(self.bank.folder.parent,self.lesson)
-        except Exception as exc:
-            self.error='Không thể nạp bộ câu hỏi mẫu: '+str(exc)
 
     def _start(self):
         try:
             if not self.grade or not self.lesson:raise ValueError('Hãy chọn lớp và bài học.')
             self.error=None
-            self._ensure_family_demo()
-            if self.error:raise ValueError(self.error)
-            self.exam=self.bank.create_exam(self.grade,self.lesson,self.level,subject=self.subject)
-        except (ValueError,KeyError,TypeError) as exc:self.error=str(exc);return
+            self.exam=self.bank.create_exam(self.grade,self.lesson,self.level,subject=self.subject,include_samples=True)
+        except (ValueError,KeyError,TypeError,OSError) as exc:self.error=str(exc);return
         self.answers={};self.index=0;self.scroll=0;self.flagged=set();self.nav_page=0;self.nav_filter='all';self.read_scroll={};self.match_pending=None;self.order_inputs={}
         self.gap_focus=0;self.group_scroll={};self.passage_scroll={};self._focus_child_id=None;self._reading_active_child=None
         self.deadline=time.time()+self.exam['minutes']*60;self.mode='exam';self.error=None

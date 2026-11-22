@@ -1,8 +1,8 @@
 ## Quyết định đã chốt
 
-- Studio dùng layout v4 cho các phần tử hoặc thuộc tính mới. Layout cũ, v2 và v3 vẫn đọc được. Định dạng theo đoạn dùng cho câu dẫn, đoạn đọc và hộp văn bản. Thẻ đáp án xáo thứ tự dùng kiểu chữ cho cả thẻ theo vị trí hiển thị.
+- Studio dùng layout v4 cho định dạng mới và tiếp tục đọc bố cục cũ. Thanh định dạng áp dụng trực tiếp lên đoạn bôi đen. Cửa sổ Studio dùng chế độ phóng to của hệ điều hành và giữ nút lưu ở chân cửa sổ.
+- Kiểm tra chọn lớp và chủ đề theo môn. Bộ mẫu Tiếng Anh lớp 1 và Tiếng Việt lớp 2 tạo được đề theo các tỷ lệ mặc định từ Level 1 đến 10. Mở và làm đề mẫu không ghi vào ngân hàng.
 
 ## Việc còn lại
 
-- Lập ma trận nghiệm thu độc lập cho từng thuộc tính ở mỗi dạng. Phát lại 26 dạng và xem trước các dạng Exam kiểm tra luồng chính, còn các giới hạn về kích thước và tự xuống dòng cần ca riêng.
-- Kiểm tay trên Windows đối với DPI, IME, âm thanh và clipboard.
+- Chưa kiểm trực tiếp trên Windows với taskbar, DPI và IME. Đã xác nhận các nút cuối cửa sổ còn thấy được trên màn hình Linux 1024 × 600.

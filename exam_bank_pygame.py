@@ -189,6 +189,9 @@ class BankManager:
         self.multiline_key=key;self.multiline_open=True;self.multiline_scroll=0;self.active=None
         pygame.key.start_text_input()
 
+    def multiline_form(self):
+        return self.reading_form if self.edit_type=='reading_group' else self.form
+
     def multiline_click(self,pos):
         w,h=self.size
         if pygame.Rect(w-156,h-95,118,42).collidepoint(pos):
@@ -216,7 +219,7 @@ class BankManager:
         self.text('SOẠN ĐOẠN VĂN NHIỀU DÒNG',44,60,self.b)
         self.text('Enter: xuống dòng  •  Cuộn chuột: xem nội dung  •  Esc: đóng',44,94,self.sm,MUTED,w-88)
         area=pygame.Rect(43,132,w-86,max(95,h-285));self.rect(area,(250,252,255),BLUE,8)
-        value=self.reading_form.get(self.multiline_key,'')
+        value=self.multiline_form().get(self.multiline_key,'')
         lines=self.wrap_lines(value,self.f,area.w-35)
         visible=max(1,(area.h-25)//27)
         self.multiline_scroll=min(self.multiline_scroll,max(0,len(lines)-visible))
@@ -248,12 +251,12 @@ class BankManager:
             return
         if self.multiline_open:
             if e.key==pygame.K_ESCAPE:self.multiline_open=False;pygame.key.stop_text_input();return
-            value=self.reading_form.get(self.multiline_key,'')
+            value=self.multiline_form().get(self.multiline_key,'')
             if e.key==pygame.K_BACKSPACE:value=value[:-1]
             elif e.key==pygame.K_RETURN:value+='\n'
             elif e.key==pygame.K_TAB:value+='    '
             
-            self.reading_form[self.multiline_key]=value
+            self.multiline_form()[self.multiline_key]=value
             lines=self.wrap_lines(value,self.f,self.size[0]-121)
             visible=max(1,(self.size[1]-251-25)//27)
             self.multiline_scroll=max(0,len(lines)-visible)
@@ -301,7 +304,8 @@ class BankManager:
         if not text or not text.isprintable():return
         if self.multiline_open:
             key=self.multiline_key
-            self.reading_form[key]=(self.reading_form.get(key,'')+text)[:30000]
+            form=self.multiline_form()
+            form[key]=(form.get(key,'')+text)[:30000]
             return
         if not self.active:return
         if self.active.startswith('ratio_'):
@@ -410,6 +414,8 @@ class BankManager:
             self.reading_questions=[{'id':str(q.get('id','')), 'prompt':str(q.get('prompt','')), 'options':' | '.join(q.get('options',[])), 'answer':str(q.get('answer','')), 'difficulty':str(q.get('difficulty',1)), 'layout':q.get('layout')} for q in row.get('questions',[])] if row else []
             if not self.reading_questions:self.reading_questions=[{'prompt':'','options':'A | B | C | D','answer':'','difficulty':'1'},{'prompt':'','options':'A | B | C | D','answer':'','difficulty':'1'}]
         self.form={'prompt':row.get('prompt','') if row else '', 'options':' | '.join(row.get('options',[])) if row else 'A | B | C | D','answer':str(row.get('answer','')) if row else '', 'sequence':' | '.join(row.get('sequence',[])) if row else '', 'pairs':' | '.join(' = '.join(p) for p in row.get('pairs',[])) if row else '', 'wrong':row.get('wrong','') if row else '', 'corrected':row.get('corrected','') if row else '', 'difficulty':str(row.get('difficulty',1)) if row else '1', 'gap_answers':' | '.join(row.get('gap_answers',[])) if row else '', 'audio':str(row.get('audio','')) if row else '', 'image':str(row.get('image','')) if row else '', 'image_options':list(row.get('options',[])) if row and row.get('type')=='image_multi_choice' else [], 'image_correct':str(row.get('answer','')) if row and row.get('type')=='image_multi_choice' else ''}
+        self.form['passage']=str(row.get('passage') or row.get('reading') or '') if row else ''
+
     def duplicate(self,row):
         self.begin(row)
         self.edit_id=''
@@ -502,6 +508,8 @@ class BankManager:
                 q['image']=self.bank._resolve_media(f['image'].strip())
                 if not Path(q['image']).is_file():
                     raise ValueError('Không tìm thấy ảnh minh họa. Hãy chọn lại tệp.')
+            if typ in ('choice','true_false') and f.get('passage','').strip():
+                q['passage']=f['passage'].strip()
             if self.edit_layout is not None:
                 q['layout']=self.edit_layout
             if typ=='image_multi_choice':
@@ -520,6 +528,25 @@ class BankManager:
         if value!=self.tab:self.edit_scroll=0
         self.tab=value;self.active=None;self.dropdown=None
 
+    def install_grade2(self):
+        from exam_content.grade2 import LESSON, install
+
+        try:
+            count = install(self.bank)
+        except (ValueError, OSError) as exc:
+            self.message = 'Lỗi nạp bộ lớp 2: ' + str(exc)
+            return
+        if self.subject not in ('toan', 'tieng_viet'):
+            self.subject = 'toan'
+        self.grade = '2'
+        self.lesson = LESSON
+        self.change_tab('bank')
+        self.filter_type = self.filter_diff = 'all'
+        self.search = ''
+        self.set_page(1)
+        self.message = (f'Đã thêm {count} câu lớp 2.' if count else
+                        'Bộ lớp 2 đã có đủ 200 mã câu hỏi.')
+
     def draw(self):
         s=self.screen;w,h=self.size;s.fill(BG);self.actions=[]
         self.text('NGÂN HÀNG KIỂM TRA',28,22,self.h)
@@ -528,6 +555,8 @@ class BankManager:
         self.btn('Đóng',pygame.Rect(w-112,23,84,36),lambda:setattr(self,'running',False))
         for i,(name,key) in enumerate([('Danh sách câu hỏi','bank'),('Thêm / Sửa câu hỏi','edit'),('Cấu hình đề','config')]):
             self.btn(name,pygame.Rect(28+i*190,92,181,38),lambda v=key:(self.begin() if v=='edit' and self.tab!='edit' else self.change_tab(v)),self.tab==key)
+        if self.tab=='bank':
+            self.btn('Nạp bộ lớp 2',pygame.Rect(w-151,92,123,38),self.install_grade2)
         self.rect(pygame.Rect(28,148,w-56,108),WHITE,LINE)
         for i,(label,attr,values) in enumerate([('Môn học','subject',list(SUBJECTS)),('Lớp','grade',self.bank.grades()),('Bài học','lesson',self.bank.lessons(self.grade,self.subject)),('Level','level',list(range(1,11))) ]):
             x=46+i*(w-92)//4;self.text(label,x,163,self.sm,MUTED)
@@ -637,6 +666,7 @@ class BankManager:
         self.text('Bộ soạn thảo theo từng dạng câu hỏi',32,274,self.b)
         self.btn('Dạng: '+dict(TYPES)[self.edit_type]+'  ▼',pygame.Rect(30,313,w-60,43),lambda:self.open_dropdown('edit_type',[t[0] for t in TYPES],pygame.Rect(30,313,w-60,43),dict(TYPES)))
         self.text('Mã: '+(self.edit_id or 'Tạo tự động khi lưu'),35,368,self.sm,MUTED)
+        self.btn('Chỉnh bố cục', pygame.Rect(w-189,360,158,38), self.edit_visual_layout)
         required=[]
         if self.edit_type not in ('reading_group','picture_missing_letters') and not self.form.get('prompt','').strip():
             required.append('nội dung')
@@ -649,6 +679,10 @@ class BankManager:
         typ=self.edit_type
         if typ!='reading_group':
             self.field('Nội dung câu hỏi','prompt',pygame.Rect(x,y,wide,43),'Nhập câu hỏi...');y+=80
+        if typ in ('choice','true_false'):
+            label='Sửa đoạn đọc' if self.form['passage'].strip() else 'Thêm đoạn đọc'
+            self.btn(label,pygame.Rect(x,y,165,36),lambda:self.open_multiline('passage'))
+            y+=55
         if typ=='reading_group':
             self.draw_reading(w,h)
             return
@@ -666,7 +700,6 @@ class BankManager:
                 self.text('VẾ PHẢI',x+wide//2+10,y,self.sm,MUTED)
                 y+=28
             else:
-        self.btn('Chỉnh bố cục', pygame.Rect(w-189,360,158,38), self.edit_visual_layout)
                 self.text('Các cặp nối',x,y,self.sm,MUTED)
                 y+=28
             for i,pair in enumerate(self.match_pairs):
@@ -764,39 +797,6 @@ class BankManager:
         finally:
             if root is not None:root.destroy()
 
-    def pick_audio(self):
-        root=None
-        try:
-            root=Tk();root.withdraw();root.attributes('-topmost',True)
-            filename=filedialog.askopenfilename(parent=root,title='Chọn file nghe',filetypes=[('Âm thanh','*.mp3 *.ogg *.wav')])
-            if filename:self.form['audio']=filename
-        except Exception as exc:self.message='Không thể chọn file nghe: '+str(exc)
-        finally:
-            if root is not None:root.destroy()
-
-    def pick_question_image(self):
-        root=None
-        try:
-            root=Tk();root.withdraw();root.attributes('-topmost',True)
-            filename=filedialog.askopenfilename(parent=root,title='Chọn ảnh câu hỏi',filetypes=[('Hình ảnh','*.png *.jpg *.jpeg *.webp *.bmp')])
-            if filename:self.form['image']=filename
-        except Exception as exc:self.message='Không thể chọn ảnh: '+str(exc)
-        finally:
-            if root is not None:root.destroy()
-
-    def pick_match_image(self,index,side):
-        try:
-            root=Tk();root.withdraw();root.attributes('-topmost',True)
-            filename=filedialog.askopenfilename(parent=root,title='Chọn hình cho Matching',filetypes=[('Hình ảnh','*.png *.jpg *.jpeg *.webp *.bmp')]);root.destroy()
-            if filename:self.match_pairs[index][side]=filename
-        except Exception as exc:self.message='Không mở được hộp chọn ảnh: '+str(exc)
-
-    def set_edit_type(self,value):
-        self.edit_type=value
-        self.active=None
-        if value=='reading_group' and not self.reading_questions:
-            self.reading_questions=[{'prompt':'','options':'A | B | C | D','answer':'','difficulty':'1'} for _ in range(2)]
-            self.reading_form={'title':'','passage':''}
     def edit_visual_layout(self, *, child=False):
         from question_layout_editor import edit_layout
         from tkinter import TclError
@@ -841,6 +841,39 @@ class BankManager:
             if root is not None:
                 root.destroy()
 
+    def pick_audio(self):
+        root=None
+        try:
+            root=Tk();root.withdraw();root.attributes('-topmost',True)
+            filename=filedialog.askopenfilename(parent=root,title='Chọn file nghe',filetypes=[('Âm thanh','*.mp3 *.ogg *.wav')])
+            if filename:self.form['audio']=filename
+        except Exception as exc:self.message='Không thể chọn file nghe: '+str(exc)
+        finally:
+            if root is not None:root.destroy()
+
+    def pick_question_image(self):
+        root=None
+        try:
+            root=Tk();root.withdraw();root.attributes('-topmost',True)
+            filename=filedialog.askopenfilename(parent=root,title='Chọn ảnh câu hỏi',filetypes=[('Hình ảnh','*.png *.jpg *.jpeg *.webp *.bmp')])
+            if filename:self.form['image']=filename
+        except Exception as exc:self.message='Không thể chọn ảnh: '+str(exc)
+        finally:
+            if root is not None:root.destroy()
+
+    def pick_match_image(self,index,side):
+        try:
+            root=Tk();root.withdraw();root.attributes('-topmost',True)
+            filename=filedialog.askopenfilename(parent=root,title='Chọn hình cho Matching',filetypes=[('Hình ảnh','*.png *.jpg *.jpeg *.webp *.bmp')]);root.destroy()
+            if filename:self.match_pairs[index][side]=filename
+        except Exception as exc:self.message='Không mở được hộp chọn ảnh: '+str(exc)
+
+    def set_edit_type(self,value):
+        self.edit_type=value
+        self.active=None
+        if value=='reading_group' and not self.reading_questions:
+            self.reading_questions=[{'prompt':'','options':'A | B | C | D','answer':'','difficulty':'1'} for _ in range(2)]
+            self.reading_form={'title':'','passage':''}
 
     def next_edit_type(self):
         values=[t[0] for t in TYPES]
@@ -895,6 +928,8 @@ class BankManager:
         self.btn('+ Thêm câu',pygame.Rect(x,712,123,35),self.reading_add,disabled=len(self.reading_questions)>=10)
         self.btn('Xóa câu',pygame.Rect(x+132,712,108,35),self.reading_remove,disabled=len(self.reading_questions)<=2)
         self.text(f'Đang sửa câu {self.reading_child+1}/{len(self.reading_questions)}',x+256,721,self.sm,BLUE)
+        self.btn('Bố cục câu con', pygame.Rect(x+wide-154,712,154,35),
+                 lambda: self.edit_visual_layout(child=True))
         self.field('Nội dung câu hỏi con','child_prompt',pygame.Rect(x,800,wide,42),'Nhập nội dung câu hỏi')
         self.field('4 lựa chọn, ngăn cách bằng dấu |','child_options',pygame.Rect(x,888,wide,42),'A | B | C | D')
         self.field('Đáp án đúng (trùng một lựa chọn)','child_answer',pygame.Rect(x,979,wide//2-10,42),'Nhập đáp án đúng')
@@ -928,8 +963,6 @@ class BankManager:
 
     def adjust_ratio(self,level,index,delta):
         self.ensure_config_draft()
-        self.btn('Bố cục câu con', pygame.Rect(x+wide-154,712,154,35),
-                 lambda: self.edit_visual_layout(child=True))
         row=self.config_draft['ratios'][str(level)]
         # Adjust selected percentage against next level bucket to keep sum = 100.
         other=next((j for j in range(5) if j!=index and (row[j]>0 if delta>0 else row[j]<100)),None)

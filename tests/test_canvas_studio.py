@@ -104,6 +104,15 @@ class StudioTests(unittest.TestCase):
 
         self.assertEqual(self.interact(question, result, reopen), result)
 
+    def test_direct_formatting_keeps_unselected_properties(self):
+        from studio_text_format import format_segments
+
+        self.assertEqual(format_segments([dict(start=0, end=4, bold=True)], 2, 6, {'italic': True}), [
+            dict(start=0, end=2, bold=True),
+            dict(start=2, end=4, bold=True, italic=True),
+            dict(start=4, end=6, italic=True),
+        ])
+
     def test_text_formatting_is_saved_without_changing_the_question(self):
         question = {'type': 'choice', 'prompt': 'Bốn quả cam', 'options': ['4', '3'], 'answer': '4'}
 
@@ -119,11 +128,19 @@ class StudioTests(unittest.TestCase):
             dialog = next(child for child in win.winfo_children() if isinstance(child, tk.Toplevel))
             text = widgets(dialog, tk.Text)[0]
             text.tag_add('sel', '1.0', '1.3')
-            next(b for b in widgets(dialog, ttk.Checkbutton) if b.cget('text') == 'Gạch chân').invoke()
+            text.event_generate('<<Selection>>')
+            next(b for b in widgets(dialog, ttk.Checkbutton) if b.cget('text') == 'U · Gạch chân').invoke()
             combo = widgets(dialog, ttk.Combobox)[0]
             combo.set('DejaVu Serif')
-            button(dialog, 'Áp dụng').invoke()
+            combo.event_generate('<<ComboboxSelected>>')
+            next(b for b in widgets(dialog, ttk.Checkbutton) if b.cget('text') == 'I · Nghiêng').invoke()
+            self.assertTrue(text.tag_ranges('format_0'))
             button(dialog, 'Lưu').invoke()
+            canvas = next(c for c in widgets(win, tk.Canvas) if c.find_withtag('formatted_text'))
+            font = next(canvas.itemcget(item, 'font') for item in canvas.find_withtag('formatted_text')
+                        if canvas.itemcget(item, 'text') == 'Bốn')
+            self.assertIn('DejaVu Serif', font)
+            self.assertIn('underline', font)
             button(win, 'Lưu bố cục').invoke()
 
         layout = self.interact(question, None, edit)
@@ -132,8 +149,26 @@ class StudioTests(unittest.TestCase):
         run = layout['desktop']['question_text']['runs'][0]
         self.assertEqual((run['start'], run['end'], run['font_family']), (0, 3, 'DejaVu Serif'))
         self.assertTrue(run['underline'])
+        self.assertTrue(run['italic'])
+        self.assertNotIn('bold', run)
         self.assertEqual(question['prompt'], 'Bốn quả cam')
         self.assertEqual(question['answer'], '4')
+
+    def test_window_keeps_footer_reachable(self):
+        def check(win):
+            self.assertFalse(win.attributes('-fullscreen'))
+            self.assertFalse(win.transient())
+            buttons = widgets(win, ttk.Button)
+            toggle = next(b for b in buttons if b.cget('text') in {'Phóng to cửa sổ', 'Thu nhỏ cửa sổ'})
+            toggle.invoke()
+            win.update_idletasks()
+            save = next(b for b in buttons if b.cget('text') == 'Lưu bố cục')
+            self.assertTrue(save.winfo_ismapped())
+            bottom = save.winfo_rooty() + save.winfo_height()
+            self.assertLessEqual(bottom, win.winfo_rooty() + win.winfo_height())
+            save.invoke()
+
+        self.interact({'type': 'choice', 'prompt': 'Câu hỏi', 'options': ['Có', 'Không']}, None, check)
 
     def test_drag_at_zoom_with_scrolled_origin(self):
         question = {'type': 'fill', 'prompt': 'Câu hỏi'}
@@ -145,9 +180,12 @@ class StudioTests(unittest.TestCase):
 
             canvas = max(widgets(win, tk.Canvas), key=lambda w: w.winfo_width()*w.winfo_height())
             button('+').invoke()
-            canvas.yview_moveto(.42)
+            source_y = (16 + 775) * 1.1
+            viewport_y = canvas.winfo_height() / 4
+            scroll_height = float(canvas.cget('scrollregion').split()[3])
+            canvas.yview_moveto((source_y - viewport_y) / scroll_height)
             sx = round((16 + 180)*1.1 - canvas.canvasx(0))
-            sy = round((16 + 775)*1.1 - canvas.canvasy(0))
+            sy = round(source_y - canvas.canvasy(0))
             self.assertTrue(30 < sy < canvas.winfo_height()-138, (sy, canvas.winfo_height()))
             canvas.event_generate('<ButtonPress-1>', x=sx, y=sy)
             canvas.event_generate('<B1-Motion>', x=sx+44, y=sy+110)

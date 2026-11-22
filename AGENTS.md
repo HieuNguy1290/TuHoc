@@ -39,11 +39,12 @@ Khi bắt đầu, đọc hướng dẫn này và `docs/STATE.md` nếu tệp bà
 | Renderer theo dạng | `dropdown_extension.py`, `dropdown_inline_logic.py`, `inline_dropdown_extension.py`, `image_letter_pick_extension.py`, `image_sentence_extension.py`, `image_write_extension.py`, `listening_image_choice.py`, `listening_image_extension.py`, `multi_fill_blanks_extension.py`, `multi_select_extension.py`, `underline_extension.py`. Kiểm tra dispatch thực tế trước khi sửa một module có tên tương tự. |
 | Cửa sổ và media SDL | `pygame_session_guard.py`, `pygame_window_utils.py`, `pygame_exit_dialog.py`, `pygame_soak_monitor.py`, `pygame_media_support.py`, `pygame_waveform.py`. |
 | Thi và ngân hàng đề | `exam_bank.py`, `exam_bank_pygame.py`, `exam_editor.py`, `exam_grading.py`, `exam_history_bridge.py`, `exam_media_migrate.py`, `exam_pygame.py`, `seed_family_grade1.py`. Seed Family lớp 1 vẫn có nơi gọi trong Exam Mode. |
+| Học liệu kiểm tra lớp 2 | `exam_content/__init__.py`, `exam_content/grade2.py` (tạo câu theo mã ổn định và nạp vào hồ sơ), `exam_content/grade2_math.py` (câu Toán), `exam_content/grade2_vietnamese.py` (câu Tiếng Việt), `docs/exam-grade2.md` (hướng dẫn và ma trận độ khó). |
 | Kết quả và ôn tập | `quiz_history_ui.py`, `wrong_answers_ui.py`, `learning_analytics_ui.py`, `ui_results_dashboard.py`, `pygame_review_panel.py`, `pygame_results.py`, `new_exercise_review.py`, `result_insights.py`, `review_normalize.py`. |
 | Âm thanh, ghi âm và trò chơi | `learning_audio.py`, `waveform_player.py`, `animated_media.py`, `recording_tools.py`, `recorder_app.py`, `floating_recorder.py`, `dictation_vi.py`, `minigames.py`, `modern_games.py`. |
 | Script dữ liệu và chẩn đoán | `make_demo.py`, `install_family_grade12_level10.py`, `them_cau_hoi_ve2.py` có thể ghi dữ liệu. `audit_layout_coverage.py` xuất báo cáo bố cục. `freeze_diagnostics.py` là tệp rỗng ở mốc rà soát. Kiểm tra cả import động và điểm gọi trước khi dời script. |
 | Bộ kiểm tra ở gốc | `check_coordinate_contracts.py`, `check_editor_drag_zoom_persistence.py`, `check_editor_reopen_persistence.py`, `check_exam_v3.py`, `check_extras_contract.py`, `check_integration_contracts.py`, `check_integration_failures_03c40.py`, `check_layout_json_consistency.py`, `check_layout_matrix.py`, `check_layout_scroll.py`, `check_legacy_runtime_regression.py`, `check_studio_shortcuts.py`, `check_studio_ui.py`, `check_studio_v3.py`, `check_ui_components.py`, `check_ui_contrast.py`, `check_ui_keys.py`, `check_ui_strings.py`, `check_ui_tokens.py`, `VERIFY_PATCH03.py`, `VERIFY_PATCH11.py`, `VERIFY_PATCH12.py`, `VERIFY_PHASE4_PATCH07.py`, `run_reading_tests.py`. |
-| Bộ kiểm thử trong `tests/` | `tests/conftest.py` chọn checkout qua `TUHOC_ROOT`. `tests/test_canvas_layout.py` và `tests/test_canvas_studio.py` kiểm tra Canvas. `tests/canvas_p0.py` phát lại thao tác, `tests/canvas_p0_cases.py` cung cấp fixture, `tests/canvas_p0_preview.py` kiểm tra xem trước. `tests/test_exam_bank.py`, `tests/test_exam_grading.py` và `tests/test_exam_state.py` là pytest cho Exam Mode. |
+| Bộ kiểm thử trong `tests/` | `tests/conftest.py` chọn checkout qua `TUHOC_ROOT`. `tests/test_canvas_layout.py` và `tests/test_canvas_studio.py` kiểm tra Canvas. `tests/canvas_p0.py` phát lại thao tác, `tests/canvas_p0_cases.py` cung cấp fixture, `tests/canvas_p0_preview.py` kiểm tra xem trước. `tests/test_exam_bank.py`, `tests/test_exam_grading.py`, `tests/test_exam_state.py` và `tests/test_exam_grade2.py` là pytest cho Exam Mode. |
 | Công cụ phát triển | `tools/audit_ui_tokens.py` kiểm kê token, `tools/analyze_nav_log.py` tổng hợp log, `tools/measure_ui_pages.py` đo dựng màn hình trên checkout và hồ sơ thử riêng. `tools/reference/exam_logic_reference.py` và `tools/reference/exam_state_reference.py` là kịch bản rà soát lưu để tham chiếu. Dùng pytest trong `tests/` để xác minh Exam Mode. |
 | Hướng dẫn và lịch sử | `AGENTS.md`, `HUONG_DAN.txt`, `docs/canvas-p0.md`, `docs/canvas-p6.md`, `docs/canvas-matrix.md`, `docs/canvas-auto-log.md`, `docs/canvas-auto-report.md`, `docs/ui-auto-log.md`, `docs/ui-auto-report.md`, `agents/skills/tuhoc-canvas/SKILL.md`, `agents/skills/tuhoc-canvas/references/build-plan.md`. |
 | Tệp dữ liệu theo dõi bởi Git | `content_library` là tệp đánh dấu trong checkout. `content_library.zip` chứa dữ liệu đề thi, nhóm bài đọc, bản sao và tệp kết quả. `__pycache__.zip` là bytecode lưu trữ. Cài mới từ mã nguồn và chọn dữ liệu cần nhập vào thư mục riêng. |
@@ -123,7 +124,7 @@ Dạng `reading_group` là cấu trúc trong trình soạn và dữ liệu nhóm
 
 ### Định dạng và Chỉnh bố cục v4
 
-- Chọn một phần tử chữ để đặt phông, cỡ chữ, đậm, nghiêng và gạch chân. Câu dẫn và đoạn đọc có thêm căn lề và giãn dòng. Dùng **Định dạng đoạn chữ…** để định dạng đoạn bôi đen trong câu dẫn, đoạn đọc và hộp văn bản tự do. Dấu **đậm** của câu hỏi cũ vẫn được hỗ trợ. Chữ gạch chân do người soạn đặt và dấu gạch đánh dấu đáp án là hai lớp hiển thị. [Đo và vẽ chữ](layout_typography.py) · [Studio](question_layout_editor.py)
+- Chọn một phần tử chữ để đặt phông, cỡ chữ, đậm, nghiêng và gạch chân. Câu dẫn và đoạn đọc có thêm căn lề và giãn dòng. Dùng **Định dạng đoạn chữ…** và bôi đen chữ trong câu dẫn, đoạn đọc hoặc hộp văn bản. Nút **B/I/U**, phông và cỡ chữ áp dụng ngay trên đoạn đang chọn. Dùng **Ctrl+B/I/U**, **Ctrl+Z/Y** hoặc lưu để thấy định dạng ngay trên Canvas. Dấu **đậm** của câu hỏi cũ vẫn được hỗ trợ. Chữ gạch chân do người soạn đặt và dấu gạch đánh dấu đáp án là hai lớp hiển thị. [Đo và vẽ chữ](layout_typography.py) · [Studio](question_layout_editor.py)
 - `slot_N` bám theo ô trống trong nội dung. `word_N` là vị trí của thẻ trong thứ tự hiển thị. `answer_preview` là khung câu đã xếp, `answer_menu` là khung danh sách thả xuống, `answer_passage` là vùng đọc và `answer_panel` là khung câu hỏi con. **Tự động bố trí** xóa phần tọa độ và kích thước đặt riêng của thành phần. [Danh sách điều khiển](layout_registry.py)
 - Trong trình sửa Ngân hàng kiểm tra, dùng **Chỉnh bố cục** cho từng dạng hoặc cho hai khung của bài đọc. Dùng **Bố cục câu con** để sửa câu được chọn. **Xem trước Pygame** dựng một khung từ bản nháp bằng renderer của màn hình thi. Chọn **Lưu câu hỏi** hoặc **Lưu bài đọc** để ghi vào ngân hàng. [Ngân hàng](exam_bank_pygame.py) · [Pygame](exam_pygame.py)
 - Kiểm tra v4 bằng `tests/test_canvas_v4.py`, các ca Studio liên quan và `tests/canvas_p0.py --layout v4`. Kết quả phát lại kiểm tra luồng làm bài và chấm cho 26 dạng. Kiểm tra mức bao phủ từng thuộc tính cần các ca thay đổi riêng giá trị của thuộc tính đó.
@@ -177,6 +178,12 @@ Trong workspace cloud đã chuẩn bị, có thể dùng `/workspace/.tuhoc/venv
 - Quy trình phát hành được kiểm chứng ở checkout này là chạy từ mã nguồn. Checkout có nhánh xử lý runtime đóng gói, nhưng hiện thiếu recipe PyInstaller, tệp `.spec` và cấu hình CI phát hành. Với yêu cầu phát hành `.exe`, xác minh recipe, tài nguyên và phụ thuộc trong một tác vụ đóng gói riêng rồi nghiệm thu trên Windows.
 - Với cloud, giữ script cài đặt và hướng dẫn khởi động trong cấu hình môi trường khi có cấu hình đó. Quy trình **Publish** trong Environment Settings dùng cho các máy cloud sau. Một cửa sổ Tk/SDL cần được khởi động lại trong mỗi phiên.
 
+### Bộ câu hỏi kiểm tra lớp 2
+
+- Mở **Ngân hàng kiểm tra → Danh sách câu hỏi → Nạp bộ lớp 2** để thêm 100 câu Toán và 100 câu Tiếng Việt. Trong **Kiểm tra**, chọn môn → **Lớp 2 → Ôn tập lớp 2** rồi chọn Level. Giáo viên có thể chỉnh đoạn văn kèm câu trắc nghiệm qua **Sửa đoạn đọc**.
+- `ExamBank.add_text_questions` xác thực cả lô trước khi ghi, giữ câu đã có theo ID và sao lưu ngân hàng hiện có dưới `content_library/backups/` khi có câu mới. Khi sửa nguồn học liệu, giữ ID đã phát hành và kiểm tra số câu theo từng môn và mức. Phân bổ hiện tại của mỗi môn là **35 / 15 / 15 / 18 / 17** từ M1 đến M5 để đáp ứng cấu hình mặc định của đủ 10 Level với đề tối đa 50 câu.
+- Soạn câu dẫn bằng tiếng Việt tự nhiên ở miền Nam và dùng chính tả chuẩn cho đáp án. Để nạp từ dòng lệnh, đóng ứng dụng và chạy `python -B -m exam_content.grade2 --root "/duong/dan/den/TuHocBeta"` từ gốc dự án. Khi kiểm thử, trỏ `--root` về thư mục tạm. Xem [hướng dẫn bộ lớp 2](docs/exam-grade2.md) để tra các dạng bài và ma trận nội dung.
+
 ## Làm việc tiết kiệm usage
 
 ### Đọc ít
@@ -192,6 +199,7 @@ Trong workspace cloud đã chuẩn bị, có thể dùng `/workspace/.tuhoc/venv
 | --- | --- | --- |
 | Chấm thi, chọn đề | `exam_grading.py`, `exam_bank.py` | `tests/test_exam_grading.py` hoặc `tests/test_exam_bank.py` bằng pytest |
 | Trạng thái phiên thi | `exam_pygame.py` | `tests/test_exam_state.py` bằng pytest |
+| Bộ câu hỏi lớp 2 | `exam_content/grade2*.py`, `docs/exam-grade2.md` | `tests/test_exam_grade2.py` bằng pytest |
 | Kéo/căn/chia trong Studio | `layout_edit_geometry.py` | `check_editor_drag_zoom_persistence.py`, `check_studio_shortcuts.py` |
 | Schema/geometry layout | `question_layout_store.py`, `question_layout_runtime.py` | `check_layout_json_consistency.py`, `check_coordinate_contracts.py` |
 | Cuộn trong Studio | `layout_scroll_extent.py` | `check_layout_scroll.py` |
@@ -232,7 +240,7 @@ Dùng `--type <mã_dạng>` để phát lại riêng một dạng. Dùng `--layo
 
 ### Baseline đã biết
 
-Mốc 22/11/2026 có **60 ca pytest đạt và 10 ca `xfail`** trong Exam Mode. Tra bảng này khi cần và tránh chạy lại chỉ để tái hiện baseline.
+Mốc 22/11/2026 có **64 ca pytest đạt và 9 ca `xfail`** trong Exam Mode. Tra bảng này khi cần và tránh chạy lại chỉ để tái hiện baseline.
 
 | Tệp | Ca `xfail` | Lý do |
 | --- | --- | --- |
@@ -245,8 +253,8 @@ Mốc 22/11/2026 có **60 ca pytest đạt và 10 ca `xfail`** trong Exam Mode. 
 | `tests/test_exam_bank.py` | `test_invalid_question` với `difficulty=None` | Dữ liệu thiếu độ khó làm phát sinh `TypeError`. |
 | `tests/test_exam_bank.py` | `test_invalid_question` với `difficulty=2.7` | Độ khó thập phân bị cắt thành số nguyên. |
 | `tests/test_exam_bank.py` | `test_invalid_question` với `sequence=["a", "a "]` | Từ trùng trong bài sắp xếp lọt qua xác thực khi có khoảng trắng thừa. |
-| `tests/test_exam_bank.py` | `test_missing_audio_skips_only_broken_question` | Thiếu một tệp âm thanh làm hỏng việc tạo cả đề. |
 
+- Bộ lớp 2 đã dựng đủ 200 câu, tạo được 1.000 tổ hợp môn, Level và số lượng câu, và nộp thử đề ở cả hai môn trên Linux/Xvfb.
 - Checkout thiếu `full_runtime_03c39.json` cho `check_integration_failures_03c40.py` và `test_reading_pipeline.py` cho `run_reading_tests.py`. Bỏ qua hai script này và giữ nguyên mã.
 - Trên Linux, ghi **chưa kiểm** đối với các mục cần Windows như DPI 100/125/150%, IME Telex/VNI, thiết bị âm thanh, clipboard và luồng phát hành `.exe`.
 

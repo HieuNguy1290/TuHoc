@@ -60,28 +60,38 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     result = [None]
     win = tk.Toplevel(parent)
     win.title('Studio bố cục câu hỏi')
-    win.geometry('1200x820')
-    # Use the OS maximized work area (excludes Windows taskbar), not -fullscreen.
-    # Defer until the window is mapped so Windows can calculate its work area.
-    def maximize_work_area():
-        nonlocal maximize_job
-        maximize_job = None
+    normal_width = min(1200, max(480, win.winfo_screenwidth()-72))
+    normal_height = min(820, max(420, win.winfo_screenheight()-128))
+    win.geometry(f'{normal_width}x{normal_height}')
+    win.minsize(min(800, normal_width), min(540, normal_height))
+    # A native maximized window keeps the taskbar work area. A transient
+    # window can be sized or repositioned relative to its owner instead.
+    def is_maximized():
+        if win.tk.call('tk', 'windowingsystem') == 'win32':
+            return win.state() == 'zoomed'
         try:
-            win.state('zoomed')
+            return bool(win.attributes('-zoomed'))
         except tk.TclError:
+            return win.state() == 'zoomed'
+
+    def maximize(enabled):
+        if win.tk.call('tk', 'windowingsystem') == 'win32':
+            win.state('zoomed' if enabled else 'normal')
+        else:
             try:
-                win.attributes('-zoomed', True)
+                win.attributes('-zoomed', enabled)
             except tk.TclError:
-                pass
-    maximize_job = win.after_idle(maximize_work_area)
+                try:
+                    win.state('zoomed' if enabled else 'normal')
+                except tk.TclError:
+                    pass
+        fullscreen_btn.configure(text='Thu nhỏ cửa sổ' if is_maximized() else 'Phóng to cửa sổ')
 
-    def cancel_maximize(event):
-        if event.widget is win and maximize_job is not None:
-            win.after_cancel(maximize_job)
+    def maximize_on_map(event):
+        if event.widget is win:
+            win.unbind('<Map>', map_binding)
+            maximize(True)
 
-    win.bind('<Destroy>', cancel_maximize, add='+')
-    win.minsize(800, 600)
-    win.transient(parent)
     win.grab_set()
     toolbar = ttk.Frame(win, padding=10)
     toolbar.pack(fill='x')
@@ -604,92 +614,18 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
             change_text_style(line_spacing=value)
 
     def edit_text_ranges():
-        from question_rich_text import plain
+        from studio_text_format import display_text, open_text_format
 
         key = active[0]
-        source = extras[key] if key in extras else current(key)
-        if key in extras:
-            value = source['text']
-        else:
-            field = 'passage' if key == 'answer_passage' else 'prompt'
-            value = plain(question.get(field) or '')
-        if not value:
+        if not key or key in locked:
             return
-        dialog = tk.Toplevel(win)
-        dialog.title('Định dạng đoạn chữ')
-        dialog.transient(win)
-        dialog.grab_set()
-        body = ttk.Frame(dialog, padding=10)
-        body.pack(fill='both', expand=True)
-        ttk.Label(body, text='Bôi đen đoạn chữ, chọn định dạng rồi bấm Áp dụng.').pack(anchor='w')
-        content = tk.Text(body, width=59, height=8, wrap='word', exportselection=False)
-        content.pack(fill='both', expand=True, pady=8)
-        content.insert('1.0', value)
-        content.configure(state='disabled')
-        runs = deepcopy(source.get('runs', []))
-        base = {field: source.get(field, False) for field in ('bold', 'italic', 'underline')}
-        base.update(font_family=source.get('font_family', ''), font_size=int(source.get('font_size', 24)))
-
-        def show_range(index, run):
-            style = {**base, **run}
-            flags = ' '.join(flag for flag in ('bold', 'italic', 'underline') if style[flag])
-            tag = f'format_{index}'
-            content.tag_configure(tag, font=(style['font_family'] or 'Segoe UI', style['font_size'], flags or 'normal'))
-            prefix = value[:run['start']]
-            segment = value[run['start']:run['end']]
-            start = f"1.0+{win.tk.call('string', 'length', prefix)}c"
-            units = int(win.tk.call('string', 'length', segment))
-            content.tag_add(tag, start, f'{start}+{units}c')
-            content.tag_raise('sel')
-
-        for i, run in enumerate(runs):
-            show_range(i, run)
-        controls = ttk.Frame(body)
-        controls.pack(anchor='w')
-        font = tk.StringVar(value=base['font_family'])
-        ttk.Combobox(controls, textvariable=font, values=FONT_FAMILIES, state='readonly', width=18).pack(side='left')
-        size = tk.StringVar(value=str(base['font_size']))
-        ttk.Spinbox(controls, from_=8, to=96, textvariable=size, width=5).pack(side='left', padx=5)
-        flags = {name: tk.BooleanVar(value=base[name]) for name in ('bold', 'italic', 'underline')}
-        for name, label in zip(flags, ('Đậm', 'Nghiêng', 'Gạch chân')):
-            ttk.Checkbutton(controls, text=label, variable=flags[name]).pack(side='left')
-
-        def apply_range():
-            if not content.tag_ranges('sel'):
-                return
-            try:
-                points = int(size.get())
-            except ValueError:
-                return
-            if not 8 <= points <= 96 or len(runs) >= 256:
-                return
-            a = len(content.get('1.0', 'sel.first'))
-            b = len(content.get('1.0', 'sel.last'))
-            run = dict(start=a, end=b, font_size=points, font_family=font.get(),
-                       **{name: variable.get() for name, variable in flags.items()})
-            show_range(len(runs), run)
-            runs.append(run)
-
-        def close_ranges(save):
-            dialog.destroy()
-            win.grab_set()
-            if save:
-                change_text_style(runs=runs)
-
-        actions = ttk.Frame(body)
-        actions.pack(fill='x', pady=(8, 0))
-        ttk.Button(actions, text='Áp dụng', command=apply_range).pack(side='left')
-        ttk.Button(actions, text='Lưu', command=lambda: close_ranges(True)).pack(side='right')
-        ttk.Button(actions, text='Hủy', command=lambda: close_ranges(False)).pack(side='right')
-        ttk.Button(actions, text='Xóa tất cả định dạng đoạn', command=lambda: reset_runs()).pack(side='left', padx=8)
-
-        def reset_runs():
-            for i in range(len(runs)):
-                content.tag_delete(f'format_{i}')
-            runs.clear()
-
-        dialog.protocol('WM_DELETE_WINDOW', lambda: close_ranges(False))
-        content.focus_set()
+        source = extras[key] if key in extras else current(key)
+        field = 'passage' if key == 'answer_passage' else 'prompt'
+        raw = source['text'] if key in extras else str(question.get(field) or '')
+        value, inherited = display_text(raw, markdown=key not in extras)
+        if value:
+            open_text_format(win, value, source, lambda runs: change_text_style(runs=runs),
+                             inherited=inherited)
 
     def choose_color(field):
         if active[0] in extras:
@@ -772,16 +708,14 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
                                tags=tag,**options)
 
         if not live:
-            if extra:
-                anchor = {'left':'nw','center':'n','right':'ne'}[extra['align']]
-                x = {'left':a,'center':(a+c)/2,'right':c}[extra['align']]
-                style = ' '.join(name for name in ('bold','italic') if extra[name]) or 'normal'
-                text(x,b,extra['text'],extra['font_size'],style,anchor=anchor,
-                     width=max(1,c-a),justify=extra['align'],fill=extra['color'])
-            elif el == 'question_text':
-                prompt = str(question.get('prompt') or 'Nội dung câu hỏi')
-                text(a+9,b+8,prompt,min(40,int(v['font_size'])),
-                     'bold' if '**' in prompt else 'normal',anchor='nw',width=max(40,c-a-18),fill='#1e293b')
+            if extra or el == 'question_text' or (el == 'answer_passage' and question.get('passage')):
+                from studio_text_format import draw_text_preview
+
+                field = 'passage' if el == 'answer_passage' else 'prompt'
+                content = extra['text'] if extra else str(question.get(field) or 'Nội dung câu hỏi')
+                inset = 2 if extra else 8
+                draw_text_preview(canvas, content, extra or v, (a+inset,b+inset,c-inset,d-inset),
+                                  scale, extra['color'] if extra else '#1e293b', tag, markdown=not extra)
             elif el == 'question_image':
                 image = None
                 if image_path is not None:
@@ -1314,19 +1248,12 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     canvas.bind('<Configure>', redraw)
     ruler_top.bind('<Configure>', lambda _e:draw_rulers())
     ruler_left.bind('<Configure>', lambda _e:draw_rulers())
-    def toggle_fullscreen():
-        # Maximize within the OS work area, leaving the taskbar accessible.
-        # Avoid -fullscreen, which covers the taskbar on Windows.
-        try:
-            maximized = win.state() == 'zoomed'
-            win.state('normal' if maximized else 'zoomed')
-        except tk.TclError:
-            maximized = bool(win.attributes('-zoomed'))
-            win.attributes('-zoomed', not maximized)
-        fullscreen_btn.configure(text='Phóng to cửa sổ' if maximized else 'Thu nhỏ cửa sổ')
-        win.after_idle(redraw)
-    fullscreen_btn = ttk.Button(toolbar, text='Thu nhỏ cửa sổ', command=toggle_fullscreen)
+    fullscreen_btn = ttk.Button(toolbar, text='Phóng to cửa sổ',
+                                command=lambda: maximize(not is_maximized()))
     fullscreen_btn.pack(side='right', padx=4)
+    map_binding = win.bind('<Map>', maximize_on_map)
+    win.bind('<Configure>', lambda event: fullscreen_btn.configure(
+        text='Thu nhỏ cửa sổ' if is_maximized() else 'Phóng to cửa sổ') if event.widget is win else None, add='+')
     ttk.Label(toolbar, text='Thước: px | Ctrl+cuộn: zoom | Shift+cuộn: ngang').pack(side='right', padx=10)
     canvas.bind('<ButtonPress-1>', down)
     canvas.bind('<B1-Motion>', move)
@@ -1361,8 +1288,22 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         ttk.Button(edit_controls,text='Lưu làm mẫu',command=save_as_template).pack(fill='x',pady=2)
     win.bind('<Control-z>',lambda e:history_key(e,undo))
     win.bind('<Control-y>',lambda e:history_key(e,redo))
+
+    def style_shortcut(event, field):
+        if isinstance(event.widget, (tk.Entry, tk.Text, ttk.Entry, ttk.Combobox)):
+            return
+        key = active[0]
+        if text_element(key) and key not in locked:
+            style = extras[key] if key in extras else current(key)
+            change_text_style(**{field: not style.get(field, False)})
+            select(key, preserve=True)
+            return 'break'
+
+    for shortcut, field in (('b','bold'), ('i','italic'), ('u','underline')):
+        win.bind(f'<Control-{shortcut}>', lambda event, prop=field: style_shortcut(event, prop))
+
     footer = ttk.Frame(win, padding=10)
-    footer.pack(fill='x')
+    footer.pack(side='bottom', fill='x', before=main)
     ttk.Label(footer, textvariable=status).pack(side='left')
     if preview is not None:
         ttk.Button(footer, text='Xem trước Pygame', command=try_preview).pack(side='left', padx=12)
