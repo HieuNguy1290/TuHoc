@@ -1287,7 +1287,7 @@ class LevelFlowMixin:
         if p:
             try:export_levels(p,self.curriculum.data_dir);messagebox.showinfo('Đã xuất',p)
             except Exception as e:messagebox.showerror('Không xuất được',str(e))
-    def _content_table(self, parent, records, columns, edit, delete, start_number=1):
+    def _content_table(self, parent, records, columns, edit, delete, start_number=1, *, duplicate=None):
         """Presentation-only grid; original row indices drive existing actions."""
         from tkinter import ttk
         shell = tk.Frame(parent, bg=parent['bg'], bd=0, highlightthickness=0)
@@ -1342,18 +1342,24 @@ class LevelFlowMixin:
             if selected: callback(int(selected[0]))
         tk.Button(actions, text='Sửa dòng chọn', command=lambda: selected_action(edit)).pack(side='right', padx=3)
         tk.Button(actions, text='Xóa dòng chọn', command=lambda: selected_action(delete)).pack(side='right', padx=3)
+        if duplicate is not None:
+            tk.Button(actions,text='Nhân bản',command=lambda:selected_action(duplicate)).pack(side='right',padx=3)
         return tree
 
     def question_editor(self):
         """Type-aware editor; persists the existing QUESTION_KEYS JSON schema."""
         from tkinter import ttk
+        from studio_list import copy_question, find_rows, remove_at
+        from ui_components import Toast
+        from safe_storage import commit_json
+
         preserved_form = getattr(self, '_question_editor_form_state', None)
         body = self.layout('Thêm / sửa bài tập')
         self.label(body, 'Chọn dạng câu hỏi để hiển thị các ô nhập phù hợp. Dữ liệu cũ vẫn được giữ nguyên.', 11).pack(anchor='w', pady=(0, 12))
         panel = tk.Frame(body, bg='white', padx=16, pady=14, highlightthickness=1, highlightbackground='#DCE8DE')
         panel.pack(fill='x', pady=6)
         controls = {}
-        selected = {'index': None, 'id': None}
+        selected = {'index': None, 'id': None, 'seed': {}}
         pending_layout = {'value': {}}
         dynamic = tk.Frame(panel, bg='white')
         sample_hints = {'choice':'Ví dụ: A. Apple | B. Banana | C. Cat | D. Dog. Chọn đáp án đúng bên dưới.', 'picture_choice':'Ví dụ: A. Cat, B. Dog, C. Bird, D. Fish. Ảnh minh họa nằm ở phần tệp đính kèm.', 'listening_choice':'Ví dụ: A. Hello, B. Goodbye, C. Thanks, D. Sorry. Tải tệp âm thanh ở dưới.', 'true_false':'Ví dụ: The sky is blue. Đáp án: Đúng.', 'fill':'Ví dụ: She ___ a student. Đáp án: is.', 'listening_fill':'Ví dụ: Listen and complete: I ___ happy. Đáp án: am.', 'order':'Ví dụ: Em | đi | đến trường | mỗi ngày. Mỗi thẻ có thể là từ, cụm từ hoặc cả câu.', 'matching':'Ví dụ: cat = con mèo; dog = con chó.', 'error':'Ví dụ: He go to school. Đáp án: go → goes.'}
@@ -1473,6 +1479,19 @@ class LevelFlowMixin:
             type_widget.set(type_names[QUESTION_TYPES.index(preserved_form['type'])])
             kind_var.set(preserved_form['type'])
         controls['prompt'] = line('Nội dung câu hỏi', 'text', height=3)
+        form_status=tk.StringVar()
+        tk.Label(panel,textvariable=form_status,bg='white',fg='#774710',
+                 anchor='w',wraplength=690).pack(fill='x')
+
+        def check_form(_event=None):
+            issues=[]
+            if not get(controls['id']).strip():
+                issues.append('Cần mã câu hỏi.')
+            if kind_var.get()!='picture_missing_letters' and not get(controls['prompt']).strip():
+                issues.append('Cần nội dung câu hỏi.')
+            form_status.set(' '.join(issues))
+        for key in ('id','prompt'):
+            controls[key].bind('<KeyRelease>',check_form,add='+')
         dynamic.pack(fill='x', pady=(8, 5))
 
         def store_media(source):
@@ -1671,7 +1690,7 @@ class LevelFlowMixin:
                     if len(matches) != 1:
                         raise ValueError('Câu hỏi đang sửa đã bị xóa hoặc danh sách đã thay đổi. Hãy chọn lại câu hỏi trước khi lưu.')
                     edit_index = matches[0]
-                obj = dict(current_questions[edit_index]) if edit_index is not None else {}
+                obj = dict(current_questions[edit_index]) if edit_index is not None else dict(selected['seed'])
                 obj.update({key:get(controls[key]) for key in ('theme','id','prompt')})
                 obj['level'] = question_location['level'].get(get(controls['level']))
                 obj['lesson'] = question_location['lesson'].get(get(controls['lesson']))
@@ -1787,6 +1806,7 @@ class LevelFlowMixin:
                 'Câu hỏi mới nằm ở cuối danh sách.', parent=self)
 
         def reset():
+            selected['seed']={}
             # A new question inherits the user's current location and exercise type.
             # Only question-specific inputs are cleared.
             selected['index'] = None
@@ -1959,6 +1979,9 @@ class LevelFlowMixin:
         lesson_var = tk.StringVar(value=saved_filters.get('lesson', all_label))
         page_state = {'offset': saved_filters.get('offset', 0)}
         page_size = 10
+        search_var=tk.StringVar(value=saved_filters.get('search',''))
+        type_filter=tk.StringVar(value=saved_filters.get('kind',all_label))
+        sort_var=tk.StringVar(value=saved_filters.get('sort','Thứ tự lưu'))
         selectors = {}
         for caption, key, var in [('Chủ đề', 'theme', theme_var),
                                   ('Level', 'level', level_var),
@@ -1969,6 +1992,15 @@ class LevelFlowMixin:
             selector = ttk.Combobox(group, textvariable=var, state='readonly', width=23 if key == 'theme' else 12)
             selector.pack()
             selectors[key] = selector
+        advanced=tk.Frame(body,bg='white',padx=8,pady=5)
+        advanced.pack(fill='x')
+        tk.Label(advanced,text='Tìm mã hoặc nội dung',bg='white').pack(side='left')
+        ttk.Entry(advanced,textvariable=search_var,width=24).pack(side='left',padx=(6,12))
+        tk.Label(advanced,text='Dạng',bg='white').pack(side='left')
+        ttk.Combobox(advanced,textvariable=type_filter,values=(all_label,*QUESTION_TYPES),
+                     state='readonly',width=20).pack(side='left',padx=(6,12))
+        ttk.Combobox(advanced,textvariable=sort_var,values=('Thứ tự lưu','Mã','Nội dung'),
+                     state='readonly',width=14).pack(side='left')
         status = tk.Label(body, bg='white', fg='#285D40', anchor='w')
         status.pack(fill='x', padx=8)
         list_container = tk.Frame(body, bg='white')
@@ -1977,10 +2009,11 @@ class LevelFlowMixin:
         pager.pack(fill='x', pady=7)
 
         def available_rows():
-            return [(i, item) for i, item in enumerate(question_rows)
-                    if (theme_var.get() == all_label or str(item.get('theme', '')) == theme_var.get())
-                    and (level_var.get() == all_label or str(item.get('level', '')) == level_var.get())
-                    and (lesson_var.get() == all_label or str(item.get('lesson') or 1) == lesson_var.get())]
+            filters={key:(value if value!=all_label else None)
+                     for key,value in (('theme',theme_var.get()),('level',level_var.get()),
+                                       ('lesson',lesson_var.get()),('type',type_filter.get()))}
+            return find_rows(question_rows,search_var.get(),
+                             sort_by={'Mã':'id','Nội dung':'prompt'}.get(sort_var.get()),filters=filters)
 
         def update_selector_options(reset=False):
             # Each selector is independent: selecting one must not overwrite or
@@ -1999,10 +2032,15 @@ class LevelFlowMixin:
                 if reset or (current != all_label and current not in values):
                     var.set(all_label)
 
-        def edit(i):
-            item = self._levels('questions')[i]
-            selected['index'] = i
-            selected['id'] = item.get('id')
+        def edit(i, clone=False):
+            item=self._levels('questions')[i]
+            selected['seed']={}
+            if clone:
+                item=copy_question(item)
+                selected['seed']=item
+
+            selected['index'] = None if clone else i
+            selected['id'] = None if clone else item.get('id')
             from question_layout_store import get_layout
             pending_layout['value'] = get_layout(item)
             for key in ('theme','id','prompt'): put(controls[key], item.get(key,''))
@@ -2011,16 +2049,43 @@ class LevelFlowMixin:
             if typ not in QUESTION_TYPES: typ='choice'
             kind_var.set(typ); type_widget.set(type_names[QUESTION_TYPES.index(typ)])
             rebuild(existing=item)
+            check_form()
+            if clone:
+                form_status.set('Bản sao chưa lưu. Kiểm tra nội dung rồi chọn Lưu bài tập.')
+
         def delete(i):
-            if messagebox.askyesno('Xóa câu hỏi', 'Xóa câu hỏi này?'):
-                items=self._levels('questions'); items.pop(i)
-                save_rows(self.curriculum.data_dir,'questions',items)
+            if not dialogs.askyesno('Xóa câu hỏi','Xóa câu hỏi này?',parent=self):
+                return
+            root=self.curriculum.data_dir
+            path=library_file(root,'questions')
+            data=load_rows(root,'questions',None)
+            identity=str(question_rows[i].get('id'))
+            matches=[index for index,row in enumerate(data) if str(row.get('id'))==identity]
+            if len(matches)!=1:
+                dialogs.showwarning('Xóa câu hỏi','Danh sách đã thay đổi. Hãy tải lại.',parent=self)
+                return
+            updated,ticket=remove_at(data,matches[0])
+            try:
+                commit_json({path:updated})
                 self.curriculum.reload()
-                self._question_editor_filter_state = {
-                    'theme': theme_var.get(), 'level': level_var.get(),
-                    'lesson': lesson_var.get(), 'offset': page_state['offset'],
-                }
-                self.question_editor()
+                question_rows[:]=self._levels('questions')
+                render_rows()
+            except (OSError,ValueError) as exc:
+                dialogs.showerror('Không xóa được câu hỏi',str(exc),parent=self)
+                return
+
+            def restore():
+                try:
+                    latest=load_rows(root,'questions',None)
+                    commit_json({path:ticket.restore(latest,unique_id=True)})
+                    self.curriculum.reload()
+                    question_rows[:]=self._levels('questions')
+                    render_rows()
+                except (OSError,ValueError) as exc:
+                    dialogs.showerror('Không hoàn tác được',str(exc),parent=self)
+
+            Toast(body,'Đã xóa câu hỏi.',duration=6000,action=('Hoàn tác',restore))
+
         def render_rows():
             for child in list_container.winfo_children():
                 child.destroy()
@@ -2037,7 +2102,7 @@ class LevelFlowMixin:
                  ('Lesson', lambda o: self._display_name('lesson', o.get('theme',''), o.get('level',''), o.get('lesson') or 1)),
                  ('Dạng bài tập', lambda o: QUESTION_LABELS.get(o.get('type'), o.get('type',''))),
                  ('Nội dung câu hỏi', lambda o: o.get('prompt',''))],
-                edit, delete, start + 1)
+                edit, delete, start + 1,duplicate=lambda i:edit(i,clone=True))
             tk.Label(pager, text=f'Trang {start // page_size + 1}/{max(1, (total + page_size - 1) // page_size)}',
                      bg='white', fg='#285D40', font=font_at(10, 'bold')).pack(side='left', padx=9)
             if start:
@@ -2048,6 +2113,7 @@ class LevelFlowMixin:
         def change_page(direction):
             page_state['offset'] += direction * page_size
             self._question_editor_filter_state = {
+                'search':search_var.get(),'kind':type_filter.get(),'sort':sort_var.get(),
                 'theme': theme_var.get(), 'level': level_var.get(),
                 'lesson': lesson_var.get(), 'offset': page_state['offset'],
             }
@@ -2055,6 +2121,7 @@ class LevelFlowMixin:
 
         def change_filter(*_):
             self._question_editor_filter_state = {
+                'search':search_var.get(),'kind':type_filter.get(),'sort':sort_var.get(),
                 'theme': theme_var.get(),
                 'level': level_var.get(),
                 'lesson': lesson_var.get(),
@@ -2067,6 +2134,7 @@ class LevelFlowMixin:
         selectors['theme'].bind('<FocusIn>', lambda event: update_selector_options(reset=False))
         update_selector_options(reset=False)
         self._question_editor_filter_state = {
+            'search':search_var.get(),'kind':type_filter.get(),'sort':sort_var.get(),
             'theme': theme_var.get(),
             'level': level_var.get(),
             'lesson': lesson_var.get(),
@@ -2074,6 +2142,8 @@ class LevelFlowMixin:
         }
         for var in (theme_var, level_var, lesson_var):
             var.trace_add('write', change_filter)
+        for variable in (search_var,type_filter,sort_var):
+            variable.trace_add('write',change_filter)
         render_rows()
 
     def level_editor(self,kind):

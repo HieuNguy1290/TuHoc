@@ -2,12 +2,17 @@ from pygame_session_guard import shutdown as _app_shutdown
 """Pygame bank UI, pagination, level statistics and safe question editing.
 No user data is overwritten unless the Save action validates successfully.
 """
+import json
 import math
+from pathlib import Path
+import time
 import os
 import sys
 import pygame
 from tkinter import Tk, filedialog
 from exam_bank import ExamBank, SUBJECTS
+from safe_storage import commit_json
+from studio_list import find_rows, remove_at
 
 # Presentation order only: existing IDs and Vietnamese labels are unchanged.
 TYPES=[('choice','Đọc câu hỏi – chọn đáp án'),('true_false','Đúng / Sai'),('picture_choice','Nhìn hình – chọn đáp án'),('image_multi_choice','Trắc nghiệm đáp án bằng hình'),('listening_choice','Nghe – chọn đáp án'),('fill','Điền đáp án'),('picture_missing_letters','Nhìn hình – điền chữ thiếu'),('listening_fill','Nghe – điền đáp án'),('sentence_gaps','Ghép từ vào câu'),('conversation_gaps','Hoàn thành hội thoại'),('passage_gaps','Hoàn thành đoạn văn'),('error','Tìm lỗi'),('order','Sắp xếp'),('matching','Nối chữ / hình / hỗn hợp'),('reading_group','Bài đọc dài + nhiều câu hỏi')]
@@ -18,6 +23,8 @@ BG=(244,247,252); WHITE=(255,255,255); INK=(32,47,71); MUTED=(104,118,139); BLUE
 class BankManager:
     def __init__(self,root):
         self.bank=ExamBank(root);self.page=1;self.tab='bank';self.level=1;self.grade='1';self.subject='tieng_anh';self.lesson='';self.filter_type='all';self.filter_diff='all';self.search='';self.message='';self.active=None;self.actions=[];self.fields=[];self.scroll=0;self.edit_type='choice';self.edit_id='';self.form={};self.match_mode=0;self.reading_child=0;self.reading_form={};self.reading_questions=[];self.size=(1100,720);self.running=True;self.multiline_open=False;self.multiline_key='';self.multiline_scroll=0;self.match_pairs=[];self.match_focus=None;self.dropdown=None;self.dropdown_scroll=0;self.desktop=(1280,800);self.edit_scroll=0;self.maximized=False;self.config_draft=None;self.config_error="";self.focus_rect=None;self.mouse_pos=(-999,-999);self._hover_offset=0
+        self.sort_by='';self.remove_request=None;self.removed=None
+        self.edit_layout=None
     def font(self,size,bold=False):
         # Prefer bundled Windows Unicode fonts; pygame's default font lacks Vietnamese glyphs.
         paths=[r'C:\Windows\Fonts\segoeuib.ttf' if bold else r'C:\Windows\Fonts\segoeui.ttf',
@@ -66,7 +73,8 @@ class BankManager:
                         self.size=(max(760,self.screen.get_width()),max(570,self.screen.get_height())) if e.type!=pygame.VIDEORESIZE else (max(760,e.w),max(570,e.h))
                         if e.type==pygame.VIDEORESIZE:self.screen=pygame.display.set_mode(self.size,pygame.RESIZABLE)
                     elif e.type==pygame.MOUSEBUTTONDOWN and e.button==1:
-                        if self.multiline_open:self.multiline_click(e.pos)
+                        if self.remove_request:self.click_remove(e.pos)
+                        elif self.multiline_open:self.multiline_click(e.pos)
                         elif self.dropdown:self.dropdown_click(e.pos)
                         else:self.click(e.pos)
                     elif e.type==pygame.TEXTINPUT:self.text_input(e.text)
@@ -82,6 +90,7 @@ class BankManager:
                 self.draw();
                 if self.multiline_open:self.draw_multiline()
                 elif self.dropdown:self.draw_dropdown()
+                if self.remove_request:self.draw_remove()
                 pygame.display.flip();clock.tick(30)
         finally:
             pygame.key.stop_text_input()
@@ -234,6 +243,9 @@ class BankManager:
         self.text(label,rect.x+15,rect.y+11,self.sm,BLUE)
 
     def key(self,e):
+        if self.remove_request:
+            if e.key==pygame.K_ESCAPE:self.remove_request=None
+            return
         if self.multiline_open:
             if e.key==pygame.K_ESCAPE:self.multiline_open=False;pygame.key.stop_text_input();return
             value=self.reading_form.get(self.multiline_key,'')
@@ -384,6 +396,7 @@ class BankManager:
         if attr in ('grade','subject'):
             lessons=self.bank.lessons(self.grade,self.subject);self.lesson=self.preferred_lesson()
     def begin(self,row=None):
+        self.edit_layout=row.get('layout') if row else None
         self.tab='edit';self.edit_scroll=0;self.active=None;self.message='';self.edit_id=str(row.get('id','')) if row else ''
         self.edit_type=row.get('type','choice') if row else 'choice';self.match_mode=MATCH_MODES.index(row.get('matching_mode')) if row and row.get('matching_mode') in MATCH_MODES else 0
         if self.edit_type=='matching' and self.size[1]<1180:
@@ -394,15 +407,80 @@ class BankManager:
             if self.size[1]<1040:
                 self.message='Mẹo: cuộn trang hoặc phóng to cửa sổ để xem đủ trường nhập.'
             self.reading_form={'title':row.get('title','') if row else '', 'passage':row.get('passage','') if row else ''}
-            self.reading_questions=[{'id':str(q.get('id','')), 'prompt':str(q.get('prompt','')), 'options':' | '.join(q.get('options',[])), 'answer':str(q.get('answer','')), 'difficulty':str(q.get('difficulty',1))} for q in row.get('questions',[])] if row else []
+            self.reading_questions=[{'id':str(q.get('id','')), 'prompt':str(q.get('prompt','')), 'options':' | '.join(q.get('options',[])), 'answer':str(q.get('answer','')), 'difficulty':str(q.get('difficulty',1)), 'layout':q.get('layout')} for q in row.get('questions',[])] if row else []
             if not self.reading_questions:self.reading_questions=[{'prompt':'','options':'A | B | C | D','answer':'','difficulty':'1'},{'prompt':'','options':'A | B | C | D','answer':'','difficulty':'1'}]
         self.form={'prompt':row.get('prompt','') if row else '', 'options':' | '.join(row.get('options',[])) if row else 'A | B | C | D','answer':str(row.get('answer','')) if row else '', 'sequence':' | '.join(row.get('sequence',[])) if row else '', 'pairs':' | '.join(' = '.join(p) for p in row.get('pairs',[])) if row else '', 'wrong':row.get('wrong','') if row else '', 'corrected':row.get('corrected','') if row else '', 'difficulty':str(row.get('difficulty',1)) if row else '1', 'gap_answers':' | '.join(row.get('gap_answers',[])) if row else '', 'audio':str(row.get('audio','')) if row else '', 'image':str(row.get('image','')) if row else '', 'image_options':list(row.get('options',[])) if row and row.get('type')=='image_multi_choice' else [], 'image_correct':str(row.get('answer','')) if row and row.get('type')=='image_multi_choice' else ''}
+    def duplicate(self,row):
+        self.begin(row)
+        self.edit_id=''
+        if self.edit_type=='reading_group':
+            for child in self.reading_questions:
+                child.pop('id',None)
+        self.message='Bản sao chưa lưu. Kiểm tra nội dung rồi chọn Lưu.'
+
+    def request_remove(self,row):
+        self.remove_request=row
+        self.active=None
+
+    def remove_buttons(self):
+        w,h=self.size
+        center=pygame.Rect(w//2-210,h//2-80,420,160)
+        yes=pygame.Rect(center.x+27,center.bottom-54,145,37)
+        no=pygame.Rect(center.right-172,center.bottom-54,145,37)
+        return center,yes,no
+
+    def draw_remove(self):
+        center,yes,no=self.remove_buttons()
+        veil=pygame.Surface(self.size,pygame.SRCALPHA)
+        veil.fill((12,25,40,175))
+        self.screen.blit(veil,(0,0))
+        self.rect(center,WHITE,LINE,12)
+        self.text('Xóa mục đang chọn?',center.x+24,center.y+16,self.b,INK)
+        self.text('Bạn có thể hoàn tác trong 6 giây.',center.x+24,center.y+54,self.sm,MUTED)
+        self.rect(yes,RED,None,5);self.text('Xóa',yes.x+53,yes.y+8,self.sm,WHITE)
+        self.rect(no,LINE,None,5);self.text('Hủy',no.x+53,no.y+8,self.sm,INK)
+
+    def click_remove(self,pos):
+        _center,yes,no=self.remove_buttons()
+        if no.collidepoint(pos):
+            self.remove_request=None
+        elif yes.collidepoint(pos):
+            row,self.remove_request=self.remove_request,None
+            path=self.bank.readings_path if row.get('_group') else self.bank.questions_path
+            try:
+                data=json.loads(path.read_text(encoding='utf-8-sig'))
+                hits=[i for i,item in enumerate(data) if item.get('id')==row.get('id')]
+                if len(hits)!=1:
+                    raise ValueError('Không xác định được mục cần xóa.')
+                remaining,ticket=remove_at(data,hits[0])
+                commit_json({path:remaining})
+                self.removed=(time.monotonic()+6,path,ticket)
+                self.message='Đã xóa mục.'
+            except (OSError,ValueError,TypeError) as exc:
+                self.message='Lỗi xóa: '+str(exc)
+
+    def undo_remove(self):
+        if self.removed is None:
+            return
+        expires,path,ticket=self.removed
+        self.removed=None
+        if time.monotonic()>expires:
+            return
+        try:
+            data=json.loads(path.read_text(encoding='utf-8-sig'))
+            commit_json({path:ticket.restore(data,unique_id=True)})
+            self.message='Đã hoàn tác xóa.'
+        except (OSError,ValueError,TypeError) as exc:
+            self.message='Lỗi hoàn tác: '+str(exc)
+
     def save(self):
         if self.edit_type=='reading_group':
             try:
                 children=[]
                 for c in self.reading_questions:
                     children.append({'id':c.get('id',''), 'prompt':c['prompt'].strip(),'options':[x.strip() for x in c['options'].split('|') if x.strip()],'answer':c['answer'].strip(),'difficulty':int(c['difficulty'])})
+                    if c.get('layout') is not None:
+                        children[-1]['layout']=c['layout']
                 self.bank.save_reading({'id':self.edit_id,'subject':self.subject,'grade':self.grade,'lesson':self.lesson,'title':self.reading_form['title'].strip(),'passage':self.reading_form['passage'].strip(),'questions':children})
                 self.message='Đã lưu bài đọc và câu hỏi con.';self.tab='bank'
             except (ValueError,KeyError,OSError) as exc:self.message='Lỗi lưu: '+str(exc)
@@ -415,7 +493,12 @@ class BankManager:
             # Optional supplementary media for every editable question type.
             # Missing media is omitted, preserving old JSON schemas.
             if f.get('audio','').strip():q['audio']=f['audio'].strip()
-            if f.get('image','').strip():q['image']=f['image'].strip()
+            if f.get('image','').strip():
+                q['image']=self.bank._resolve_media(f['image'].strip())
+                if not Path(q['image']).is_file():
+                    raise ValueError('Không tìm thấy ảnh minh họa. Hãy chọn lại tệp.')
+            if self.edit_layout is not None:
+                q['layout']=self.edit_layout
             if typ=='image_multi_choice':
                 q['options']=list(f.get('image_options',[]));q['answer']=f.get('image_correct','')
             if typ in ('choice','true_false','picture_choice','listening_choice'):q['options']=[x.strip() for x in f['options'].split('|') if x.strip()]
@@ -465,7 +548,12 @@ class BankManager:
         self.btn('Dạng: '+('Tất cả' if self.filter_type=='all' else dict(TYPES).get(self.filter_type,self.filter_type)),pygame.Rect(355,391,max(155,min(365,w-680)),41),lambda:self.open_dropdown('filter_type',['all']+[t[0] for t in TYPES],pygame.Rect(355,391,max(155,min(365,w-680)),41),dict([('all','Tất cả')]+TYPES)))
         self.btn('Mức: '+('Tất cả' if self.filter_diff=='all' else 'M'+self.filter_diff),pygame.Rect(w-300,391,133,41),lambda:self.open_dropdown('filter_diff',['all','1','2','3','4','5'],pygame.Rect(w-300,391,133,41),{'all':'Tất cả',**{str(i):'M'+str(i) for i in range(1,6)}}))
         self.btn('+ Thêm câu hỏi',pygame.Rect(w-156,391,128,41),lambda:self.begin())
-        needle=self.search.strip().casefold();rows=[r for r in scoped if (not needle or needle in str(r.get('id','')).casefold() or needle in str(r.get('prompt','')).casefold()) and (self.filter_type=='all' or r.get('type')==self.filter_type) and (self.filter_diff=='all' or (str(r.get('difficulty'))==self.filter_diff or r.get('_group') and any(str(c.get('difficulty'))==self.filter_diff for c in r.get('questions',[]))))]
+        matched=find_rows(scoped,self.search,sort_by=self.sort_by or None,
+                          filters={'type':None if self.filter_type=='all' else self.filter_type})
+        rows=[row for _,row in matched if self.filter_diff=='all'
+              or str(row.get('difficulty'))==self.filter_diff
+              or row.get('_group') and any(str(child.get('difficulty'))==self.filter_diff
+                                           for child in row.get('questions',[]))]
         total=len(rows);pages=max(1,math.ceil(total/10));self.page=min(max(1,self.page),pages)
         if total==0:
             available=sum(1 for q in self.bank.questions() if str(q.get('grade'))==str(self.grade) and str(q.get('subject') or 'tieng_anh')==self.subject)
@@ -487,10 +575,12 @@ class BankManager:
         max_scroll=max(0,content_h-viewport.h)
         self.scroll=min(max(0,self.scroll),max_scroll)
         # Header stays fixed while only table rows scroll.
-        self.text('MÃ CÂU HỎI',43,top+8,self.sm,MUTED)
-        self.text('NỘI DUNG',w//4,top+8,self.sm,MUTED)
+        self.btn('MÃ' + (' ↑' if self.sort_by=='id' else ''),pygame.Rect(43,top+3,86,28),
+                 lambda:self.sort_bank('id'))
+        self.btn('NỘI DUNG'+(' ↑' if self.sort_by=='prompt' else ''),pygame.Rect(w//4,top+3,114,28),
+                 lambda:self.sort_bank('prompt'))
         self.text('DẠNG',w*3//5,top+8,self.sm,MUTED)
-        self.text('MỨC',w-165,top+8,self.sm,MUTED)
+        self.text('MỨC',w-239,top+8,self.sm,MUTED)
         pygame.draw.line(self.screen,LINE,(frame.x+8,top+header_h),(frame.right-8,top+header_h))
         old_clip=self.screen.get_clip()
         self.screen.set_clip(viewport)
@@ -504,9 +594,11 @@ class BankManager:
             pygame.draw.line(self.screen,LINE,(40,y),(w-40,y))
             self.text(q.get('id','')[:23],43,y+9,self.sm,BLUE,w//4-55)
             self.text(q.get('prompt','') or q.get('title',''),w//4,y+9,self.sm,INK,w*7//20)
-            self.text(dict(TYPES).get(q.get('type'),q.get('type')),w*3//5,y+9,self.sm,MUTED,w//4-40)
-            self.text('M'+str(q.get('difficulty')) if not q.get('_group') else str(len(q.get('questions',[])))+' câu',w-165,y+9,self.sm)
-            self.btn('Sửa',pygame.Rect(w-95,y+5,60,28),lambda r=q:self.begin(r))
+            self.text(dict(TYPES).get(q.get('type'),q.get('type')),w*3//5,y+9,self.sm,MUTED,max(55,w-245-w*3//5))
+            self.text('M'+str(q.get('difficulty')) if not q.get('_group') else str(len(q.get('questions',[])))+' câu',w-239,y+9,self.sm)
+            self.btn('Sửa',pygame.Rect(w-177,y+5,42,28),lambda r=q:self.begin(r))
+            self.btn('Sao',pygame.Rect(w-129,y+5,42,28),lambda r=q:self.duplicate(r))
+            self.btn('Xóa',pygame.Rect(w-81,y+5,42,28),lambda r=q:self.request_remove(r))
         self.screen.set_clip(old_clip)
         self.actions=self.actions[:action_start]+[(r.clip(viewport),cb) for r,cb in self.actions[action_start:] if r.colliderect(viewport)]
         if max_scroll:
@@ -524,6 +616,15 @@ class BankManager:
         self.btn('<',pygame.Rect(w-274,y,52,34),lambda:self.set_page(max(1,self.page-1)),disabled=self.page==1)
         self.btn('>',pygame.Rect(w-214,y,52,34),lambda:self.set_page(min(pages,self.page+1)),disabled=self.page==pages)
         self.btn('Cuối',pygame.Rect(w-154,y,87,34),lambda:self.set_page(pages),disabled=self.page==pages)
+        if self.removed and time.monotonic()<=self.removed[0]:
+            self.btn('Hoàn tác',pygame.Rect(30,y+4,105,34),self.undo_remove)
+        elif self.removed:
+            self.removed=None
+
+    def sort_bank(self,key):
+        self.sort_by='' if self.sort_by==key else key
+        self.set_page(1)
+
     def set_page(self,page):
         self.page=page
         self.scroll=0
@@ -531,6 +632,13 @@ class BankManager:
         self.text('Bộ soạn thảo theo từng dạng câu hỏi',32,274,self.b)
         self.btn('Dạng: '+dict(TYPES)[self.edit_type]+'  ▼',pygame.Rect(30,313,w-60,43),lambda:self.open_dropdown('edit_type',[t[0] for t in TYPES],pygame.Rect(30,313,w-60,43),dict(TYPES)))
         self.text('Mã: '+(self.edit_id or 'Tạo tự động khi lưu'),35,368,self.sm,MUTED)
+        required=[]
+        if self.edit_type not in ('reading_group','picture_missing_letters') and not self.form.get('prompt','').strip():
+            required.append('nội dung')
+        if self.edit_type in ('choice','true_false','fill','picture_choice','picture_missing_letters','listening_choice','listening_fill') and not self.form.get('answer','').strip():
+            required.append('đáp án')
+        if required:
+            self.text('Còn thiếu: '+', '.join(required),w//2,368,self.sm,RED,w//2-35)
         self.rect(pygame.Rect(28,397,w-56,max(150,h-485)),WHITE,LINE)
         x=47;y=435;wide=w-95
         typ=self.edit_type

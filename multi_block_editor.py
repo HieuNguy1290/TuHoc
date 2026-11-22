@@ -13,6 +13,8 @@ from tkinter import filedialog, messagebox, ttk
 from level_flow import library_file, load_rows
 from safe_storage import commit_json
 from lesson_display_names import breadcrumb
+from studio_list import find_rows, remove_at
+from ui_components import Toast
 
 
 def open_block_editor(app, theme, level, lesson=1, create_mode=False):
@@ -59,6 +61,13 @@ def open_block_editor(app, theme, level, lesson=1, create_mode=False):
     left.pack_propagate(False)
     tk.Label(left, text='DANH SÁCH BLOCK', bg='white', fg='#244D3B',
              font=('Segoe UI', 11, 'bold')).pack(anchor='w', pady=(0, 8))
+    search=tk.StringVar()
+    tk.Label(left,text='Tìm tên hoặc nội dung',bg='white').pack(anchor='w')
+    ttk.Entry(left,textvariable=search).pack(fill='x',pady=(0,6))
+    sort=tk.StringVar(value='Thứ tự bài')
+    ttk.Combobox(left,textvariable=sort,values=('Thứ tự bài','Tiêu đề'),
+                 state='readonly').pack(fill='x',pady=(0,6))
+    visible=[]
     listbox = tk.Listbox(left, font=('Segoe UI', 11), exportselection=False, activestyle='none')
     listbox.pack(fill='both', expand=True)
     right = tk.Frame(main, bg='white', padx=18, pady=12)
@@ -95,11 +104,15 @@ def open_block_editor(app, theme, level, lesson=1, create_mode=False):
 
     def refresh_list():
         listbox.delete(0, 'end')
-        for i, block in enumerate(blocks):
-            listbox.insert('end', f'#{i + 1}  {str(block.get("title", ""))[:42] or "(Chưa có giới thiệu)"}')
-        if active['index'] is not None and active['index'] < len(blocks):
-            listbox.selection_set(active['index'])
-            listbox.see(active['index'])
+        visible[:]=find_rows(blocks,search.get(),fields=('title','content'),
+                             sort_by='title' if sort.get()=='Tiêu đề' else None)
+        for i,block in visible:
+            listbox.insert('end',f'#{i+1}  {str(block.get("title",""))[:42] or "(Chưa có giới thiệu)"}')
+        indices=[i for i,_row in visible]
+        if active['index'] in indices:
+            index=indices.index(active['index'])
+            listbox.selection_set(index)
+            listbox.see(index)
         status.set(f'{len(blocks)} block · ' + ('Có thay đổi chưa lưu' if dirty['value'] else 'Chưa có thay đổi'))
 
     def flush():
@@ -128,6 +141,7 @@ def open_block_editor(app, theme, level, lesson=1, create_mode=False):
         title_var.set(str(block.get('title', '')))
         image_var.set(str(block.get('image', '')))
         layout_var.set(str(block.get('layout') or 'auto'))
+        content.configure(state='normal')
         content.delete('1.0', 'end')
         content.insert('1.0', str(block.get('content', '')))
         state = 'normal' if i is not None else 'disabled'
@@ -138,10 +152,14 @@ def open_block_editor(app, theme, level, lesson=1, create_mode=False):
 
     def select(_event=None):
         selection = listbox.curselection()
-        if selection and selection[0] != active['index']:
-            flush()
-            show(selection[0])
+        if selection:
+            index=visible[selection[0]][0]
+            if index!=active['index']:
+                flush()
+                show(index)
     listbox.bind('<<ListboxSelect>>', select)
+    search.trace_add('write',lambda *_args:refresh_list())
+    sort.trace_add('write',lambda *_args:refresh_list())
 
     def add():
         flush()
@@ -172,9 +190,17 @@ def open_block_editor(app, theme, level, lesson=1, create_mode=False):
     def remove():
         i = active['index']
         if i is None or not messagebox.askyesno('Xóa block', 'Xóa block này khỏi bài học?', parent=window): return
-        blocks.pop(i)
-        dirty['value'] = True
-        show(min(i, len(blocks) - 1) if blocks else None)
+        flush()
+        remaining,ticket=remove_at(blocks,i)
+        blocks[:]=remaining
+        dirty['value']=True
+        show(min(i,len(blocks)-1) if blocks else None)
+        def restore():
+            flush()
+            blocks[:]=ticket.restore(blocks)
+            dirty['value']=True
+            show(min(i,len(blocks)-1))
+        Toast(window,'Đã xóa block.',duration=6000,action=('Hoàn tác',restore))
 
     def choose_image():
         i = active['index']
@@ -211,6 +237,12 @@ def open_block_editor(app, theme, level, lesson=1, create_mode=False):
             return
         if not blocks:
             if not messagebox.askyesno('Bài học trống', 'Lưu bài học không có block?', parent=window): return
+        from unified_subjects import subject_image
+        missing=[str(block.get('title') or index) for index,block in enumerate(blocks,1)
+                 if block.get('image') and not subject_image(data_dir,block['image'])]
+        if missing:
+            messagebox.showwarning('Thiếu ảnh','Kiểm tra ảnh của block: '+', '.join(missing),parent=window)
+            return
         new_rows = []
         inserted = False
         for row in original:

@@ -1108,7 +1108,7 @@ class GameAppMixin:
         from quiz_history_ui import show_history
         body=self.layout('📚 Lịch sử làm bài')
         show_history(body,self.db.conn,self.student['id'],
-                     on_back=self.report_page)
+                     on_back=self.report_page,on_retry=self.wrong_answers_page)
 
     def wrong_answers_page(self):
         """Review incorrect attempts without altering the current quiz session."""
@@ -1122,7 +1122,7 @@ class GameAppMixin:
     def learning_analytics_page(self):
         from learning_analytics_ui import show_analytics
         body=self.layout('📈 Tiến độ học tập')
-        show_analytics(body,self.db.conn,self.student['id'],on_back=self.report_page)
+        show_analytics(body,self.db.conn,self.student['id'],on_back=self.report_page,on_retry=self.wrong_answers_page)
 
     def time_statistics_page(self):
         self.learning.ensure_time_tables()
@@ -1201,7 +1201,7 @@ class GameAppMixin:
     def report_page(self):
         sid=self.student['id'];body=self.layout('📊  Báo cáo phụ huynh / giáo viên')
         from ui_results_dashboard import dashboard
-        dashboard(body,self.db,sid)
+        dashboard(body,self.db,sid,on_retry=self.wrong_answers_page)
         r=self.db.conn.execute('SELECT COUNT(*),COALESCE(SUM(seconds),0),COALESCE(SUM(correct),0),COALESCE(SUM(total),0) FROM learning_sessions WHERE student_id=?',(sid,)).fetchone()
         self._heading(body,f'{r[0]} phiên học  •  {r[1]/60:.1f} phút  •  {r[2]}/{r[3]} câu đúng')
         self.button(body,'📚  Xem lịch sử từng lần làm bài',self.quiz_history_page).pack(anchor='w',pady=(8,12))

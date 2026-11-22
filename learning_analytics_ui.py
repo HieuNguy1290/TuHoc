@@ -30,10 +30,12 @@ def aggregate(conn, student_id, days=30, subject='all', now=None):
             'by_day':dict(by_day),'by_topic':dict(by_topic),'days':days}
 
 
-def show_analytics(parent,conn,student_id,on_back=None):
+def show_analytics(parent,conn,student_id,on_back=None,on_retry=None):
     outer=tk.Frame(parent,bg=BG);outer.pack(fill='both',expand=True)
     header=tk.Frame(outer,bg=BG);header.pack(fill='x',pady=(8,15))
     tk.Label(header,text='Tiến độ học tập',font=(FONT,21,'bold'),bg=BG,fg=INK).pack(side='left')
+    if on_retry:
+        tk.Button(header,text='Ôn lại câu sai',command=on_retry,bg=PALE,fg=INK,bd=0,padx=14,pady=9).pack(side='right',padx=6)
     if on_back:
         tk.Button(header,text='← Báo cáo',command=on_back,bg=PALE,fg=INK,bd=0,padx=14,pady=9,cursor='hand2').pack(side='right')
     tk.Label(outer,text='Thống kê từ các bài tập đã hoàn thành',font=(FONT,10),bg=BG,fg=MUTED).pack(anchor='w',pady=(0,14))

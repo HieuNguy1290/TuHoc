@@ -682,7 +682,21 @@ def show_exam_detail(parent, record, library_dir=None):
     return dialog
 
 
-def show_history(parent, conn, student_id, on_back=None):
+def history_window(rows,days,now=None):
+    if days is None:
+        return list(rows)
+    now=now or datetime.datetime.now()
+    cutoff=(now-datetime.timedelta(days=days-1)).replace(hour=0,minute=0,second=0,microsecond=0)
+    start,end=cutoff.timestamp(),now.timestamp()
+    visible=[]
+    for row in rows:
+        try:timestamp=float(row[3])
+        except (TypeError,ValueError):continue
+        if start<=timestamp<=end:visible.append(row)
+    return visible
+
+
+def show_history(parent, conn, student_id, on_back=None, on_retry=None):
     """Modern, borderless learning-history table. Read-only database access."""
     BG = TOKEN_COLORS['background']
     INK = '#173E2B'
@@ -701,6 +715,9 @@ def show_history(parent, conn, student_id, on_back=None):
     title_row.pack(fill='x', pady=(6, 3))
     tk.Label(title_row, text=t('history'), bg=BG, fg=INK,
              font=(font, 19, 'bold')).pack(side='left')
+    if on_retry:
+        tk.Button(title_row,text='Ôn lại câu sai',command=on_retry,
+                  bg=PALE_GREEN,fg=INK,bd=0,padx=12,pady=8,takefocus=True).pack(side='right',padx=6)
     if on_back:
         back = tk.Button(title_row, text='← Quay lại', command=on_back,
                          bg=PALE_GREEN, activebackground=HOVER, fg=INK,
@@ -726,6 +743,11 @@ def show_history(parent, conn, student_id, on_back=None):
     combo = ttk.Combobox(filters, textvariable=selected, values=list(options),
                          state='readonly', width=17, style='LearningHistory.TCombobox')
     combo.pack(side='left')
+    periods={'Mọi thời gian':None,'7 ngày':7,'30 ngày':30,'90 ngày':90}
+    period=tk.StringVar(value='Mọi thời gian')
+    time_filter=ttk.Combobox(filters,textvariable=period,values=list(periods),state='readonly',width=15)
+    tk.Label(filters,text='Thời gian',bg=BG,fg=INK).pack(side='left',padx=(16,8))
+    time_filter.pack(side='left')
 
     # Each row uses the same grid proportions as the heading, so the table
     # remains aligned when the parent window is resized.
@@ -815,6 +837,7 @@ def show_history(parent, conn, student_id, on_back=None):
                       '[Kiểm tra] '+item[2], item[3], item[4], None, item[5], item[6])
                      for item in exams]
         combined = sorted(list(db_records) + exam_rows, key=lambda r: float(r[3] or 0), reverse=True)
+        combined=history_window(combined,periods[period.get()])
         count = len(combined)
         max_page = (count - 1) // PAGE_SIZE if count else 0
         page[0] = min(page[0], max_page)
@@ -891,5 +914,6 @@ def show_history(parent, conn, student_id, on_back=None):
 
     prev_btn.config(command=lambda: move(-1))
     next_btn.config(command=lambda: move(1))
-    combo.bind('<<ComboboxSelected>>', lambda _event: (page.__setitem__(0, 0), render()))
+    for selector in (combo,time_filter):
+        selector.bind('<<ComboboxSelected>>',lambda _event:(page.__setitem__(0,0),render()))
     render()

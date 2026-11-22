@@ -71,11 +71,18 @@ class AdminEditor:
         self.enabled=self.app.admin_enabled=True
         self.badge=tk.Label(self.app,text='✎ ADMIN · Ctrl+Shift+A để khóa',bg='#FDE68A',fg='#713F12',font=('Segoe UI',10,'bold'),padx=9,pady=5)
         self.badge.place(relx=.5,y=8,anchor='n');self.badge.lift()
+        self._question_shortcut=tk.Button(self.app,text='Quản lý câu hỏi',
+                                         command=self._open_questions,takefocus=True)
+        self._question_shortcut.place(relx=1,x=-12,y=8,anchor='ne')
         self.marker=tk.Button(self.app,text='✎',bg='#FDE68A',fg='#713F12',font=('Segoe UI',12,'bold'),bd=0,padx=6,pady=3,cursor='hand2',command=self.edit_selected)
         self.marker.place_forget()
         self.scan()
         self._periodic_scan()
         messagebox.showinfo('Admin','Chế độ sửa trực tiếp đã bật. Di chuột lên tiêu đề, văn bản hoặc ô nội dung, rồi bấm ✎. Nhấn Admin trong dấu + lần nữa để khóa.',parent=self.app)
+
+    def _open_questions(self):
+        if self.enabled:
+            self.app.question_editor()
 
     def disable(self):
         self.enabled=self.app.admin_enabled=False
@@ -87,7 +94,7 @@ class AdminEditor:
             try:widget.unbind('<Enter>',funcid)
             except tk.TclError:pass
         self._bindings.clear()
-        for w in (self.badge,self.marker):
+        for w in (self.badge,self.marker,getattr(self,'_question_shortcut',None)):
             try: w.destroy()
             except (tk.TclError,AttributeError):pass
         self.badge=self.marker=self._widget=None

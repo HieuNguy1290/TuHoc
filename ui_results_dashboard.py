@@ -2,14 +2,16 @@
 import tkinter as tk
 from datetime import date, datetime, timedelta
 from collections import defaultdict
+from ui_components import Badge, RoundedButton
+from ui_tokens import font_at
 
 BLUE='#327ED9'; YELLOW='#F5C34D'; DARK='#31435F'; MUTED='#6D7890'; LINE='#E4E8F0'; WHITE='#FFFFFF'
 FONT='Segoe UI'
 
 def text(parent,value,size=11,bold=False,**kwargs):
-    return tk.Label(parent,text=value,font=(FONT,size,'bold' if bold else 'normal'),bg=kwargs.pop('bg',WHITE),fg=kwargs.pop('fg',DARK),**kwargs)
+    return tk.Label(parent,text=value,font=font_at(size,'bold' if bold else 'normal'),bg=kwargs.pop('bg',WHITE),fg=kwargs.pop('fg',DARK),**kwargs)
 
-def dashboard(parent,db,sid):
+def dashboard(parent,db,sid,on_retry=None):
     """Build a three-tier dashboard based on recorded sessions, with no invented scores."""
     rows=db.conn.execute('SELECT theme,level,started,seconds,correct,total FROM learning_sessions WHERE student_id=?',(sid,)).fetchall()
     sessions=len(rows); secs=sum(float(r[3] or 0) for r in rows)
@@ -33,6 +35,14 @@ def dashboard(parent,db,sid):
     metric(0,'Tiến độ khóa học',f'{completed}/{known}' if known else '—','Level đã đạt','◉')
     metric(1,'Thời gian học',f'{secs/3600:.1f}','giờ đã ghi nhận','◷')
     metric(2,'Kết quả kiểm tra',f'{good/total:.0%}' if total else '—','tỷ lệ đúng','🏆')
+    note=tk.Frame(outer,bg=WHITE,padx=22)
+    note.pack(fill='x',pady=(0,12))
+    if total:
+        Badge(note,f'★  Đã trả lời đúng {good}/{total} câu',tone='success').pack(side='left')
+    else:
+        text(note,'Bắt đầu một bài luyện tập để xem tiến độ ở đây.').pack(side='left')
+    if on_retry:
+        RoundedButton(note,'Ôn lại câu sai',on_retry,variant='outline',width=155).pack(side='right')
     tk.Frame(outer,bg=LINE,height=1).pack(fill='x')
     middle=tk.Frame(outer,bg=WHITE);middle.pack(fill='x',padx=26,pady=20)
     left=tk.Frame(middle,bg=WHITE);left.grid(row=0,column=0,sticky='nsew',padx=(0,18))
