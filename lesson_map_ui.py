@@ -6,6 +6,7 @@ import math
 from theme_config import UI_COLORS as C
 from ui_components import Card, Chip, ProgressBar, Tooltip, Toast, bind_hover
 from lesson_display_names import display_name
+from ui_keys import GRID_MOVES, keyboard_button
 
 class LessonMap:
     def __init__(self, app, map_mode=False):
@@ -28,10 +29,13 @@ class LessonMap:
     def later(self,ms,fn):
         def wrapped():
             if self.body.winfo_exists():fn()
-        self.jobs.append(self.app.after(ms,wrapped))
+        if getattr(self.app,'reduce_motion',False):
+            wrapped()
+        else:
+            self.jobs.append(self.app.after(ms,wrapped))
 
     def label(self,parent,text,size=11,bold=False,fg=None,bg=None,**kw):
-        return tk.Label(parent,text=text,font=('Segoe UI',size,'bold' if bold else 'normal'),bg=bg or parent.cget('bg'),fg=fg or C['text'],**kw)
+        return tk.Label(parent,text=text,font=font_at(size,'bold' if bold else 'normal'),bg=bg or parent.cget('bg'),fg=fg or C['text'],**kw)
 
     def build(self):
         if not self.theme:return
@@ -54,7 +58,7 @@ class LessonMap:
             slot=tk.Frame(inner,bg=C['background'])
             chip=Chip(slot,text=f'{icon}  {title}',bg=base_bg,fg=base_fg,
                       cursor='hand2',takefocus=1)
-            chip.configure(bd=0,relief='flat')
+            chip.configure(bd=0,relief='flat',highlightthickness=2,highlightcolor=C['focus'])
             chip.update_idletasks()
             width,height=chip.winfo_reqwidth(),chip.winfo_reqheight()
             slot_h=max(56,height+18)
@@ -267,7 +271,8 @@ class LessonMap:
             edge=C['primary'] if n==self.level else '#C99A24' if unlocked and not done else C['border']
             slot=tk.Frame(self.level_grid,bg=C['background'],width=10)
             slot.grid(row=(n-1)//5,column=(n-1)%5,padx=5,pady=5,sticky='nsew')
-            card=tk.Frame(self.level_grid,bg=bg,highlightbackground=edge,highlightthickness=2,cursor='hand2')
+            card=tk.Frame(self.level_grid,bg=bg,highlightbackground=edge,highlightthickness=2,
+                          highlightcolor=C['focus'],takefocus=True,cursor='hand2')
             card._ready=False
             self._cards[n]=(card,bg);self._info[n]=(done,unlocked)
             cards.append((card,bg,n,2))
@@ -285,6 +290,17 @@ class LessonMap:
             card.place(in_=slot,x=-28,y=0,relwidth=1,relheight=1)
             for widget in [card,*card.winfo_children()]:
                 widget.bind('<Button-1>',lambda e,k=n:self.select(k))
+            def focus_level(event,origin=n):
+                target=max(1,min(maximum,origin+GRID_MOVES[event.keysym]))
+                self._cards[target][0].focus_set()
+                return 'break'
+            for key in GRID_MOVES:
+                card.bind('<'+key+'>',focus_level)
+            def activate(_event,level=n):
+                self.select(level)
+                return 'break'
+            card.bind('<Return>',activate)
+            card.bind('<space>',activate)
             bind_hover(card,lambda a,k=n:self._level_hover(k,a),region=slot,also=(slot,))
         end=self.animate_levels(cards,generation,delay)
         # Fit names once, while the cards are still at 0% opacity.
@@ -405,6 +421,8 @@ class LessonMap:
             for mode,text in [('lesson','Học'),('quiz','Bài tập')]:
                 b=tk.Button(actions,text=text,font=font_at(10, 'bold'),bg='white' if mode=='lesson' else C['primary'],fg=C['primary'] if mode=='lesson' else 'white',relief='solid',bd=1,padx=12,pady=5,cursor='hand2' if unlocked else 'arrow',state='normal' if unlocked else 'disabled',command=lambda k=i,m=mode:self.open_lesson(k,m))
                 b.pack(side='left',padx=(0,8))
+                keyboard_button(b)
+                b.configure(highlightcolor=C['focus'])
                 if unlocked:
                     base='white' if mode=='lesson' else C['primary']
                     over=C['tint'] if mode=='lesson' else '#236743'

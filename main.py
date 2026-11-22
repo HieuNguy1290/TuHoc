@@ -36,6 +36,7 @@ from mouse_effects import MouseEffects
 from floating_vocabulary import FloatingVocabulary
 from ui_shell import AppShell
 from ui_components import Toast
+from ui_keys import HELP as KEY_HELP, action_for, allow_shell, focus_first, keyboard_button
 from profile_ui import ProfilePage
 from ui_grid import UIGrid
 from minigames import MiniGamesMixin
@@ -487,11 +488,12 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         self._navigation_busy = False
         self._sidebar_slide_direction = 0
         self._sidebar_slide_job = None
-        self.bind_all("<Alt-Left>", self._navigation_back_key, add="+")
+        self.bind_all('<Alt-Left>',self._navigation_back_key,add='+')
         self.recording_session = None
         self.recording_busy = False
         self.setup_upgrade()
         self.apply_font_preferences()
+        self.reduce_motion=bool(self._display_settings.get('reduce_motion',False))
         self.ui_grid = UIGrid(self)
         install_wheel_scroll(self)
         install_drag_scroll(self)
@@ -674,7 +676,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         self._sidebar_slide_direction = 0
         canvas = getattr(self, 'active_scroll_canvas', None)
         item = getattr(self, '_sidebar_slide_window', None)
-        if not direction or canvas is None or item is None:
+        if self.reduce_motion or not direction or canvas is None or item is None:
             return
         if getattr(self, '_admin_page', '') in ('Lịch sử làm bài', 'Lịch sử'):
             return
@@ -723,6 +725,8 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         self._navigation_busy = False
 
     def _navigation_back_key(self, event=None):
+        if event is not None and not allow_shell(self,event.widget):
+            return
         if self._navigation_history and not self._navigation_busy:
             self.navigation_back()
             return 'break'
@@ -865,7 +869,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
 
     def _fast_navigation_enabled(self):
         """Avoid synchronous screen capture by default; opt in with TU_HOC_FAST_NAV=0."""
-        return os.environ.get('TU_HOC_FAST_NAV', '1').strip().lower() not in ('0', 'false', 'off')
+        return getattr(self,'reduce_motion',False) or os.environ.get('TU_HOC_FAST_NAV', '1').strip().lower() not in ('0', 'false', 'off')
 
     def _snapshot_before_navigation(self):
         """Freeze the complete app client area at a fixed screen coordinate.
@@ -1103,7 +1107,8 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         # Match the soft green hover treatment used in subject selection.
         button.bind('<Enter>',lambda e,b=button: b.configure(bg='#257B56') if not getattr(b,'_selection_pending',False) else None,add='+')
         button.bind('<Leave>',lambda e,b=button: b.configure(bg=GREEN) if not getattr(b,'_selection_pending',False) else None,add='+')
-        button.configure(command=activate)
+        button.configure(command=activate,highlightcolor=TOKEN_COLORS['focus'])
+        keyboard_button(button)
         return button
 
     def action_button(self, parent, text, command):
@@ -1114,6 +1119,8 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
                            cursor='hand2', command=command)
         button.bind('<Enter>', lambda e, b=button: b.configure(bg='#257B56'), add='+')
         button.bind('<Leave>', lambda e, b=button: b.configure(bg=GREEN), add='+')
+        button.configure(highlightcolor=TOKEN_COLORS['focus'])
+        keyboard_button(button)
         return button
 
     def _show_shortcut_guide(self):
@@ -1140,7 +1147,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         rows=tk.Frame(canvas,bg='#F5FAF6');win=canvas.create_window((0,0),window=rows,anchor='nw')
         rows.bind('<Configure>',lambda e=None:canvas.configure(scrollregion=canvas.bbox('all')))
         canvas.bind('<Configure>',lambda e=None:canvas.itemconfigure(win,width=e.width if e is not None else canvas.winfo_width()))
-        sections=[('Toàn chương trình', [('F1','Mở bảng phím tắt'),('Esc','Tắt công cụ đang bật'),('Ctrl + Q','Viết ghi chú tự do'),('Ctrl + D','Vẽ đường'),('Ctrl + E','Xóa đối tượng'),('Ctrl + K','Chọn màu'),('Ctrl + Z','Hoàn tác nét vẽ'),('Ctrl + Shift + X','Xóa tất cả chú thích')]),('Riêng Tập đọc',[('Ctrl + H','Tô màu chữ'),('Ctrl + U','Gạch chân'),('Ctrl + B','In đậm'),('Ctrl + M','Đổi màu chữ'),('Ctrl + P','Chọn màu bút'),('Ctrl + +','Phóng to chữ'),('Ctrl + -','Thu nhỏ chữ')])]
+        sections=[('Toàn chương trình', [*KEY_HELP,('Ctrl + Q','Viết ghi chú tự do'),('Ctrl + D','Vẽ đường'),('Ctrl + E','Xóa đối tượng'),('Ctrl + K','Chọn màu'),('Ctrl + Z','Hoàn tác nét vẽ'),('Ctrl + Shift + X','Xóa tất cả chú thích')]),('Riêng Tập đọc',[('Ctrl + H','Tô màu chữ'),('Ctrl + U','Gạch chân'),('Ctrl + B','In đậm'),('Ctrl + M','Đổi màu chữ'),('Ctrl + P','Chọn màu bút'),('Ctrl + +','Phóng to chữ'),('Ctrl + -','Thu nhỏ chữ')])]
         for section,items in sections:
             tk.Label(rows,text=section,bg='#F5FAF6',fg='#285D40',font=font_at(12, 'bold')).pack(anchor='w',pady=(12,5))
             for shortcut,meaning in items:
@@ -1356,17 +1363,24 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         self._reading_base_reader=None
 
     def _teaching_key(self,event):
+        if not allow_shell(self,event.widget):
+            return
+        action=action_for(event.keysym,event.state,event.widget.winfo_class())
         if event.keysym=='F11':
             if getattr(self,'_v8_active_reader',None) is not None:
                 self._reading_focus();return 'break'
         if event.keysym=='Escape' and getattr(self,'_reading_focus_active',False):
             self._reading_focus(False);return 'break'
-        if event.keysym=='F1':
+        if action=='help':
             self._show_shortcut_guide();return 'break'
         if event.keysym=='Escape':
+            profile=getattr(self,'_profile_page',None)
+            if profile is not None and profile.root.winfo_exists() and profile.popup is not None:
+                profile.close_popup()
+                return 'break'
             callback=getattr(self,'_teaching_escape',None)
             if callback:callback();return 'break'
-            return
+            return self._navigation_back_key(event)
         if event.state & 0x4:
             key='ctrl+'+('shift+' if event.state & 0x1 else '')+event.keysym.lower()
             action=getattr(self,'_teaching_shortcuts',{}).get(key)
@@ -1395,6 +1409,8 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         canvas.bind('<Configure>',lambda e=None:canvas.itemconfigure(window,width=e.width if e else canvas.winfo_width()))
         self.label(body,title,20,True).pack(anchor='w',fill='x',pady=(0,12))
         self._page_transition_ready=False
+        self.after_idle(lambda:focus_first(body) if body.winfo_exists() and
+                        getattr(self,'active_scroll_canvas',None) is canvas else None)
         return body
 
     def play_learning_audio(self,path):

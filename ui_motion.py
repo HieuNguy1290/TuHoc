@@ -1,16 +1,22 @@
 """Safe Tkinter micro-interactions and cancellable easing animations."""
 import tkinter as tk
 
+from ui_tokens import DURATION
+
 
 def ease_out_cubic(t):
     return 1 - (1-t)**3
 
 
-def animate_position(root, widget, start, end, duration=230, on_complete=None):
+def animate_position(root, widget, start, end, duration=DURATION['slow'], on_complete=None):
     """Animate an already-placed widget; stale callbacks are ignored after destroy."""
     import time
     token = object()
     widget._motion_token = token
+    if getattr(root,'reduce_motion',False) or duration<=0:
+        widget.place_configure(x=end)
+        if on_complete:on_complete()
+        return
     started = time.monotonic()
     def frame():
         try:
@@ -36,11 +42,14 @@ def add_hover(widget, normal='#FFFFFF', hover='#EFF4FF', foreground=None):
     widget.bind('<Leave>', lambda _e=None: change(normal), add='+')
 
 
-def reveal(widget, root, duration=190):
+def reveal(widget, root, duration=DURATION['normal']):
     """Short, non-blocking reveal via widget padding (no alpha flicker)."""
     import time
     token = object()
     widget._reveal_token = token
+    if getattr(root,'reduce_motion',False) or duration<=0:
+        widget.configure(pady=0)
+        return
     start = time.monotonic()
     def frame():
         try:

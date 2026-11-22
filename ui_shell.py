@@ -2,6 +2,8 @@
 import time
 import tkinter as tk
 from theme_config import UI_COLORS, UI_FONTS
+from ui_components import Tooltip
+from ui_keys import keyboard_button
 from ui_components import bind_hover
 
 NAV = [('⌂','Trang chủ','home'),('▤','Bài học','topic_page'),('▣','Tập đọc','reading_menu'),('▦','Flashcard','flashcards'),('✎','Chính tả','dictation_page'),('★','Trò chơi','games_page'),('▣','Kiểm tra','exam_page'),('♛','Phần thưởng','reward_shop'),('▤','Lịch sử làm bài','quiz_history_page'),('▥','Báo cáo học tập','report_page'),('◷','Thống kê thời gian','time_statistics_page')]
@@ -109,6 +111,7 @@ class AppShell:
         btn.bind('<Leave>', lambda _e, b=btn: self._nav_hover(b, False), add='+')
         btn.bind('<FocusIn>', lambda _e, b=btn: self._nav_hover(b, True), add='+')
         btn.bind('<FocusOut>', lambda _e, b=btn: self._nav_hover(b, False), add='+')
+        keyboard_button(btn)
         self._bind_sidebar_wheel(btn)
         return btn
 
@@ -455,9 +458,11 @@ class AppShell:
             self.app._navigate_to(callback)
 
     def _build_top(self):
-        tk.Button(self.top, text='←', command=self.app.navigation_back,
-                  bg=UI_COLORS['surface'], bd=0, font=UI_FONTS['card'], width=3).pack(
-                      side='left', padx=(12, 6), pady=8)
+        back=tk.Button(self.top,text='←',command=self.app.navigation_back,
+                       bg=UI_COLORS['surface'],bd=0,font=UI_FONTS['card'],width=3)
+        back.pack(side='left',padx=(12,6),pady=8)
+        Tooltip(back,'Quay lại · Alt + ←')
+        keyboard_button(back)
         self.crumb = tk.Label(self.top, text='Trang chủ', bg=UI_COLORS['surface'],
                               fg=UI_COLORS['text'], font=UI_FONTS['body'])
         self.crumb.pack(side='left', padx=8)
@@ -467,6 +472,9 @@ class AppShell:
         self.bell = tk.Button(self.top, text='🔔', command=self.app._click_notification_icon,
                               bg=UI_COLORS['surface'], bd=0, font=UI_FONTS['body'])
         self.bell.pack(side='right', padx=8)
+        Tooltip(self.bell,'Thông báo')
+        keyboard_button(self.bell)
+        keyboard_button(self.account)
         self.tools = tk.Frame(self.top, bg=UI_COLORS['surface'])
         self.tools.pack(side='right', padx=4)
 
@@ -487,7 +495,8 @@ class AppShell:
     def active(self, title, reset_tools=True):
         self._active_title = title
         self.refresh_subject_name()
-        self.crumb.configure(text=title)
+        subject=self._subject_title(False)
+        self.crumb.configure(text=f'{subject}  /  {title}' if ' / ' in title else title)
         if reset_tools:
             for child in self.tools.winfo_children():
                 child.destroy()

@@ -271,6 +271,8 @@ class GameAppMixin:
                              font=('Segoe UI',11),relief='groove',padx=10)
             swatch.pack(side='left')
             colors[key].trace_add('write',lambda *_args,b=swatch,k=key:b.configure(fg=colors[k].get()))
+        reduced=tk.BooleanVar(value=bool(settings.get('reduce_motion',False)))
+        tk.Checkbutton(c,text='Giảm chuyển động',variable=reduced,bg='white').pack(anchor='w',pady=4)
         auto=tk.BooleanVar(value=bool(settings.get('auto_next',False)))
         tk.Checkbutton(c,text='Tự động sang câu khi trả lời đúng',variable=auto,bg='white',font=('Segoe UI',12)).pack(anchor='w',pady=10)
         dragon_enabled=tk.BooleanVar(value=bool(settings.get('dragon_feedback_enabled',False)))
@@ -283,6 +285,7 @@ class GameAppMixin:
             # Keep text_size for older quiz/vocabulary views, without coupling it to lesson content.
             settings['ui_font_scale']=next(key for key,label in labels.items() if label==selected.get())
             self.apply_font_preferences()
+            self.reduce_motion=settings['reduce_motion']=reduced.get()
             settings['auto_next']=auto.get()
             settings['dragon_feedback_enabled']=dragon_enabled.get()
             self._save_display_settings()
