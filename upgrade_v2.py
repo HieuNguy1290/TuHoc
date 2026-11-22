@@ -191,7 +191,7 @@ class GameAppMixin:
         self.lang=getattr(self,'lang','en')
         self._setup_language()
         self.title('Cùng Học Cùng Vui (Beta) - Dev by HiHieu');self.configure(bg=BG)
-        self.option_add('*Font',('Segoe UI',11))
+        self.option_add('*Font',font_at(11))
     def _setup_language_steps(self):
         """Subject preparation split into small steps so the loading animation can
         repaint between them. _setup_language() runs them back to back."""
@@ -227,7 +227,7 @@ class GameAppMixin:
     def display_settings(self):
         body=self.layout('⚙  Cỡ hình, cỡ chữ và màu sắc bài học')
         c=self._card(body)
-        tk.Label(c,text='Thiết lập dùng cho cả hai môn học',bg='white',fg=INK,font=('Segoe UI',15,'bold')).pack(anchor='w',pady=8)
+        tk.Label(c,text='Thiết lập dùng cho cả hai môn học',bg='white',fg=INK,font=font_at(15, 'bold')).pack(anchor='w',pady=8)
         settings=self._display_settings
         controls={}
         from ui_tokens import FONT_SCALES
@@ -272,18 +272,18 @@ class GameAppMixin:
             row=tk.Frame(c,bg='white');row.pack(fill='x',pady=3)
             tk.Label(row,text=caption,width=18,anchor='w',bg='white',fg=INK).pack(side='left')
             swatch=tk.Button(row,textvariable=colors[key],command=lambda k=key:select_color(k),
-                             font=('Segoe UI',11),relief='groove',padx=10)
+                             font=font_at(11),relief='groove',padx=10)
             swatch.pack(side='left')
             colors[key].trace_add('write',lambda *_args,b=swatch,k=key:b.configure(fg=colors[k].get()))
         reduced=tk.BooleanVar(value=bool(settings.get('reduce_motion',False)))
         tk.Checkbutton(c,text='Giảm chuyển động',variable=reduced,bg='white').pack(anchor='w',pady=4)
         auto=tk.BooleanVar(value=bool(settings.get('auto_next',False)))
-        tk.Checkbutton(c,text='Tự động sang câu khi trả lời đúng',variable=auto,bg='white',font=('Segoe UI',12)).pack(anchor='w',pady=10)
+        tk.Checkbutton(c,text='Tự động sang câu khi trả lời đúng',variable=auto,bg='white',font=font_at(12)).pack(anchor='w',pady=10)
         sound=tk.BooleanVar(value=bool(settings.get('feedback_sound',False)))
         tk.Checkbutton(c,text='Âm báo khi trả lời',variable=sound,bg='white').pack(anchor='w',pady=4)
         dragon_enabled=tk.BooleanVar(value=bool(settings.get('dragon_feedback_enabled',False)))
         tk.Checkbutton(c,text='Rồng Lân Ú: hiệu ứng mây ngũ sắc và mưa sao khi trả lời',
-                       variable=dragon_enabled,bg='white',font=('Segoe UI',12)).pack(anchor='w',pady=(4,10))
+                       variable=dragon_enabled,bg='white',font=font_at(12)).pack(anchor='w',pady=(4,10))
         update_preview()
         def save():
             for key,var in controls.items():settings[key]=var.get()
@@ -305,12 +305,12 @@ class GameAppMixin:
         except Exception:
             pass
         body=self.layout('Xin chào các em. Đây là phần mềm học tập giúp các em có thể tự học và ôn tập các bài tập sát với chương trình học thực tế!')
-        tk.Label(body,text='Các em hãy chọn ngôn ngữ mình muốn học',bg=body['bg'],fg=MUTED,font=('Segoe UI',13)).pack(anchor='w',pady=12)
-        tk.Label(body,text='Môn đang chọn: '+('Tiếng Việt' if self.lang=='vi' else 'Tiếng Anh'),bg=body['bg'],fg=PURPLE,font=('Segoe UI',14,'bold')).pack(anchor='w',pady=8)
+        tk.Label(body,text='Các em hãy chọn ngôn ngữ mình muốn học',bg=body['bg'],fg=MUTED,font=font_at(13)).pack(anchor='w',pady=12)
+        tk.Label(body,text='Môn đang chọn: '+('Tiếng Việt' if self.lang=='vi' else 'Tiếng Anh'),bg=body['bg'],fg=PURPLE,font=font_at(14, 'bold')).pack(anchor='w',pady=8)
         for lang,title,desc in [('en','TIẾNG ANH','Học tiếng anh chuẩn English'),('vi','TIẾNG VIỆT','Chuẩn ngôn ngữ miền Nam')]:
             card=self._card(body,24)
-            tk.Label(card,text=title,bg='white',fg=INK,font=('Segoe UI',22,'bold')).pack(anchor='w')
-            tk.Label(card,text=desc,bg='white',fg=MUTED,font=('Segoe UI',12)).pack(anchor='w',pady=9)
+            tk.Label(card,text=title,bg='white',fg=INK,font=font_at(22, 'bold')).pack(anchor='w')
+            tk.Label(card,text=desc,bg='white',fg=MUTED,font=font_at(12)).pack(anchor='w',pady=9)
             self.button(card,('✓ ĐANG CHỌN' if self.lang==lang else 'CHỌN'),lambda l=lang:self.switch_language(l)).pack(anchor='w')
     def switch_language(self,language):
         """H2.5: 2-second clock-driven loading, gated on real data readiness.
@@ -406,7 +406,7 @@ class GameAppMixin:
         self.after(100, prepare)
 
     def button(self,parent,text,command):
-        b=tk.Button(parent,text=text,command=command,bg=PURPLE,fg='white',activebackground='#4C3EBD',activeforeground='white',font=('Segoe UI',11,'bold'),bd=4,relief='raised',padx=19,pady=12,cursor='hand2')
+        b=tk.Button(parent,text=text,command=command,bg=PURPLE,fg='white',activebackground='#4C3EBD',activeforeground='white',font=font_at(11, 'bold'),bd=4,relief='raised',padx=19,pady=12,cursor='hand2')
         b.bind('<Enter>',lambda e:b.configure(bg='#4D43B5',cursor='hand2'))
         b.bind('<Leave>',lambda e:b.configure(bg=PURPLE))
         b.bind('<ButtonPress-1>',lambda e:b.configure(relief='sunken',bd=4),add='+')
@@ -418,14 +418,14 @@ class GameAppMixin:
         if not hasattr(self,'learning'):self.setup_upgrade()
         sid=self.student['id'];theme,level=self.learning.next_level(sid)
         body=self.layout('✦ '+('TIẾNG VIỆT' if self.lang=='vi' else 'TIẾNG ANH'))
-        tk.Label(body,text='Học mỗi ngày • tích sao • khám phá thế giới!',bg=body['bg'],fg=MUTED,font=('Segoe UI',13)).pack(anchor='w')
+        tk.Label(body,text='Học mỗi ngày • tích sao • khám phá thế giới!',bg=body['bg'],fg=MUTED,font=font_at(13)).pack(anchor='w')
         c=self._card(body)
         theme_name=next(x[1] for x in theme_tuples(self.curriculum.data_dir) if x[0]==theme)
-        tk.Label(c,text=f'🚀  TIẾP TỤC HỌC  •  {theme_name} — Level {level}',bg='white',fg=INK,font=('Segoe UI',19,'bold')).pack(anchor='w',pady=(0,15))
+        tk.Label(c,text=f'🚀  TIẾP TỤC HỌC  •  {theme_name} — Level {level}',bg='white',fg=INK,font=font_at(19, 'bold')).pack(anchor='w',pady=(0,15))
         self.button(c,'BẮT ĐẦU NGAY  →',lambda:self.start_session(theme,level)).pack(anchor='w')
         r=self._card(body)
         due=len(self._language_words(due=True));total=self.db.points(sid)
-        tk.Label(r,text=f'🔥  {self.learning.streak(sid)} ngày streak       🃏  {due} từ đến hạn ôn       ⭐  {total} sao       🎯  Mục tiêu: 1 level/ngày',bg='white',fg=INK,font=('Segoe UI',12,'bold')).pack(anchor='w')
+        tk.Label(r,text=f'🔥  {self.learning.streak(sid)} ngày streak       🃏  {due} từ đến hạn ôn       ⭐  {total} sao       🎯  Mục tiêu: 1 level/ngày',bg='white',fg=INK,font=font_at(12, 'bold')).pack(anchor='w')
         self.button(body,'⚙  Chỉnh Size hình/nội dung',self.display_settings).pack(anchor='w',fill='x',pady=(16,8))
         tk.Label(body,text='Các chức năng học tập nằm trong menu ☰ góc trên bên trái.',bg=body['bg'],fg=MUTED).pack(anchor='w',pady=12)
         if self.curriculum.errors:
@@ -561,8 +561,8 @@ class GameAppMixin:
 
     def _quiz_timer_header(self,body,index,total):
         line=tk.Frame(body,bg=body['bg']);line.pack(fill='x',pady=(2,12))
-        tk.Label(line,text=('TIẾNG VIỆT' if self.lang=='vi' else 'TIẾNG ANH')+f'  ·  Level {self.s_level}',bg=body['bg'],fg=INK,font=('Segoe UI',15,'bold')).pack(side='left')
-        tk.Label(line,text=f'Câu {index+1}/{total}',bg=body['bg'],fg=MUTED,font=('Segoe UI',12)).pack(side='right')
+        tk.Label(line,text=('TIẾNG VIỆT' if self.lang=='vi' else 'TIẾNG ANH')+f'  ·  Level {self.s_level}',bg=body['bg'],fg=INK,font=font_at(15, 'bold')).pack(side='left')
+        tk.Label(line,text=f'Câu {index+1}/{total}',bg=body['bg'],fg=MUTED,font=font_at(12)).pack(side='right')
         clock=tk.Label(line,text='',bg='#E6F7EF',fg='#147B46',font=('Consolas',15,'bold'),padx=12,pady=5)
         clock.pack(side='top',anchor='center')
         def refresh():
@@ -572,7 +572,7 @@ class GameAppMixin:
         refresh()
 
     def _heading(self,body,sub):
-        tk.Label(body,text=sub,bg=body['bg'],fg=MUTED,font=('Segoe UI',12)).pack(anchor='w',pady=(0,15))
+        tk.Label(body,text=sub,bg=body['bg'],fg=MUTED,font=font_at(12)).pack(anchor='w',pady=(0,15))
     def _speak(self, word):
         """Start a tracked TTS process; navigation and shutdown stop it."""
         import subprocess
@@ -639,7 +639,7 @@ class GameAppMixin:
         if self.practice_index>=len(self.practice_words):self.session_quiz(0);return
         v=self.practice_words[self.practice_index];body=self.layout('🎲  Luyện tập kéo-thả');self._heading(body,f'Bước 2/4  •  Ghép chữ cái thành từ  {self.practice_index+1}/{len(self.practice_words)}')
         word=v['word'];c=self._card(body)
-        tk.Label(c,text=f'Gợi ý: {v.get("example") or v.get("meaning") or "Sắp xếp chữ cái thành từ đúng"}',bg='white',fg=INK,font=('Segoe UI',18,'bold')).pack(anchor='w',pady=12)
+        tk.Label(c,text=f'Gợi ý: {v.get("example") or v.get("meaning") or "Sắp xếp chữ cái thành từ đúng"}',bg='white',fg=INK,font=font_at(18, 'bold')).pack(anchor='w',pady=12)
         tk.Label(c,text='Kéo các ô chữ vào khung, hoặc bấm vào từng ô theo thứ tự.',bg='white',fg=MUTED).pack(anchor='w')
         target=tk.Frame(c,bg='#ECEDFF',height=58);target.pack(fill='x',pady=12)
         tray=tk.Frame(c,bg='white');tray.pack(fill='x',pady=8)
@@ -648,13 +648,13 @@ class GameAppMixin:
         def pick(i):
             if buttons[i]['state']=='disabled':return
             chosen.append((i,letters[i]));buttons[i].configure(state='disabled',bg='#E8E9F2')
-            tk.Label(target,text=letters[i],bg=PURPLE,fg='white',font=('Segoe UI',16,'bold'),padx=10,pady=6).pack(side='left',padx=3,pady=4)
+            tk.Label(target,text=letters[i],bg=PURPLE,fg='white',font=font_at(16, 'bold'),padx=10,pady=6).pack(side='left',padx=3,pady=4)
             assembled=''.join(x[1] for x in chosen)
             if len(chosen)==len(letters):
                 ok=assembled.casefold()==word.casefold();status.configure(text='✓ Chính xác!' if ok else f'↻ Thử lại nhé — Đáp án: {word}',fg=MINT if ok else '#D35B67')
                 self.after(900,lambda:self._practice_done(ok))
         for i,ch in enumerate(letters):
-            b=tk.Button(tray,text=ch,font=('Segoe UI',16,'bold'),bg='#EAE7FF',fg=INK,width=3,height=1,bd=0,cursor='hand2');b.pack(side='left',padx=4)
+            b=tk.Button(tray,text=ch,font=font_at(16, 'bold'),bg='#EAE7FF',fg=INK,width=3,height=1,bd=0,cursor='hand2');b.pack(side='left',padx=4)
             b.configure(command=lambda n=i:pick(n));buttons.append(b)
             b.bind('<ButtonPress-1>',lambda e,idx=i:setattr(self,'drag_source',idx))
             b.bind('<ButtonRelease-1>',lambda e,idx=i:pick(idx) if target.winfo_rooty()<=e.y_root<=target.winfo_rooty()+target.winfo_height() else None)
@@ -918,13 +918,13 @@ class GameAppMixin:
                     tk.Label(holder, text=char, width=2, padx=5, pady=8,
                              bg='#DDF5E5' if i in hidden else '#EEF2F6',
                              fg='#147B46' if i in hidden else INK,
-                             font=('Segoe UI', 13, 'bold')).grid(row=i//16, column=i%16, padx=2, pady=2)
+                             font=font_at(13, 'bold')).grid(row=i//16, column=i%16, padx=2, pady=2)
             else:
                 # Render EVERY dialogue turn and EVERY gap at its original position.
                 # Do not use q['answer']: it is only a flat answer summary.
                 display = tk.Text(c, height=min(18, max(5, len(q.get('dialogue', []))*3+3)),
                                   wrap='word', bg='#F8FAFC', fg=INK,
-                                  font=('Segoe UI', 13), relief='flat', padx=12, pady=12)
+                                  font=font_at(13), relief='flat', padx=12, pady=12)
                 display.tag_configure('correct_gap', background='#DDF5E5', foreground='#147B46')
                 display.pack(fill='x', pady=8)
                 for j, (source, indices) in enumerate(gaps(q)):
@@ -954,7 +954,7 @@ class GameAppMixin:
         elif kind in ('choice','true_false','listening','listening_choice','picture_choice') and opts:
             first_option=None
             for opt in opts:
-                option=tk.Radiobutton(c,text=str(opt),variable=choice,value=str(opt),bg='white',activebackground='#EDF0FF',font=('Segoe UI',13),anchor='w',wraplength=700,justify='left',cursor='hand2',takefocus=True,highlightthickness=2,highlightbackground='white',highlightcolor=PURPLE)
+                option=tk.Radiobutton(c,text=str(opt),variable=choice,value=str(opt),bg='white',activebackground='#EDF0FF',font=font_at(13),anchor='w',wraplength=700,justify='left',cursor='hand2',takefocus=True,highlightthickness=2,highlightbackground='white',highlightcolor=PURPLE)
                 option.pack(anchor='w',fill='x',pady=4)
                 option.bind('<Enter>',lambda _event,widget=option:widget.configure(bg='#EDF0FF'))
                 option.bind('<Leave>',lambda _event,widget=option:widget.configure(bg='white'))
@@ -964,12 +964,12 @@ class GameAppMixin:
                 if first_option is None:first_option=option
             if first_option is not None:self.after_idle(lambda widget=first_option:widget.focus_set() if widget.winfo_exists() else None)
         else:
-            entry=tk.Entry(c,textvariable=choice,font=('Segoe UI',15),width=46,highlightthickness=2,highlightbackground='#DCE3F3',highlightcolor=PURPLE)
+            entry=tk.Entry(c,textvariable=choice,font=font_at(15),width=46,highlightthickness=2,highlightbackground='#DCE3F3',highlightcolor=PURPLE)
             entry.pack(anchor='w',fill='x',pady=15)
             self.after_idle(lambda widget=entry:widget.focus_set() if widget.winfo_exists() else None)
         # Tk fallback is exclusive: do not launch a second Pygame question here.
         # The primary Pygame launch above already handles its own callback.
-        notice=tk.Label(c,text='',bg='white',fg='#B45309',font=('Segoe UI',11))
+        notice=tk.Label(c,text='',bg='white',fg='#B45309',font=font_at(11))
         notice.pack(anchor='w',pady=5)
         def submit(pygame_answer=None):
             if getattr(self,'_quiz_saved',False) or len(self.s_answers)!=index:
@@ -1028,11 +1028,11 @@ class GameAppMixin:
         body = self.layout('Kết quả bài tập')
         card = self._card(body)
         tk.Label(card, text=t('quiz_completed',completed=completed,total=total), bg='white', fg=INK,
-                 font=('Segoe UI', 19, 'bold')).pack(anchor='w', pady=(4, 10))
+                 font=font_at(19, 'bold')).pack(anchor='w', pady=(4, 10))
         tk.Label(card, text=f'Đúng: {correct}  |  Sai: {completed-correct}  |  Chưa làm: {total-completed}',
-                 bg='white', fg=MUTED, font=('Segoe UI', 13)).pack(anchor='w', pady=(0, 8))
+                 bg='white', fg=MUTED, font=font_at(13)).pack(anchor='w', pady=(0, 8))
         tk.Label(card, text=t('draft_saved' if getattr(self,'_draft_saved_ok',False) else 'draft_unsaved'),
-                 bg='white', fg=MUTED, font=('Segoe UI', 11)).pack(anchor='w', pady=(0, 12))
+                 bg='white', fg=MUTED, font=font_at(11)).pack(anchor='w', pady=(0, 12))
         self.button(card, 'Tiếp tục làm bài', lambda: self._resume_quiz_from_results()).pack(anchor='w', pady=5)
         self.button(card, 'Về danh sách bài học', self._return_to_home_lessons).pack(anchor='w', pady=5)
 
@@ -1130,11 +1130,11 @@ class GameAppMixin:
         self._heading(body,'Thời gian sử dụng ứng dụng và kỷ lục Level theo tài khoản.')
         self.button(body,'📚  Xem lịch sử làm bài',self.quiz_history_page).pack(anchor='w',pady=(5,12))
         c=self._card(body)
-        tk.Label(c,text='THỐNG KÊ SỬ DỤNG ỨNG DỤNG',bg='white',fg=INK,font=('Segoe UI',15,'bold')).pack(anchor='w')
+        tk.Label(c,text='THỐNG KÊ SỬ DỤNG ỨNG DỤNG',bg='white',fg=INK,font=font_at(15, 'bold')).pack(anchor='w')
         filters=tk.Frame(c,bg='white');filters.pack(anchor='w',pady=10)
         period=tk.StringVar(value='Tuần');offset=tk.IntVar(value=0)
-        title=tk.Label(c,bg='white',fg=INK,font=('Segoe UI',12,'bold'));title.pack(anchor='w')
-        total_label=tk.Label(c,bg='white',fg=INK,font=('Segoe UI',12));total_label.pack(anchor='w',pady=6)
+        title=tk.Label(c,bg='white',fg=INK,font=font_at(12, 'bold'));title.pack(anchor='w')
+        total_label=tk.Label(c,bg='white',fg=INK,font=font_at(12));total_label.pack(anchor='w',pady=6)
         chart=tk.Canvas(c,width=780,height=240,bg='white',highlightthickness=0);chart.pack(fill='x',pady=8)
         def render():
             import datetime,calendar
@@ -1167,10 +1167,10 @@ class GameAppMixin:
         tk.Button(nav,text='Kỳ sau →',command=lambda:(offset.set(offset.get()+1),render()),bg='#E9EBF7',bd=0,padx=12,pady=7).pack(side='left',padx=5)
         render()
         records=self._card(body)
-        tk.Label(records,text='🏆 KỶ LỤC NHANH NHẤT THEO LEVEL (ĐÚNG 100%)',bg='white',fg=INK,font=('Segoe UI',15,'bold')).pack(anchor='w',pady=5)
+        tk.Label(records,text='🏆 KỶ LỤC NHANH NHẤT THEO LEVEL (ĐÚNG 100%)',bg='white',fg=INK,font=font_at(15, 'bold')).pack(anchor='w',pady=5)
         from theme_config import tuples as theme_list,max_level as level_limit
         for lang,title_lang in [('en','Tiếng Anh'),('vi','Tiếng Việt')]:
-            tk.Label(records,text=title_lang,bg='white',fg=PURPLE,font=('Segoe UI',13,'bold')).pack(anchor='w',pady=(12,4))
+            tk.Label(records,text=title_lang,bg='white',fg=PURPLE,font=font_at(13, 'bold')).pack(anchor='w',pady=(12,4))
             subject_dir=self.curriculum.data_dir
             try:
                 from unified_subjects import prepare_subject
@@ -1178,19 +1178,19 @@ class GameAppMixin:
                 themes=theme_list(subject_dir)
             except Exception:themes=[]
             for theme,title_theme,*_ in themes:
-                tk.Label(records,text=title_theme,bg='white',fg=INK,font=('Segoe UI',11,'bold')).pack(anchor='w',pady=(7,2))
+                tk.Label(records,text=title_theme,bg='white',fg=INK,font=font_at(11, 'bold')).pack(anchor='w',pady=(7,2))
                 row=tk.Frame(records,bg='white');row.pack(fill='x')
                 for level in range(1,level_limit(subject_dir,theme)+1):
                     record=self.db.conn.execute('SELECT best_seconds FROM level_time_records WHERE student_id=? AND subject=? AND theme=? AND level=?',(sid,lang,theme,level)).fetchone()
                     text=f'Level {level}\n'+(self._format_elapsed(record[0]) if record else 'Chưa có')
-                    tk.Label(row,text=text,bg='#E6F7EF' if record else '#F0F1F4',fg=INK if record else MUTED,font=('Segoe UI',9),padx=8,pady=7,justify='center').pack(side='left',padx=3,pady=4)
+                    tk.Label(row,text=text,bg='#E6F7EF' if record else '#F0F1F4',fg=INK if record else MUTED,font=font_at(9),padx=8,pady=7,justify='center').pack(side='left',padx=3,pady=4)
 
     def reward_shop(self):
         sid=self.student['id'];body=self.layout('🎁  Cửa hàng phần thưởng')
         balance=self.db.points(sid);self._heading(body,f'Em có {balance} sao. Mua chủ đề / avatar để trang trí hồ sơ!')
         for item,name,cost in [('avatar_fox','🦊 Avatar Cáo',5),('avatar_bear','🐻 Avatar Gấu',10),('theme_space','🚀 Chủ đề Vũ Trụ',15),('theme_ocean','🐬 Chủ đề Đại Dương',20)]:
             row=self._card(body,10);owned=self.db.conn.execute('SELECT 1 FROM rewards WHERE student_id=? AND reward_id=?',(sid,item)).fetchone()
-            tk.Label(row,text=f'{name}  —  {cost} ⭐',bg='white',fg=INK,font=('Segoe UI',14,'bold')).pack(side='left')
+            tk.Label(row,text=f'{name}  —  {cost} ⭐',bg='white',fg=INK,font=font_at(14, 'bold')).pack(side='left')
             def buy(k=item,c=cost):
                 if self.db.points(sid)<c:messagebox.showwarning('Chưa đủ sao','Hãy học thêm để tích sao!');return
                 with self.db.conn:
@@ -1209,9 +1209,9 @@ class GameAppMixin:
         self.button(body,'📝  Ôn tập câu trả lời sai',self.wrong_answers_page).pack(anchor='w',pady=(0,12))
         trend_card=self._card(body)
         tk.Label(trend_card,text='TIẾN ĐỘ LUYỆN TẬP · 7 NGÀY GẦN NHẤT',
-                 bg='white',fg=INK,font=('Segoe UI',14,'bold')).pack(anchor='w',pady=(0,5))
+                 bg='white',fg=INK,font=font_at(14, 'bold')).pack(anchor='w',pady=(0,5))
         tk.Label(trend_card,text='Tỷ lệ câu đúng theo từng ngày có lượt luyện tập (%)',
-                 bg='white',fg=MUTED,font=('Segoe UI',10)).pack(anchor='w')
+                 bg='white',fg=MUTED,font=font_at(10)).pack(anchor='w')
         trend_canvas=tk.Canvas(trend_card,width=780,height=230,bg='white',highlightthickness=0)
         trend_canvas.pack(fill='x',pady=(8,5))
         def render_trend(event=None):
