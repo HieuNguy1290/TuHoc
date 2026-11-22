@@ -1,4 +1,3 @@
-from question_rich_text import draw as draw_rich, wrap as wrap_rich
 from exercise_buttons import draw_complete
 from exercise_gfx import draw_question_progress, present_frame
 from extras_render import draw_extras
@@ -340,7 +339,8 @@ def run(question, letter_mode=False):
     choices = list(exp) + [str(x) for x in (question.get('distractors') or [])]
     # Custom option slots refer to the editor's original option order.
     # Preserve the legacy shuffle unless an individual chip was positioned.
-    from question_layout_runtime import element as layout_element
+    from layout_typography import TextBlock, resolve_font
+    from question_layout_runtime import element as layout_element, rectangle
     chip_layouts = [layout_element(question, 'option_%d' % i) for i in range(len(choices))]
     if not any(chip_layouts):
         random.shuffle(choices)
@@ -364,6 +364,8 @@ def run(question, letter_mode=False):
     slot_w = max(34, widest + 14) if letter_mode else max(96, widest + 26)
     slot_gap = 2 if letter_mode else 8
     answer_area = layout_element(question, 'answer_area') or {}
+    sent_font = resolve_font(answer_area, sent_font, 28)
+    slot_geometry = [layout_element(question, f'slot_{i}') for i in range(len(question.get('blank_answers') or []))]
     left = min(840, answer_area.get('x', 65))
     right = min(930, left + max(90, answer_area.get('width', 810)))
     items = []; x = left; y = 0; line_h = 46
@@ -413,7 +415,8 @@ def run(question, letter_mode=False):
                     line = trial
             lines.append(line)
         return lines
-    prompt_lines = wrap_rich(question.get('prompt') or 'Look and complete the sentence:', font, 845)[:3]
+    prompt = TextBlock(question.get('prompt') or 'Look and complete the sentence:',
+                       layout_element(question, 'question_text'), font, 22, (52, 109, 845), 27, 3)
 
     # ---- hàng đáp án (chip) ----
     chip_pos = []; cx = left; cy = 0; chip_h = 42
@@ -438,17 +441,16 @@ def run(question, letter_mode=False):
                 max(28, geometry.get('width', default[3])),
                 max(28, geometry.get('height', chip_h)),
             )
-            if geometry.get('font_size'):
-                custom_chip_fonts[i] = _cached_font(None, geometry['font_size'], False)
+            custom_chip_fonts[i] = resolve_font(geometry, font, 22)
     hint_y = chips_top - 30
     sentence_top = hint_y - 14 - sentence_h
-    prompt_bottom = 109 + len(prompt_lines) * 27
+    prompt_bottom = prompt.bottom
 
     # ---- file nghe (không bắt buộc, chỉ dạng chọn chữ cái) ----
     has_audio = bool(letter_mode and str(question.get('audio') or '').strip())
     audio_path = str(question.get('_resolved_audio') or '').strip() if has_audio else ''
     audio_h = 92 if has_audio else 0
-    audio_rect = pygame.Rect(52, prompt_bottom + 8, 856, 88)
+    audio_rect = pygame.Rect(rectangle(layout_element(question, 'audio_player'), (52, prompt_bottom + 8, 856, 88)))
     audio_err = '' if (audio_path or not has_audio) else 'Chưa tìm thấy file nghe. Kiểm tra trong Quản lý nội dung.'
     wf = None; wf_pending = bool(audio_path); wf_rects = None; wf_drag = None
     content_top = prompt_bottom + audio_h      # vùng dưới khung nghe: hình + câu + đáp án
@@ -508,8 +510,7 @@ def run(question, letter_mode=False):
             screen.fill(bg)
             pygame.draw.rect(screen, 'white', (25, 25, 910, max(590, content_height - 50)), border_radius=18)
             idx = max(1, int(question.get('_index') or 1)); tot = max(1, int(question.get('_total') or 1))
-            for r, line in enumerate(prompt_lines):
-                draw_rich(screen,font,line,navy,52,109+r*27)
+            prompt.draw(screen, navy)
             zoom_rects = []; hits = []
             if has_audio:
                 pygame.draw.rect(screen, (246, 250, 254), audio_rect, border_radius=14)
@@ -532,18 +533,20 @@ def run(question, letter_mode=False):
                 if typ == 'text':
                     screen.blit(sent_font.render(value, True, navy), (ix, ry))
                 else:
-                    rect = pygame.Rect(ix, ry - 2, w, 38)
+                    geometry = slot_geometry[value] if value < len(slot_geometry) else None
+                    rect = pygame.Rect(rectangle(geometry, (ix, ry - 2, w, 38)))
+                    field_font = resolve_font(geometry, sent_font, 28)
                     if value in assigned:
                         pygame.draw.rect(screen, (214, 236, 255), rect, border_radius=8)
                         pygame.draw.rect(screen, (70, 119, 169), rect, 2, border_radius=8)
-                        txt = sent_font.render(choices[assigned[value]], True, navy)
+                        txt = field_font.render(choices[assigned[value]], True, navy)
                         screen.blit(txt, txt.get_rect(center=rect.center))
                     else:
                         active = (target == value) or (target is None and first_empty() == value)
                         if active:
                             pygame.draw.rect(screen, (233, 245, 255), rect, border_radius=8)
                             pygame.draw.rect(screen, (70, 119, 169), rect, 2, border_radius=8)
-                        dots = sent_font.render('....', True, navy)
+                        dots = field_font.render('....', True, navy)
                         screen.blit(dots, dots.get_rect(center=(rect.centerx, rect.centery + 4)))
                     hits.append((rect, ('slot', value)))
             hint = small.render('Click vào đáp án phía dưới để tự động điền vào chỗ chấm', True, navy)

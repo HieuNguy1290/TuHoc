@@ -1,4 +1,3 @@
-from question_rich_text import draw as draw_rich, wrap as wrap_rich
 from exercise_gfx import present_frame
 from exercise_gfx import open_exercise_window
 """Chọn đáp án từ danh sách thả xuống ngay trong câu (một hoặc nhiều chỗ).
@@ -117,7 +116,8 @@ def run(question):
     import pygame
     from pygame_exercises import _image, _cached_font
     from exercise_image_zoom import draw_zoom_icon, draw as draw_zoom
-    from question_layout_runtime import element as layout_element
+    from question_layout_runtime import element as layout_element, rectangle
+    from layout_typography import resolve_font
     from layout_scroll_extent import content_bottom as layout_content_bottom
     from exercise_layout import Page
     pygame.init(); pygame.display.init()
@@ -158,10 +158,14 @@ def run(question):
                 picture = _image(picture_path, (420, 200))
         except (OSError, ValueError, pygame.error): picture = None
 
+    slot_geometry = [layout_element(question, f'slot_{i}') for i in range(len(options))]
+    menu_geometry = layout_element(question, 'answer_menu') or {}
     field_w = [max(110, max(sent_font.size(o)[0] for o in opts) + 54) for opts in options]
     # Optional editor geometry: reposition the sentence and its interactive slots
     # together. Legacy coordinates remain unchanged for questions without layout.
-    answer_layout = layout_element(question, 'dropdown_area') or layout_element(question, 'answer_area')
+    answer_style = layout_element(question, 'answer_area')
+    answer_layout = layout_element(question, 'dropdown_area') or answer_style
+    sent_font = resolve_font(answer_style, sent_font, 28)
     left, right, line_h = 65, 875, 52
     if answer_layout:
         left = max(25, min(890, int(answer_layout.get('x', left))))
@@ -185,9 +189,10 @@ def run(question):
             items.append(('slot', value, x, y, w)); x += w + 8
     sentence_h = y + line_h
 
-    prompt_lines = wrap_rich(question.get('prompt') or 'Chọn đáp án đúng:', font, 845)
-    prompt_lines = prompt_lines[:3]
-    prompt_bottom = 109 + len(prompt_lines) * 27
+    from layout_typography import TextBlock
+    prompt = TextBlock(question.get('prompt') or 'Chọn đáp án đúng:',
+                       layout_element(question, 'question_text'), font, 22, (52, 109, 845), 27, 3)
+    prompt_bottom = prompt.bottom
     pic_top = prompt_bottom + 8
     sentence_top = (pic_top + picture.get_height() + 30) if picture else prompt_bottom + 34
     if answer_layout and 'y' in answer_layout:
@@ -212,8 +217,7 @@ def run(question):
             surface.fill(bg)
             pygame.draw.rect(surface, 'white', (25, 25, 910, surface.get_height()-50), border_radius=18)
             idx = max(1, int(question.get('_index') or 1)); tot = max(1, int(question.get('_total') or 1))
-            for r, line in enumerate(prompt_lines):
-                draw_rich(surface,font,line,navy,52,109+r*27)
+            prompt.draw(surface, navy)
             zoom_rects = []; fields = {}
             if picture:
                 pr = image_rect or picture.get_rect(topleft=(left, pic_top))
@@ -224,16 +228,18 @@ def run(question):
                 if typ == 'text':
                     surface.blit(sent_font.render(value, True, navy), (ix, ry))
                 else:
-                    rect = pygame.Rect(ix, ry - 4, w, 42)
+                    geometry = slot_geometry[value] if value < len(slot_geometry) else None
+                    rect = pygame.Rect(rectangle(geometry, (ix, ry - 4, w, 42)))
+                    field_font = resolve_font(geometry, sent_font, 28)
                     fields[value] = rect
                     hovered = rect.collidepoint((pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1] + page.scroll)) and opened is None
                     pygame.draw.rect(surface, (233, 247, 240) if hovered else (247, 251, 255), rect, border_radius=8)
                     edge = hover_edge if hovered else blue if opened == value else (150, 175, 205)
                     pygame.draw.rect(surface, edge, rect, 2, border_radius=8)
                     if value in selected:
-                        txt = sent_font.render(options[value][selected[value]], True, navy)
+                        txt = field_font.render(options[value][selected[value]], True, navy)
                     else:
-                        txt = sent_font.render('Chọn', True, (140, 150, 162))
+                        txt = field_font.render('Chọn', True, (140, 150, 162))
                     surface.blit(txt, txt.get_rect(midleft=(rect.x + 14, rect.centery)))
                     cx, cy = rect.right - 20, rect.centery
                     pygame.draw.polygon(surface, navy, [(cx - 6, cy - 3), (cx + 6, cy - 3), (cx, cy + 4)])
@@ -247,7 +253,8 @@ def run(question):
                 my = f.bottom + 4
                 if my + mh > 548 + page.scroll:
                     my = f.top - mh - 4
-                mr = pygame.Rect(f.x, my, f.width, mh)
+                mr = pygame.Rect(rectangle(menu_geometry, (f.x, my, f.width, mh)))
+                row_h = max(1, (mr.height - (n-1)*gap - 2*pad)//n)
                 pygame.draw.rect(surface, (214, 223, 233), mr.move(0, 4), border_radius=10)
                 pygame.draw.rect(surface, 'white', mr, border_radius=10)
                 pygame.draw.rect(surface, (170, 188, 208), mr, 1, border_radius=10)
@@ -262,7 +269,8 @@ def run(question):
                     elif is_sel:
                         pygame.draw.rect(surface, (228, 240, 253), rr, border_radius=8)
                         pygame.draw.rect(surface, (150, 180, 214), rr, 1, border_radius=8)
-                    ft = opt_bold if is_sel else opt_font
+                    ft = resolve_font(slot_geometry[opened],
+                                      resolve_font(menu_geometry, opt_bold if is_sel else opt_font, 26), 26)
                     label_surf = ft.render(o, True, navy)
                     surface.blit(label_surf, label_surf.get_rect(midleft=(rr.x + 14, rr.centery)))
                     menu.append((rr, j))

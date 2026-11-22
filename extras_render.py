@@ -3,19 +3,16 @@ from functools import lru_cache
 
 import pygame
 
+from layout_typography import TextBlock, _font
+
 from exercise_layout import wrap
 from layout_render import DESKTOP
 from question_layout_store import pixel_extras
 
 
-@lru_cache(maxsize=48)
-def _font(size, bold, italic):
-    return pygame.font.SysFont(['Segoe UI', 'DejaVu Sans', 'Arial'], size, bold, italic)
-
-
 @lru_cache(maxsize=128)
-def _lines(text, size, bold, italic, width, color):
-    font = _font(size, bold, italic)
+def _lines(text, family, size, bold, italic, underline, width, color):
+    font = _font(family, size, bold, italic, underline)
     return font.get_linesize(), tuple(font.render(line, True, color)
                                       for line in wrap(text, font, width))
 
@@ -35,8 +32,16 @@ def draw_extras(screen, question, screen_size=DESKTOP, *, offset=(0, 0), mobile=
             screen.set_clip(visible)
             if extra['bg']:
                 screen.fill(extra['bg'], rect)
-            step, lines = _lines(extra['text'].replace('\0', ''), extra['font_size'], extra['bold'],
-                                 extra['italic'], rect.width, extra['color'])
+            if extra.get('runs'):
+                size = extra['font_size']
+                font = _font(extra.get('font_family', ''), size, extra['bold'], extra['italic'], extra.get('underline', False))
+                block = TextBlock(extra['text'], {**extra, 'height': rect.height}, font, size,
+                                  (rect.x, rect.y, rect.width), font.get_linesize(), markdown=False)
+                block.draw(screen, extra['color'], align=extra['align'])
+                continue
+            step, lines = _lines(extra['text'].replace('\0', ''), extra.get('font_family', ''),
+                                 extra['font_size'], extra['bold'], extra['italic'],
+                                 extra.get('underline', False), rect.width, extra['color'])
             for i, line in enumerate(lines):
                 y = rect.y + i * step
                 if y >= visible.bottom:

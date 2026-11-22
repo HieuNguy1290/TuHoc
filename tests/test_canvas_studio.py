@@ -104,6 +104,37 @@ class StudioTests(unittest.TestCase):
 
         self.assertEqual(self.interact(question, result, reopen), result)
 
+    def test_text_formatting_is_saved_without_changing_the_question(self):
+        question = {'type': 'choice', 'prompt': 'Bốn quả cam', 'options': ['4', '3'], 'answer': '4'}
+
+        def edit(win):
+            def button(owner, label):
+                return next(b for b in widgets(owner, ttk.Button) if b.cget('text') == label)
+
+            choices = widgets(win, tk.Listbox)[0]
+            choices.selection_set(choices.get(0, 'end').index('question_text'))
+            choices.event_generate('<<ListboxSelect>>')
+            next(b for b in widgets(win, ttk.Checkbutton) if b.cget('text') == 'Đậm').invoke()
+            button(win, 'Định dạng đoạn chữ…').invoke()
+            dialog = next(child for child in win.winfo_children() if isinstance(child, tk.Toplevel))
+            text = widgets(dialog, tk.Text)[0]
+            text.tag_add('sel', '1.0', '1.3')
+            next(b for b in widgets(dialog, ttk.Checkbutton) if b.cget('text') == 'Gạch chân').invoke()
+            combo = widgets(dialog, ttk.Combobox)[0]
+            combo.set('DejaVu Serif')
+            button(dialog, 'Áp dụng').invoke()
+            button(dialog, 'Lưu').invoke()
+            button(win, 'Lưu bố cục').invoke()
+
+        layout = self.interact(question, None, edit)
+        self.assertEqual(layout['version'], 4)
+        self.assertTrue(layout['desktop']['question_text']['bold'])
+        run = layout['desktop']['question_text']['runs'][0]
+        self.assertEqual((run['start'], run['end'], run['font_family']), (0, 3, 'DejaVu Serif'))
+        self.assertTrue(run['underline'])
+        self.assertEqual(question['prompt'], 'Bốn quả cam')
+        self.assertEqual(question['answer'], '4')
+
     def test_drag_at_zoom_with_scrolled_origin(self):
         question = {'type': 'fill', 'prompt': 'Câu hỏi'}
         initial = {'input_area': {'x': 100/960, 'y': 750/640, 'width': 300/960, 'height': 50/640}}

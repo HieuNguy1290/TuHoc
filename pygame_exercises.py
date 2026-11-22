@@ -450,7 +450,7 @@ def _run(question):
     if kind in ('fill', 'listening_fill', 'error'):
         try:
             from question_layout_runtime import element as _text_element
-            field = 'input_area' if (question.get('layout') or {}).get('version') in (2, 3) else 'answer_area'
+            field = 'input_area' if (question.get('layout') or {}).get('version') in (2, 3, 4) else 'answer_area'
             legacy_text_area = _text_element(question, field)
         except (ImportError, AttributeError, TypeError, ValueError):
             pass
@@ -515,6 +515,7 @@ def _run(question):
     typed='';chosen=[];selected_option=None;drag=None;hover=-1;particles=[];answer=None
     # Load once per question, not once per animation frame.
     question_image = None
+    from layout_typography import TextBlock, resolve_font
     from question_layout_runtime import element as runtime_element
     image_frame = image_destination = None
     image_path = str(question.get('_pygame_image') or '').strip()
@@ -706,9 +707,14 @@ def _run(question):
     prompt_x = prompt_geometry.get('x', 60)
     prompt_y = prompt_geometry.get('y', 123)
     prompt_width = max(1,prompt_geometry.get('width',825))
-    prompt_font = (_cached_font(font_path,prompt_geometry['font_size'],True)
-                   if 'font_size' in prompt_geometry else fonts[1])
+    prompt_font = resolve_font(prompt_geometry, fonts[1], 23)
+    input_font = resolve_font(legacy_text_area, fonts[0], 29)
+    choice_fonts = {i: resolve_font({**(legacy_answer_area or {}), **(legacy_choice_geometry.get(i) or {})},
+                                    fonts[2], 22) for i in range(len(options[:8]))}
+    order_preview = runtime_element(question, 'answer_preview') if kind == 'order' else None
     prompt = question.get('prompt','Hoàn thành bài tập')
+    prompt_block = TextBlock(prompt, prompt_geometry, fonts[1], 23,
+                             (prompt_x, prompt_y, prompt_width), prompt_font.get_linesize()+7) if prompt_geometry else None
     mini_fade = 0.0      # 0..1 fade of the floating mini player
     mini_rects = None
     try:
@@ -756,8 +762,9 @@ def _run(question):
                         card_y = int(geom.get('y', cursor))
                         card_w = max(80, int(geom.get('width', area_w)))
                         card_font_width = max(40, card_w - 36)
-                        card_lines = wrapped_lines(f'{chr(65+i)}. {options[i]}', fonts[2], card_font_width)
-                        text_h = len(card_lines) * (fonts[2].get_height()+7) - 7
+                        card_font = choice_fonts.get(i, fonts[2])
+                        card_lines = wrapped_lines(f'{chr(65+i)}. {options[i]}', card_font, card_font_width)
+                        text_h = len(card_lines) * (card_font.get_height()+7) - 7
                         card_h = max(47, int(geom.get('height', max(old_h, text_h+20))))
                         card_h = max(card_h, text_h + 20)
                         updated.append((card_x, card_y, card_w, card_h, card_lines))
@@ -822,6 +829,8 @@ def _run(question):
             if is_listening:
                 _audio_bounds = audio_player_rect(max(177, prompt_end + 10))
                 content_bottom = max(content_bottom, _audio_bounds.bottom + 100)
+            if order_preview:
+                content_bottom = max(content_bottom, order_preview.get('y', 0) + order_preview.get('height', 60) + 80)
             virtual_height = max(640, int(content_bottom + 35))
             max_content_scroll = max(0, virtual_height - 640)
             content_scroll = max(0, min(content_scroll, max_content_scroll))
@@ -834,7 +843,11 @@ def _run(question):
             draw_question_progress(screen, question)
             # Full prompt is rendered with word wrapping; answer controls follow it.
             # The complete content is scrolled together in the vertical direction.
-            prompt_bottom = draw_text(prompt,prompt_font,navy,prompt_x,prompt_y,prompt_width)
+            if prompt_block is None:
+                prompt_bottom = draw_text(prompt,prompt_font,navy,prompt_x,prompt_y,prompt_width)
+            else:
+                prompt_block.draw(screen, navy)
+                prompt_bottom = prompt_block.bottom
             if waveform is not None:
                 waveform.update()
             if is_listening and waveform is None and playing and not paused and not pygame.mixer.music.get_busy():
@@ -845,7 +858,7 @@ def _run(question):
             if total_seconds: elapsed = min(elapsed, total_seconds)
             _audio_player_bounds = audio_player_rect(max(177, prompt_bottom+10)) if is_listening else None
             play_rect = pygame.Rect(_audio_player_bounds.x + 13, _audio_player_bounds.y, 122, 36) if is_listening else None
-            stop_rect = pygame.Rect(199, play_rect.y, 80, 36) if play_rect else None
+            stop_rect = pygame.Rect(play_rect.right + 11, play_rect.y, 80, 36) if play_rect else None
             if play_rect and waveform is None:
                 depth = 2 if playing and not paused else 5
                 rounded(play_rect.move(0,depth), (26,95,120), 9)
@@ -972,6 +985,8 @@ def _run(question):
                             caption = '[Không tìm thấy ảnh]' if token.startswith('img:') else token
                             width_limit = max(40, rect.width-28)
                             label_font = fonts[2] if fonts[2].size(caption)[0] <= width_limit else fonts[3]
+                            label_font = resolve_font({**(legacy_match_area or {}), **(legacy_match_geometry.get(row + side * n) or {})}, label_font,
+                                                      22 if label_font is fonts[2] else 19)
                             # Show up to two wrapped lines; hover shows the complete answer.
                             lines = wrapped_lines(caption, label_font, width_limit)
                             if len(lines) > 2:
@@ -1018,9 +1033,10 @@ def _run(question):
                     rounded(r,(193,235,215) if selected else (222,246,237) if r.collidepoint(mouse) else (235,241,248),10)
                     if selected:
                         aa_rect(screen, green, r, 2, border_radius=10)
+                    card_font = choice_fonts.get(i, fonts[2])
                     for line_no, line in enumerate(lines):
-                        screen.blit(fonts[2].render(line,True,navy),
-                                    (r.x+18,r.y+10+line_no*(fonts[2].get_height()+7)))
+                        screen.blit(card_font.render(line,True,navy),
+                                    (r.x+18,r.y+10+line_no*(card_font.get_height()+7)))
                 # The choice submit control is rendered on the viewport below.
                 # Do not add a scrolling hitbox for the same control.
                 confirm_ready = selected_option is not None
@@ -1029,12 +1045,16 @@ def _run(question):
                 # Display the assembled text in a wrapping panel; long sentences
                 # must not be clipped or overlap the available choices.
                 chosen_text = ' '.join(str(options[j]) for j in chosen)
-                preview_lines = wrapped_lines(chosen_text or 'Chưa chọn thẻ nào', fonts[3], 780)
-                preview_height = max(60, 20 + len(preview_lines)*(fonts[3].get_height()+5))
-                preview_rect = pygame.Rect(66,y+35,828,preview_height)
+                preview_geometry = order_preview or {}
+                preview_font = resolve_font(preview_geometry, fonts[3], 19)
+                preview_width = preview_geometry.get('width', 828)
+                preview_lines = wrapped_lines(chosen_text or 'Chưa chọn thẻ nào', preview_font, max(1, preview_width-48))
+                preview_height = max(60, 20 + len(preview_lines)*(preview_font.get_height()+5))
+                preview_rect = pygame.Rect(preview_geometry.get('x', 66), preview_geometry.get('y', y+35),
+                                           preview_width, preview_geometry.get('height', preview_height))
                 rounded(preview_rect,(235,245,252),10)
                 for line_idx,line_text in enumerate(preview_lines):
-                    screen.blit(fonts[3].render(line_text,True,navy),(preview_rect.x+12,preview_rect.y+9+line_idx*(fonts[3].get_height()+5)))
+                    screen.blit(preview_font.render(line_text,True,navy),(preview_rect.x+12,preview_rect.y+9+line_idx*(preview_font.get_height()+5)))
                 cards_y = preview_rect.bottom+16
                 cols = 2 if any(len(str(v))>16 for v in options) else 4
                 card_w = 404 if cols==2 else 197
@@ -1061,10 +1081,11 @@ def _run(question):
                     cells.append((r,i))
                     rounded(r,(224,236,242) if i in chosen else (255,235,177) if r.collidepoint(mouse) else (227,242,253),10)
                     if i in chosen:aa_rect(screen,green,r,2,border_radius=10)
-                    label_lines=wrapped_lines(str(opt),fonts[3],max(40,r.width-25))
+                    label_font = resolve_font({**(legacy_order_area or {}), **(legacy_order_geometry.get(i) or {})}, fonts[3], 19)
+                    label_lines=wrapped_lines(str(opt),label_font,max(40,r.width-25))
                     max_lines=3 if cols==2 else 2
                     for line_no,label_line in enumerate(label_lines[:max_lines]):
-                        screen.blit(fonts[3].render(label_line,True,navy),(r.x+12,r.y+7+line_no*(fonts[3].get_height()+3)))
+                        screen.blit(label_font.render(label_line,True,navy),(r.x+12,r.y+7+line_no*(label_font.get_height()+3)))
                 buttons_y=max(cards_y+((len(options)+cols-1)//cols)*(card_h+gap_y), order_card_bottom+gap_y)+15
                 r=pygame.Rect(66,buttons_y,185,48);cells.append((r,'reset'))
                 rounded(r,(209,223,217) if r.collidepoint(mouse) else (230,233,238),10)
@@ -1082,7 +1103,7 @@ def _run(question):
                     r = pygame.Rect(66,y+60,828,66)
                 rounded(r,(235,241,248))
                 # Clip long user input to the visible box without changing its value.
-                _text_surface = fonts[0].render(typed+'|', True, navy)
+                _text_surface = input_font.render(typed+'|', True, navy)
                 _available = max(1, r.width-30)
                 _visible_text = _text_surface.subsurface(
                     pygame.Rect(max(0, _text_surface.get_width()-_available), 0,

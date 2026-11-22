@@ -1,4 +1,3 @@
-from question_rich_text import draw as draw_rich, wrap as wrap_rich
 from exercise_gfx import draw_question_progress, present_frame
 """Dang bai 'Nghe va chon dap an bang hinh' (type: listening_image_choice).
 
@@ -76,6 +75,7 @@ def _run(question):
     if options is None:
         return None
     # Preserve legacy random order unless individual answer positions are saved.
+    from layout_typography import TextBlock, resolve_font
     from question_layout_runtime import element as layout_element
     custom_options = [layout_element(question, f'option_{i}') for i in range(len(options))]
     if not any(custom_options):
@@ -244,14 +244,20 @@ def _run(question):
                 lines.append(cur); cur = word
         return lines + ([cur] if cur else [])
 
-    play_btn = pygame.Rect(60, 118, 64, 64)
-    replay_btn = pygame.Rect(140, 126, 48, 48)
-    bar = pygame.Rect(210, 142, 620, 12)
+    from question_layout_runtime import rectangle
+    prompt_block = TextBlock(prompt, layout_element(question, 'question_text'),
+                             f_title, 26, (40, 44, 880), 32, 2)
+    audio_rect = pygame.Rect(rectangle(layout_element(question, 'audio_player'), (40, 104, 880, 92)))
+    extent = max(extent, prompt_block.bottom, audio_rect.bottom + 10)
+    play_side = min(64, max(12, audio_rect.height-16), max(12, audio_rect.width//5))
+    replay_side = min(48, play_side)
+    play_btn = pygame.Rect(audio_rect.x+20, audio_rect.centery-play_side//2, play_side, play_side)
+    replay_btn = pygame.Rect(play_btn.right+16, audio_rect.centery-replay_side//2, replay_side, replay_side)
+    bar = pygame.Rect(replay_btn.right+22, audio_rect.centery-8, max(1, audio_rect.right-replay_btn.right-112), 12)
     from exercise_buttons import complete_rect
     submit = complete_rect(572)
     # Text size follows the matching saved answer slot, if specified.
-    option_label_fonts = [host._cached_font(font_path, max(10, min(72, c['font_size'])), True)
-                          if c and 'font_size' in c else f_bold for c in custom_options]
+    option_label_fonts = [resolve_font(c, f_bold, 20) for c in custom_options]
     selected = None
     hover = None
     ripples = []          # (x, y, t0)
@@ -359,13 +365,12 @@ def _run(question):
         screen.fill(BG)
         # tieu de
         #text('NGHE VÀ CHỌN HÌNH', f_small, GREEN, 40, 22)
-        for k, line in enumerate(wrap_rich(prompt, f_title, 880)[:2]):
-            draw_rich(screen, f_title, line, NAVY, 40, 44 + k * 32)
+        prompt_block.draw(screen, NAVY)
         # khung audio: waveform giong cac bai nghe khac
-        rrect(pygame.Rect(40, 104, 880, 92), CARD, 18)
+        rrect(audio_rect, CARD, 18)
         if wf is not None:
             wf.update()
-            wf_rects = wf.draw(screen, pygame.Rect(53, 112, 828, 73), f_small)
+            wf_rects = wf.draw(screen, pygame.Rect(audio_rect.x+13, audio_rect.y+8, max(16, audio_rect.width-52), max(16, audio_rect.height-19)), f_small)
             if st['error']:
                 text(st['error'], f_small, (200, 60, 60), 60, 108)
         elif wf_pending:

@@ -16,3 +16,10 @@ def element(question, name, screen_size=DESKTOP):
         elif kind in {'dropdown_fill_blank', 'inline_dropdown_fill'}:
             value = elements.get('dropdown_area')
     return value or None
+
+
+def rectangle(geometry, default):
+    """Apply saved coordinates to a default drawable and interactive box."""
+    geometry = geometry or {}
+    return tuple(geometry.get(field, fallback)
+                 for field, fallback in zip(('x', 'y', 'width', 'height'), default))

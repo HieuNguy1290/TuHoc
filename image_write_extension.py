@@ -59,12 +59,13 @@ def run(question):
     navy=(32,52,77); bg=(241,247,252)
     text_layout=element(question,'question_text')
     image_layout=element(question,'question_image')
-    if (question.get('layout') or {}).get('version') in (2, 3):
+    if (question.get('layout') or {}).get('version') in (2, 3, 4):
         input_layout = element(question, 'input_area')
     else:
         input_layout = element(question, 'answer_area')
-    if text_layout and text_layout.get('font_size'):
-        font=_cached_font(None,text_layout['font_size'],False)
+    from layout_typography import TextBlock, resolve_font
+    input_font = resolve_font(input_layout, font, 23)
+    font = resolve_font(text_layout, font, 23)
     picture=None
     authored_rect=authored_frame=None
     path=question.get('_pygame_image')
@@ -107,7 +108,13 @@ def run(question):
             # Wrap long prompts instead of cropping the question.
             prompt_x=text_layout.get('x',55) if text_layout else 55
             prompt_y=text_layout.get('y',95) if text_layout else 95
-            for i,text in enumerate(lines):draw_rich(screen,font,text,navy,prompt_x,prompt_y+i*32)
+            if text_layout:
+                prompt = TextBlock(question.get('prompt') or 'Nhìn hình và ghi đáp án', text_layout,
+                                   font, 23, (prompt_x, prompt_y, 850), 32)
+                prompt.draw(screen, navy)
+            else:
+                for i,text in enumerate(lines):
+                    draw_rich(screen,font,text,navy,prompt_x,prompt_y+i*32)
             zoom_hit=None
             if picture:
                 image_rect=authored_rect or picture.get_rect(midtop=(480,group_top))
@@ -120,8 +127,9 @@ def run(question):
             pygame.draw.rect(screen,(47,120,200),field,2,border_radius=8)
             # Horizontally scroll long input to keep the caret visible.
             visible=answer
-            while visible and font.size(visible+'|')[0]>max(30,field_width-30):visible=visible[1:]
-            screen.blit(font.render(visible+('| ' if active else ''),True,navy),(field_x+13,field_y+max(4,(field_height-font.get_height())//2)))
+            while visible and input_font.size(visible+'|')[0]>max(30,field_width-30):visible=visible[1:]
+            screen.blit(input_font.render(visible+('| ' if active else ''),True,navy),
+                        (field_x+13,field_y+max(4,(field_height-input_font.get_height())//2)))
             submit=pygame.Rect(705,submit_y,185,42)
             enabled=bool(answer.strip())
             page.present(question)

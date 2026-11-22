@@ -2,7 +2,7 @@ from question_prompt import display_prompt
 from exercise_gfx import draw_question_progress, present_frame
 from extras_render import draw_extras
 from question_layout_store import pixel_extras
-from question_rich_text import draw as draw_rich, wrap as wrap_rich
+from question_rich_text import draw as draw_rich
 """Pygame interaction and scoring for the five additional editor formats."""
 import re
 import random
@@ -112,6 +112,7 @@ def run(question):
         from multi_select_extension import run
         return run(question)
     import pygame
+    from layout_typography import TextBlock, resolve_font
     from exercise_buttons import complete_rect, draw_complete
     from exercise_gfx import draw_rect as aa_rect
     from pygame_exercises import _image, _cached_font, _a21_log
@@ -136,7 +137,7 @@ def run(question):
     narration_waveform = None
     narration_waveform_pending = bool(narration_path)
     narration_waveform_rects = None
-    from question_layout_runtime import element as _audio_layout_element
+    from question_layout_runtime import element as _audio_layout_element, rectangle
     _audio_geometry = _audio_layout_element(question, 'audio_player') or {}
     narration_waveform_area = pygame.Rect(
         int(_audio_geometry.get('x', 510)), int(_audio_geometry.get('y', 39)),
@@ -222,6 +223,10 @@ def run(question):
         gap_area = layout_element(question, 'answer_area') or {}
         gap_image_area = layout_element(question, 'question_image') or {}
         bank = layout_element(question, 'word_bank') or {}
+        gap_slot_layouts = [layout_element(question, f'slot_{i}') for i in range(len(exp))]
+        word_layouts = [layout_element(question, f'word_{i}') for i in range(len(choices))]
+        gap_font = resolve_font(gap_area, font, 21)
+        bank_font = resolve_font(bank, small, 16)
         gap_left = int(gap_area.get('x', 65))
         gap_top = int(gap_area.get('y', 221))
         gap_right = min(900, gap_left + max(115, int(gap_area.get('width', 810))))
@@ -261,9 +266,11 @@ def run(question):
             lines.append(line)
         return lines or ['']
     prompt_scroll=0
-    prompt_lines=wrap_rich(display_prompt(question, 'Hoàn thành bài tập'),font,845)
+    prompt_block = TextBlock(display_prompt(question, 'Hoàn thành bài tập'),
+                             _audio_layout_element(question, 'question_text'), font, 21, (52, 109, 845), 27)
+    prompt_lines = prompt_block.lines
     prompt_visible=3
-    def button(rect,label,fill=(231,239,248),enabled=True):
+    def button(rect,label,fill=(231,239,248),enabled=True,label_font=None):
         # Consistent hover/pressed feedback for gap and letter controls.
         pointer = pygame.mouse.get_pos()
         if letter_page:pointer = (pointer[0],pointer[1]+letter_page.scroll)
@@ -279,7 +286,7 @@ def run(question):
         aa_rect(screen,(172,189,199),rect.move(0,2),border_radius=8)
         aa_rect(screen,face,rect,border_radius=8)
         aa_rect(screen,edge,rect,2 if hovered else 1,border_radius=8)
-        t=small.render(str(label),True,ink);screen.blit(t,t.get_rect(center=rect.center))
+        t=(label_font or small).render(str(label),True,ink);screen.blit(t,t.get_rect(center=rect.center))
     zoom_path = None
     zoom_regions = []
     from exercise_image_zoom import draw_zoom_icon
@@ -306,25 +313,27 @@ def run(question):
                 if source is None:
                     continue
                 iw, ih = source.get_size()
-                target_w = max(180, min(360, iw + 24))
-                target_h = max(125, min(245, round(target_w * ih / max(1, iw)) + 24))
-                x = max(48, min(900 - target_w, int(old.get('x', 95))))
-                y = max(previous_bottom + 14, int(old.get('y', 300)))
+                target_w = max(1, old.get('width', max(180, min(360, iw + 24))))
+                target_h = max(1, old.get('height', max(125, min(245, round(target_w * ih / max(1, iw)) + 24))))
+                x = old.get('x', max(48, min(900-target_w, 95)))
+                y = old.get('y', max(previous_bottom + 14, 300))
                 choice_positions[i] = dict(old, x=x, y=y, width=target_w, height=target_h)
                 previous_bottom = y + target_h
             choice_page_surface = Page(screen)
         if choice_page_surface is None and audio_doc and narration_waveform_area.bottom > 560:
             choice_page_surface = Page(screen)
     if kind=='picture_missing_letters':
+        from layout_scroll_extent import content_bottom as scroll_extent
+        letter_slots = {i: _audio_layout_element(question, f'slot_{i}') for i in hidden}
         from exercise_layout import Page, wrap as flow_wrap, block_top, image_message, letter_items
         letter_page=Page(screen)
-        prompt_lines=wrap_rich(display_prompt(question, 'Hoàn thành bài tập'),font,845)
-        letter_prompt_bottom=109+len(prompt_lines)*27
+        letter_prompt_bottom = prompt_block.bottom
         letter_note=image_message(question,picture)
         media_height=picture.get_height()+22 if picture else 32 if letter_note else 0
         from question_layout_runtime import element as layout_element
         letter_area_geometry = layout_element(question, 'answer_area') or {}
         letter_cell_geometry = layout_element(question, 'option_0') or {}
+        letter_font = resolve_font(letter_cell_geometry, small, 17)
         letter_left = min(870, letter_area_geometry.get('x', 70))
         letter_width = min(945-letter_left, max(32, letter_area_geometry.get('width', 820)))
         letter_cell = (min(letter_width, max(20, letter_cell_geometry.get('width', 42))),
@@ -362,7 +371,7 @@ def run(question):
     try:
         pygame.key.start_text_input()
         while True:
-            if letter_page:screen=letter_page.begin(max(letter_content_bottom, extras_bottom))
+            if letter_page:screen=letter_page.begin(scroll_extent(question, max(letter_content_bottom, extras_bottom)))
             elif choice_page_surface:
                 lowest = max((g.get('y', 244+(i//3)*140) + g.get('height', 118)
                               for i,g in choice_positions.items()), default=640)
@@ -386,8 +395,7 @@ def run(question):
                 draw_label('Dừng nghe' if narration_playing else 'Nghe câu hỏi',
                            narration_button.x + 12, narration_button.y + 5, small, 'white')
             prompt_scroll=min(prompt_scroll,max(0,len(prompt_lines)-prompt_visible))
-            for row,line in enumerate(prompt_lines if letter_page else prompt_lines[prompt_scroll:prompt_scroll+prompt_visible]):
-                draw_label(line,52,109+row*27,font)
+            prompt_block.draw(screen, navy, 0 if letter_page else prompt_scroll, None if letter_page else prompt_visible)
             hits=[];zoom_regions=[];submit=complete_rect(letter_submit_y if letter_page else 553)
             can_submit = (chosen is not None if kind=='image_multi_choice'
                           else all(values.values()) if kind=='picture_missing_letters'
@@ -430,7 +438,7 @@ def run(question):
                             zoom_rect = draw_zoom_icon(screen, image_rect)
                             zoom_regions.append((zoom_rect, question['_choice_images'][path]))
                     else:draw_label('Không tìm thấy ảnh',x+20,y+40,small)
-                    draw_label(chr(65+i),x+12,y+8,small)
+                    draw_label(chr(65+i),x+12,y+8,resolve_font(geometry, small, 16))
                     hits.append((rect,('choose',i)))
             elif kind=='picture_missing_letters':
                 if picture:
@@ -443,8 +451,10 @@ def run(question):
                 for i,x,dy in letter_positions:
                     y=letter_top+dy
                     if i in hidden:
-                        rect=pygame.Rect((x, y), letter_cell)
-                        button(rect,values.get(i,'_'),(215,238,255) if i==active else (234,240,246))
+                        geometry = letter_slots[i]
+                        rect = pygame.Rect(rectangle(geometry, (x, y, *letter_cell)))
+                        button(rect,values.get(i,'_'),(215,238,255) if i==active else (234,240,246),
+                               label_font=resolve_font(geometry, letter_font, 17))
                         hits.append((rect,('letter',i)))
                     else:
                         t=font.render(letters[i],True,navy)
@@ -452,7 +462,7 @@ def run(question):
             else:
                 # The gap passage is a dedicated scroll viewport.  Clip both
                 # text and media so they cannot paint over fixed controls.
-                gap_viewport = pygame.Rect(55, 210, 850, 285)
+                gap_viewport = pygame.Rect(55, 210, 850, max(1, min(355, gap_area.get('height', 285))))
                 old_clip = screen.get_clip()
                 screen.set_clip(gap_viewport)
                 y=gap_top-scroll;slot_hits=[]
@@ -478,26 +488,29 @@ def run(question):
                                     x=gap_left
                                     y+=40
                                 for token in re.findall(r'\S+\s*|[ \t]+', line_text):
-                                    w=font.size(token)[0]
+                                    w=gap_font.size(token)[0]
                                     if x+w>gap_right and x>gap_left:
                                         x=gap_left
                                         y+=40
                                     if -10<y<490:
-                                        draw_label(token,x,y)
+                                        draw_label(token,x,y,gap_font)
                                     x+=w
                         else:
                             w=115
                             if x+w>gap_right:x=gap_left;y+=40
-                            rect=pygame.Rect(x,y-4,w,34)
-                            if -10<y<510:
-                                button(rect,choices[assigned[value]] if value in assigned else '........', (211,237,255) if selected_slot==value else (234,240,246))
-                                if gap_viewport.contains(rect):
-                                    hits.append((rect,('slot',value)))
+                            geometry = gap_slot_layouts[value]
+                            rect = pygame.Rect(rectangle(geometry, (x, y+scroll-4, w, 34))).move(0, -scroll)
+                            if gap_viewport.colliderect(rect):
+                                button(rect,choices[assigned[value]] if value in assigned else '........', (211,237,255) if selected_slot==value else (234,240,246),
+                                       label_font=resolve_font(geometry, small, 16))
+                                hits.append((rect.clip(gap_viewport),('slot',value)))
                             x+=w+5
                     y+=55
                 content_bottom=max(y+scroll,
                     (gap_picture_frame.bottom if gap_picture_frame else gap_top + (sentence_picture.get_height() if sentence_picture else 0)) + 18)
-                max_scroll=max(0,content_bottom-465, extras_bottom-490)
+                authored = [geometry for geometry in (*gap_slot_layouts, *word_layouts, bank) if geometry]
+                saved_bottom = max((g.get('y', 0) + g.get('height', 35) for g in authored), default=0)
+                max_scroll=max(0,content_bottom-465, extras_bottom-490, saved_bottom-545)
                 scroll=min(scroll,max_scroll)
                 screen.set_clip(old_clip)
                 if pending_gap_zoom is not None:
@@ -514,8 +527,8 @@ def run(question):
                     aa_rect(screen, (104, 145, 183), (track.x, thumb_y, track.width, thumb_h), border_radius=2)
                 bank_left = min(810, max(0, bank.get('x', 65)))
                 bank_right = min(918, bank_left + max(65, bank.get('width', 825)))
-                cy = max(495, min(506, bank.get('y', 505)))
-                bank_height = max(24, min(40, bank.get('height', 35)))
+                cy = bank.get('y', 505) - scroll if 'y' in bank else 505
+                bank_height = max(1, bank.get('height', 35))
                 available_choices=[(i,c) for i,c in enumerate(choices) if i not in assigned.values()]
                 pages=[];page=[];used=bank_left
                 for i,choice in available_choices:
@@ -527,8 +540,12 @@ def run(question):
                 choice_page=min(choice_page,max(0,len(pages)-1))
                 if pages:
                     for i,choice,cx,w in pages[choice_page]:
-                        rect=pygame.Rect(cx,cy,w,bank_height)
-                        button(rect,str(choice));hits.append((rect,('choice',i)))
+                        geometry = word_layouts[i] or {}
+                        rect = pygame.Rect(rectangle(geometry, (cx, cy, w, bank_height)))
+                        if 'y' in geometry:
+                            rect.y -= scroll
+                        button(rect, str(choice), label_font=resolve_font(geometry, bank_font, 16))
+                        hits.append((rect, ('choice', i)))
                 if len(pages)>1:
                     prev=pygame.Rect(65,547,100,34);nxt=pygame.Rect(178,547,100,34)
                     button(prev,'◀ Trước',enabled=choice_page>0)

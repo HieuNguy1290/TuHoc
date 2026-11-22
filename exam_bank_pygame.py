@@ -481,7 +481,12 @@ class BankManager:
                     children.append({'id':c.get('id',''), 'prompt':c['prompt'].strip(),'options':[x.strip() for x in c['options'].split('|') if x.strip()],'answer':c['answer'].strip(),'difficulty':int(c['difficulty'])})
                     if c.get('layout') is not None:
                         children[-1]['layout']=c['layout']
-                self.bank.save_reading({'id':self.edit_id,'subject':self.subject,'grade':self.grade,'lesson':self.lesson,'title':self.reading_form['title'].strip(),'passage':self.reading_form['passage'].strip(),'questions':children})
+                group = {'id': self.edit_id, 'subject': self.subject, 'grade': self.grade,
+                         'lesson': self.lesson, 'title': self.reading_form['title'].strip(),
+                         'passage': self.reading_form['passage'].strip(), 'questions': children}
+                if self.edit_layout is not None:
+                    group['layout'] = self.edit_layout
+                self.bank.save_reading(group)
                 self.message='Đã lưu bài đọc và câu hỏi con.';self.tab='bank'
             except (ValueError,KeyError,OSError) as exc:self.message='Lỗi lưu: '+str(exc)
             return
@@ -638,7 +643,7 @@ class BankManager:
         if self.edit_type in ('choice','true_false','fill','picture_choice','picture_missing_letters','listening_choice','listening_fill') and not self.form.get('answer','').strip():
             required.append('đáp án')
         if required:
-            self.text('Còn thiếu: '+', '.join(required),w//2,368,self.sm,RED,w//2-35)
+            self.text('Còn thiếu: '+', '.join(required),w//2,368,self.sm,RED,max(100,w//2-200))
         self.rect(pygame.Rect(28,397,w-56,max(150,h-485)),WHITE,LINE)
         x=47;y=435;wide=w-95
         typ=self.edit_type
@@ -661,6 +666,7 @@ class BankManager:
                 self.text('VẾ PHẢI',x+wide//2+10,y,self.sm,MUTED)
                 y+=28
             else:
+        self.btn('Chỉnh bố cục', pygame.Rect(w-189,360,158,38), self.edit_visual_layout)
                 self.text('Các cặp nối',x,y,self.sm,MUTED)
                 y+=28
             for i,pair in enumerate(self.match_pairs):
@@ -791,6 +797,50 @@ class BankManager:
         if value=='reading_group' and not self.reading_questions:
             self.reading_questions=[{'prompt':'','options':'A | B | C | D','answer':'','difficulty':'1'} for _ in range(2)]
             self.reading_form={'title':'','passage':''}
+    def edit_visual_layout(self, *, child=False):
+        from question_layout_editor import edit_layout
+        from tkinter import TclError
+
+        target = self.reading_questions[self.reading_child] if child else None
+        data = target if child else self.reading_form if self.edit_type == 'reading_group' else self.form
+        kind = 'choice' if child else self.edit_type
+        question = {**data, 'type': kind, '_layout_context': 'exam',
+                    'prompt': data.get('prompt') or data.get('title', '')}
+        if kind == 'matching':
+            question['pairs'] = [(pair['left'], pair['right']) for pair in self.match_pairs]
+        for field in ('sequence', 'gap_answers'):
+            if field in question:
+                question[field] = [value.strip() for value in question[field].split('|') if value.strip()]
+        def options_for(source):
+            return [value.strip() for value in source.split('|') if value.strip()]
+
+        question['options'] = (question.get('image_options', []) if kind == 'image_multi_choice'
+                               else options_for(question.get('options', '')))
+        if kind == 'reading_group':
+            question['questions'] = [{**item, 'options': options_for(item['options'])}
+                                     for item in self.reading_questions]
+        initial = target.get('layout') if child else self.edit_layout
+
+        def preview(layout, _parent, show_frame):
+            from exam_pygame import layout_preview
+            show_frame(*layout_preview(self.bank.folder.parent, question, layout))
+        root = None
+        try:
+            root = Tk()
+            root.withdraw()
+            layout = edit_layout(root, question, initial, preview=preview)
+            if layout is not None:
+                if child:
+                    target['layout'] = layout
+                else:
+                    self.edit_layout = layout
+                self.message = 'Đã cập nhật bản nháp bố cục.'
+        except (TclError, ValueError, OSError) as exc:
+            self.message = 'Không mở được Studio: ' + str(exc)
+        finally:
+            if root is not None:
+                root.destroy()
+
 
     def next_edit_type(self):
         values=[t[0] for t in TYPES]
@@ -878,6 +928,8 @@ class BankManager:
 
     def adjust_ratio(self,level,index,delta):
         self.ensure_config_draft()
+        self.btn('Bố cục câu con', pygame.Rect(x+wide-154,712,154,35),
+                 lambda: self.edit_visual_layout(child=True))
         row=self.config_draft['ratios'][str(level)]
         # Adjust selected percentage against next level bucket to keep sum = 100.
         other=next((j for j in range(5) if j!=index and (row[j]>0 if delta>0 else row[j]<100)),None)

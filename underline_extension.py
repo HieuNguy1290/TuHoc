@@ -1,4 +1,3 @@
-from question_rich_text import draw as draw_rich, wrap as wrap_rich
 from exercise_gfx import present_frame
 from exercise_gfx import open_exercise_window
 """Two additive underline exercise types: image choice and sentence word selection."""
@@ -151,16 +150,22 @@ def run(question):
         return result
     from exercise_layout import Page, wrap as flow_wrap, block_top, image_message
     page=Page(screen)
-    prompt_lines=wrap_rich(str(question.get('prompt') or 'Gạch chân đáp án đúng'),title,850)
-    prompt_bottom=95+len(prompt_lines)*38
+    from layout_typography import TextBlock, resolve_font
+    prompt = TextBlock(question.get('prompt') or 'Gạch chân đáp án đúng',
+                       layout_element(question, 'question_text'), title, 28, (55, 95, 850), 38)
+    prompt_bottom = prompt.bottom
+    image_geometry = layout_element(question, 'question_image')
+    image_rect = None
+    if picture is not None and image_geometry:
+        from layout_images import pygame_image
+        picture, image_rect, _ = pygame_image(question['_pygame_image'], image_geometry,
+                                               (0, 0, *picture.get_size()))
     # Optional layout applies to the answer group; without it, preserve legacy geometry.
     answer_layout = layout_element(question, 'answer_area')
     answer_left = max(25, min(875, int(answer_layout.get('x', 58)))) if answer_layout else 58
     answer_width = max(80, min(920-answer_left, int(answer_layout.get('width', 837)))) if answer_layout else 837
     answer_right = answer_left + answer_width
-    answer_font = int(answer_layout.get('font_size', 24)) if answer_layout else 24
-    if answer_layout and answer_font != 24:
-        font = _cached_font(None, max(8, min(96, answer_font)), False)
+    font = resolve_font(answer_layout, font, 24)
     # Lay out each clickable word/option first; draw and hit-test the same boxes.
     rows=[]; x=answer_left; row_y=0
     for i,word in enumerate(options):
@@ -182,27 +187,21 @@ def run(question):
     answer_y=group_top+image_height
     if answer_layout and 'y' in answer_layout:
         answer_y = max(65, int(answer_layout['y']))
-    # Individually positioned options are supported only for the image-choice
-    # variant. Each option's hitbox follows its drawn text exactly.
-    if kind == TYPES[0]:
-        adjusted = []
-        for x,dy,i,lines,height,suffix,width in rows:
-            item = layout_element(question, 'option_%d' % i)
-            if item:
-                x = max(20, min(920, int(item.get('x', x))))
-                dy = max(0, int(item.get('y', answer_y)) - answer_y)
-                item_width = max(40, min(930-x, int(item.get('width', 825))))
-                if 'font_size' in item:
-                    # Per-option font sizes require matching drawing and hitboxes.
-                    # The group font is used here until per-option typography is
-                    # supported by the underlying word renderer.
-                    pass
-                lines = flow_wrap(options[i], font, item_width)
-                width = max(font.size(line)[0] for line in lines)
-                height = len(lines)*(font.get_height()+6)-6
-            adjusted.append((x,dy,i,lines,height,suffix,width))
-        rows = adjusted
-        answer_height = max((dy+height for _,dy,_,_,height,_,_ in rows), default=42)
+    adjusted = []
+    for x, dy, i, lines, height, suffix, width in rows:
+        item = layout_element(question, f'option_{i}') or {}
+        face = resolve_font(item, font, 24)
+        if item:
+            x = item.get('x', x)
+            dy = item.get('y', answer_y+dy) - answer_y
+            item_width = max(1, item.get('width', answer_width))
+            lines = flow_wrap(options[i], face, item_width)
+            width = max(face.size(line)[0] for line in lines)
+            height = len(lines)*(face.get_height()+6)-6
+        adjusted.append((x, dy, i, lines, item.get('height', height), suffix,
+                         item.get('width', width), face, bool(item)))
+    rows = adjusted
+    answer_height = max((dy+height for _,dy,_,_,height,_,_,_,_ in rows), default=42)
     button_y = 552
     # Extend the scrollable drawing surface for elements placed below the page.
     content_extent = layout_content_bottom(question, max(640, answer_y + answer_height + 98))
@@ -210,20 +209,35 @@ def run(question):
         while True:
             screen=page.begin(content_extent)
             screen.fill(bg);pygame.draw.rect(screen,(255,255,255),(25,25,910,screen.get_height()-50),border_radius=18)
-            for j,line in enumerate(prompt_lines):
-                draw_rich(screen,title,line,navy,55,95+j*38)
-            if picture:screen.blit(picture,picture.get_rect(midtop=(480,group_top)))
+            prompt.draw(screen, navy)
+            if picture:screen.blit(picture,image_rect or picture.get_rect(midtop=(480,group_top)))
             elif note:screen.blit(small.render(note,True,navy),(55,group_top))
             hit=[]
             # Layout with natural word spacing (9px), preserving compact sentences.
-            for x,dy,i,word_lines,height,suffix,width in rows:
-                for j,line in enumerate(word_lines):
-                    y=answer_y+dy+j*(font.get_height()+6)
-                    rendered=font.render(line,True,green if i in chosen else navy)
-                    screen.blit(rendered,(x,y))
-                    if i in chosen:pygame.draw.line(screen,green,(x,y+font.get_height()+2),(x+rendered.get_width(),y+font.get_height()+2),2)
-                    hit.append((pygame.Rect(x-2,y-3,rendered.get_width()+4,font.get_height()+9),i))
-                if kind==TYPES[0]:screen.blit(font.render(suffix,True,navy),(x+font.size(word_lines[-1])[0],y))
+            for x, dy, i, word_lines, height, suffix, width, face, custom in rows:
+                top = answer_y+dy
+                bounds = pygame.Rect(x, top, max(1, width), max(1, height))
+                clip = screen.get_clip()
+                if custom:
+                    screen.set_clip(clip.clip(bounds))
+                    hit.append((bounds, i))
+                try:
+                    for j, line in enumerate(word_lines):
+                        y = top+j*(face.get_height()+6)
+                        rendered = face.render(line, True, green if i in chosen else navy)
+                        screen.blit(rendered, (x,y))
+                        if i in chosen:
+                            underline = y+face.get_height()+2
+                            pygame.draw.line(screen, green, (x,underline),
+                                             (x+rendered.get_width(),underline), 2)
+                        if not custom:
+                            hit.append((pygame.Rect(x-2,y-3,rendered.get_width()+4,face.get_height()+9),i))
+                finally:
+                    if custom:
+                        screen.set_clip(clip)
+                if kind==TYPES[0] and word_lines:
+                    y = top + (len(word_lines)-1)*(face.get_height()+6)
+                    screen.blit(face.render(suffix,True,navy),(x+face.size(word_lines[-1])[0],y))
             button=pygame.Rect(704,button_y,200,46)
             page.present(question)
             page.complete(question, button, small, bool(chosen))

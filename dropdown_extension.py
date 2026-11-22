@@ -1,4 +1,3 @@
-from question_rich_text import draw as draw_rich, wrap as wrap_rich
 from exercise_gfx import present_frame
 from exercise_gfx import open_exercise_window
 """Dropdown answer: Tk authoring widget and Pygame exercise window."""
@@ -59,7 +58,7 @@ def run(question):
         return inline_run(q)
     import pygame
     from pygame_exercises import _image,_cached_font
-    from question_layout_runtime import element as layout_element
+    from question_layout_runtime import element as layout_element, rectangle
     from layout_scroll_extent import content_bottom as layout_content_bottom
     pygame.init();pygame.display.init()
     screen=open_exercise_window((960, 640));pygame.display.set_caption('Tự Học - Bài tập')
@@ -83,8 +82,16 @@ def run(question):
         return lines
     from exercise_layout import Page, wrap, block_top, image_message
     page=Page(screen)
-    lines=wrap_rich(question.get('prompt') or 'Chọn đáp án thích hợp để điền vào ô trống.',font,850)
-    bottom=96+len(lines)*33
+    from layout_typography import TextBlock, resolve_font
+    prompt = TextBlock(question.get('prompt') or 'Chọn đáp án thích hợp để điền vào ô trống.',
+                       layout_element(question, 'question_text'), font, 23, (55, 96, 850), 33)
+    bottom = prompt.bottom
+    image_geometry = layout_element(question, 'question_image')
+    image_rect = None
+    if picture is not None and image_geometry:
+        from layout_images import pygame_image
+        picture, image_rect, _ = pygame_image(question['_pygame_image'], image_geometry,
+                                               (0, 0, *picture.get_size()))
     note=image_message(question,picture)
     media_height=picture.get_height()+22 if picture else 32 if note else 0
     group_top=block_top(bottom,media_height+48)
@@ -92,7 +99,10 @@ def run(question):
     submit_y = 560
     # Optional per-question geometry. The field and its popup share one origin,
     # so pointer hit testing always follows the rendered answer control.
-    answer_layout = layout_element(question, 'dropdown_area') if (question.get('layout') or {}).get('version') in (2, 3) else layout_element(question, 'answer_area')
+    answer_layout = layout_element(question, 'dropdown_area') if (question.get('layout') or {}).get('version') in (2, 3, 4) else layout_element(question, 'answer_area')
+    menu_geometry = layout_element(question, 'answer_menu') or {}
+    menu_options = [layout_element(question, f'option_{i}') for i in range(len(options))]
+    option_font = resolve_font(answer_layout, small, 19)
     if answer_layout:
         field_x = max(30, min(900, int(answer_layout.get('x', 175))))
         field_y = max(60, int(answer_layout.get('y', field_y)))
@@ -109,34 +119,39 @@ def run(question):
             screen=page.begin(content_extent)
             screen.fill(bg)
             pygame.draw.rect(screen,'white',(25,25,910,screen.get_height()-50),border_radius=18)
-            for i,line in enumerate(lines):draw_rich(screen,font,line,navy,55,96+i*33)
-            if picture:screen.blit(picture,picture.get_rect(midtop=(480,group_top)))
+            prompt.draw(screen, navy)
+            if picture:screen.blit(picture,image_rect or picture.get_rect(midtop=(480,group_top)))
             elif note:screen.blit(small.render(note,True,(140,90,90)),(55,group_top))
             screen.blit(font.render('Trả lời:',True,navy),(max(30,field_x-110),field_y+10))
             field=pygame.Rect(field_x,field_y,field_width,field_height)
             pygame.draw.rect(screen,(247,251,255),field,border_radius=8)
             pygame.draw.rect(screen,(70,119,169),field,2,border_radius=8)
             shown='Chọn đáp án' if selected is None else options[selected]
-            while shown and small.size(shown)[0]>max(30,field.width-75):shown=shown[:-2]+'…'
-            screen.blit(small.render(shown,True,navy if selected is not None else (126,138,150)),(field.x+15,field.y+max(5,(field.height-small.get_height())//2)))
+            while shown and option_font.size(shown)[0]>max(30,field.width-75):shown=shown[:-2]+'…'
+            screen.blit(option_font.render(shown,True,navy if selected is not None else (126,138,150)),(field.x+15,field.y+max(5,(field.height-small.get_height())//2)))
             pygame.draw.polygon(screen,navy,[(field.right-34,field.centery-5),(field.right-20,field.centery-5),(field.right-27,field.centery+4)])
             submit=pygame.Rect(690,submit_y,200,45)
 
             menu=[]
             if opened:
-                max_visible=min(5,len(options));menu_height=max_visible*43
+                menu_height_per_row = max(24, int((answer_layout or {}).get('height', 48)) - 5)
+                max_visible=min(5,len(options));menu_height=max_visible*menu_height_per_row
                 menu_y=field.bottom+3
                 if menu_y + menu_height > submit_y - 10 + page.scroll:
                     menu_y = max(bottom+8, field.top-menu_height-3)
-                menu_rect=pygame.Rect(field.x,menu_y,field.width,menu_height)
+                menu_rect = pygame.Rect(rectangle(menu_geometry, (field.x,menu_y,field.width,menu_height)))
+                menu_height_per_row = max(1, menu_rect.height // max_visible)
                 pygame.draw.rect(screen,'white',menu_rect,border_radius=6)
                 pygame.draw.rect(screen,(95,130,167),menu_rect,2,border_radius=6)
                 for j in range(scroll,min(len(options),scroll+max_visible)):
-                    rect=pygame.Rect(field.x+3,menu_y+(j-scroll)*43,field.width-6,43)
+                    row_geometry = menu_options[j]
+                    rect = pygame.Rect(rectangle(row_geometry, (menu_rect.x+3,
+                        menu_rect.y+(j-scroll)*menu_height_per_row, max(1, menu_rect.width-6), menu_height_per_row)))
                     if j==selected:pygame.draw.rect(screen,(223,239,252),rect)
                     val=options[j]
-                    while val and small.size(val)[0]>rect.width-20:val=val[:-2]+'…'
-                    screen.blit(small.render(val,True,navy),(rect.x+10,rect.y+11))
+                    row_font = resolve_font(row_geometry, resolve_font(menu_geometry, option_font, 19), 19)
+                    while val and row_font.size(val)[0]>rect.width-20:val=val[:-2]+'…'
+                    screen.blit(row_font.render(val,True,navy),(rect.x+10,rect.y+11))
                     menu.append((rect,j))
             page.present(question)
             page.complete(question, submit, small, selected is not None)

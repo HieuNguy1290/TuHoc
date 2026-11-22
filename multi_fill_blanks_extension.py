@@ -115,17 +115,20 @@ def run(question):
     small = _cached_font(None, 19, False)
     title = _cached_font(None, 28, True)
     navy = (32, 52, 77)
-    from question_layout_runtime import element as layout_element
+    from question_layout_runtime import element as layout_element, rectangle
     text_layout = layout_element(question, "question_text")
     image_layout = layout_element(question, "question_image")
     audio_layout = layout_element(question, "audio_player")
     answer_layout = layout_element(question, "answer_area")
-    prompt_font = _cached_font(None, text_layout.get("font_size", 22), False) if text_layout else font
+    from layout_typography import TextBlock, resolve_font
+    prompt_font = resolve_font(text_layout, font, 22)
+    small = resolve_font(answer_layout, small, 17)
     template = str(question.get('blank_text') or '')
     expected = question.get('blank_answers') or []
     if not 1 <= len(expected) <= 8:
         return None
     values = [''] * len(expected)
+    slot_geometry = [layout_element(question, f'slot_{i}') for i in range(len(values))]
     active = 0
     audio_path = str(question.get('_resolved_audio') or '').strip()
     has_audio = bool(str(question.get('audio') or '').strip())
@@ -168,12 +171,11 @@ def run(question):
                 tx = text_layout.get('x', 55)
                 ty = text_layout.get('y', y)
                 tw = max(80, text_layout.get('width', 845))
-                line_step = prompt_font.get_linesize() + 5
-                prompt_rows = wrap_rich(question.get('prompt') or 'Điền đáp án vào các ô trống.', prompt_font, tw)[:4]
-                for row, line in enumerate(prompt_rows):
-                    draw_rich(screen, prompt_font, line, navy, tx, ty + row * line_step)
-                # Preserve the original answer-flow start unless the new text is lower.
-                y = max(y + 33 * len(prompt_rows), ty + line_step * len(prompt_rows))
+                prompt_block = TextBlock(question.get('prompt') or 'Điền đáp án vào các ô trống.',
+                                         text_layout, font, 22, (tx, ty, tw),
+                                         prompt_font.get_linesize()+5, 4)
+                prompt_block.draw(screen, navy)
+                y = max(y + 33 * len(prompt_block.lines), prompt_block.bottom)
             else:
                 for line in wrap_rich(question.get('prompt') or 'Điền đáp án vào các ô trống.', font, 845)[:4]:
                     draw_rich(screen, font, line, navy, 55, y); y += 33
@@ -222,15 +224,17 @@ def run(question):
                     if not 0 <= i < len(values): continue
                     width = 88
                     if x + width > answer_right: x = answer_left; y += line_height
-                    rect = pygame.Rect(x, y - 8, width, 42)
+                    geometry = slot_geometry[i]
+                    rect = pygame.Rect(rectangle(geometry, (x, y - 8, width, 42)))
+                    field_font = resolve_font(geometry, small, 19)
                     pygame.draw.rect(screen, (248, 253, 255), rect, border_radius=8)
                     pygame.draw.rect(screen, (51, 143, 98) if i == active else (155, 176, 192), rect, 2, border_radius=8)
                     display = values[i]
-                    while display and small.size(display)[0] > width - 18: display = display[1:]
-                    screen.blit(small.render(display, True, navy), (x + 10, y + 1))
+                    while display and field_font.size(display)[0] > rect.width - 18: display = display[1:]
+                    screen.blit(field_font.render(display, True, navy), (rect.x + 10, rect.y + 9))
                     if i == active and pygame.time.get_ticks() % 1000 < 500:
-                        cursor_x = x + 10 + small.size(display)[0]
-                        pygame.draw.line(screen, navy, (cursor_x, y), (cursor_x, y + 25), 2)
+                        cursor_x = rect.x + 10 + field_font.size(display)[0]
+                        pygame.draw.line(screen, navy, (cursor_x, rect.y + 8), (cursor_x, rect.bottom - 8), 2)
                     boxes.append((rect, i)); x += width + 7
                 elif part.isspace():
                     if '\n' in part: x = answer_left; y += line_height

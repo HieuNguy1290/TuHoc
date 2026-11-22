@@ -8,7 +8,7 @@ from tkinter import ttk, messagebox, colorchooser
 from copy import deepcopy
 from pathlib import Path
 from uuid import uuid4
-from question_layout_store import GEOMETRY, IMAGE_FITS, layout_v2, validate_layout
+from question_layout_store import FONT_FAMILIES, GEOMETRY, IMAGE_FITS, TEXT, layout_v2, validate_layout
 from layout_render import DESKTOP, MOBILE, PAGE_LIMIT, fit_pixels, to_pixels, to_relative
 
 from layout_registry import DEFAULTS, controls_for
@@ -46,7 +46,7 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     """Open a modal editor. Return validated layout, or None if cancelled."""
     initial = validate_layout(initial or {})
     stored = initial
-    if stored.get('version') in (2, 3):
+    if stored.get('version') in (2, 3, 4):
         initial = {key: to_relative(rect, DESKTOP) for key, rect in stored['desktop'].items()}
     working = deepcopy(initial)
     saved_layout = deepcopy(initial)
@@ -163,6 +163,7 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     ttk.Label(sidebar, text='Cỡ chữ thành phần được chọn').pack(anchor='w', pady=(18, 4))
     font_spin = ttk.Spinbox(sidebar, from_=8, to=96, textvariable=font_var, width=8)
     font_spin.pack(anchor='w')
+    font_spin.state(['disabled'])
     ttk.Label(sidebar, text='Số câu và nút Hoàn thành được khóa.', wraplength=180, foreground='#64748b').pack(anchor='w', pady=22)
     fields = ttk.Frame(sidebar)
     fields.pack(anchor='w', pady=4)
@@ -175,6 +176,7 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         entry.bind('<Return>', lambda _event: apply_pixels())
         pixel_vars[field] = variable
     ttk.Button(fields, text='Áp dụng (px)', command=lambda: apply_pixels()).grid(row=4, columnspan=2, sticky='ew')
+    ttk.Button(fields, text='Tự động bố trí', command=lambda: reset_geometry()).grid(row=5, columnspan=2, sticky='ew')
     ttk.Label(sidebar, text='Khung 960 × 640 px. Nội dung có thể kéo xuống đến Y = 2560 px.',
               wraplength=180, foreground='#475569').pack(anchor='w', pady=6)
     fit_var = tk.StringVar(value='contain')
@@ -184,15 +186,33 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     text_tools = ttk.Frame(sidebar)
     bold_var = tk.BooleanVar()
     italic_var = tk.BooleanVar()
+    underline_var = tk.BooleanVar()
+    family_var = tk.StringVar()
+    family_select = ttk.Combobox(text_tools, values=FONT_FAMILIES, textvariable=family_var,
+                                 state='readonly', width=19)
+    family_select.pack(anchor='w', pady=(0, 4))
+    family_select.bind('<<ComboboxSelected>>', lambda _e: change_text_style(font_family=family_var.get()))
+    style_row = ttk.Frame(text_tools)
+    style_row.pack(anchor='w')
+    ttk.Checkbutton(text_tools, text='Gạch chân', variable=underline_var,
+                    command=lambda: change_text_style(underline=underline_var.get())).pack(anchor='w')
     align_var = tk.StringVar(value='left')
-    ttk.Checkbutton(text_tools, text='Đậm', variable=bold_var,
+    ttk.Checkbutton(style_row, text='Đậm', variable=bold_var,
                     command=lambda: change_text_style(bold=bold_var.get())).pack(side='left')
-    ttk.Checkbutton(text_tools, text='Nghiêng', variable=italic_var,
+    ttk.Checkbutton(style_row, text='Nghiêng', variable=italic_var,
                     command=lambda: change_text_style(italic=italic_var.get())).pack(side='left')
     align_select = ttk.Combobox(text_tools, values=('left', 'center', 'right'),
                                 textvariable=align_var, state='readonly', width=7)
-    align_select.pack(side='left')
+    align_select.pack(anchor='w')
     align_select.bind('<<ComboboxSelected>>', lambda _e: change_text_style(align=align_var.get()))
+    spacing_var = tk.IntVar(value=0)
+    spacing_row = ttk.Frame(text_tools)
+    ttk.Label(spacing_row, text='Thêm giãn dòng (px)').pack(side='left')
+    spacing_spin = ttk.Spinbox(spacing_row, textvariable=spacing_var, from_=0, to=80, width=4)
+    spacing_spin.pack(side='left')
+    spacing_spin.bind('<Return>', lambda _e: spacing_change())
+    spacing_spin.bind('<FocusOut>', lambda _e: spacing_change())
+    ranges_button = ttk.Button(text_tools, text='Định dạng đoạn chữ…', command=lambda: edit_text_ranges())
     colors = ttk.Frame(sidebar)
     ttk.Button(colors, text='Màu chữ', command=lambda: choose_color('color')).pack(side='left')
     ttk.Button(colors, text='Nền', command=lambda: choose_color('bg')).pack(side='left')
@@ -243,16 +263,22 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     if question.get('type') in {'image_multi_choice', 'listening_image_choice'} and image_options:
         options = [str(item.get('label') or item.get('image') or '') if isinstance(item, dict) else str(item)
                    for item in image_options]
+    if question.get('type') == 'true_false' and not options:
+        options = ['Đúng', 'Sai']
+    if question.get('type') == 'order' and not options:
+        options = question.get('sequence') or str(question.get('answer', '')).split()
     if question.get('type') == 'matching':
         from matching_widget import parse_pairs
-        pairs = parse_pairs(options)
+        pairs = question.get('pairs') or parse_pairs(options)
         options = [pair[side] for side in (0, 1) for pair in pairs]
+    elif question.get('type') == 'sentence_underline_words':
+        from underline_extension import TOKEN
+        options = TOKEN.findall(question.get('source_text', ''))
     elif question.get('type') in {'image_letter_pick', 'image_sentence_fill'}:
         options = [*question.get('blank_answers', []), *question.get('distractors', [])]
     elif question.get('type') == 'picture_missing_letters':
         options = ['Kích thước ô chữ']
-    options = options[:20]
-    controls = controls_for(question.get('type'))
+    controls = controls_for(question.get('type'), question.get('_layout_context', 'lesson'))
     area_keys = [key for key in controls.editable if key in DEFAULTS]
     if not area_keys and 'option_N' not in controls.editable:
         ttk.Label(metadata,text='Dạng này chỉ hỗ trợ hộp văn bản.',
@@ -274,7 +300,24 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
             option_defaults[key] = dict(x=.12, y=min(.91, .46+i*.095),
                                         width=.76, height=.075, font_size=18)
 
-    system_elements = [*area_keys, *option_defaults]
+    item_labels = {f'option_{i}': value for i, value in enumerate(options)}
+    if 'slot_N' in controls.editable:
+        slot_count = len(question.get('blank_answers') or question.get('gap_answers') or [])
+        if question.get('type') in {'sentence_gaps', 'passage_gaps', 'conversation_gaps'} and not slot_count:
+            from new_exercise_runtime import gaps
+            slot_count = sum(len(indices) for _, indices in gaps(question))
+        slot_indices = range(slot_count)
+        if question.get('type') == 'picture_missing_letters':
+            slot_indices = sorted({i for i in question.get('hidden_indices', []) if type(i) is int and i >= 0})
+        for i in slot_indices:
+            item_labels[f'slot_{i}'] = f'Ô trống {i + 1}'
+    if 'word_N' in controls.editable:
+        for i in range(slot_count + len(question.get('distractors') or [])):
+            item_labels[f'word_{i}'] = f'Thẻ từ {i + 1}'
+    for key in item_labels.keys() - option_defaults.keys():
+        option_defaults[key] = dict(x=.09, y=.60, width=.12, height=.07, font_size=20)
+
+    system_elements = [*area_keys, *item_labels]
     elements = []
 
     def sync_elements():
@@ -298,6 +341,9 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         base = option_defaults.get(el) or DEFAULTS[el]
         return {**base, **desktop_layout.get(el, {}), **working.get(el, {})}
 
+    def text_element(el):
+        return bool(el and el not in {'question_image', 'audio_player'})
+
     def select(el, from_list=False, preserve=False):
         if not preserve:
             selected_keys.clear()
@@ -310,13 +356,27 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         if el == 'question_image':
             fit_var.set(current(el).get('image_fit', 'contain'))
             fit_select.pack(anchor='w', pady=2)
-        if el in extras:
-            extra = extras[el]
-            bold_var.set(extra['bold'])
-            italic_var.set(extra['italic'])
-            align_var.set(extra['align'])
+        align_select.pack_forget()
+        ranges_button.pack_forget()
+        spacing_row.pack_forget()
+        font_spin.state(['!disabled'] if text_element(el) else ['disabled'])
+        if text_element(el):
+            style = extras[el] if el in extras else current(el)
+            bold_var.set(style.get('bold', False))
+            italic_var.set(style.get('italic', False))
+            underline_var.set(style.get('underline', False))
+            family_var.set(style.get('font_family', ''))
             text_tools.pack(anchor='w')
-            colors.pack(anchor='w', pady=2)
+            if el in {'question_text', 'answer_passage'} or el in extras:
+                ranges_button.pack(anchor='w', pady=3)
+            if el in {'question_text', 'answer_passage'} or el in extras:
+                align_var.set(style.get('align', 'left'))
+                align_select.pack(anchor='w')
+            if el in {'question_text', 'answer_passage'}:
+                spacing_var.set(style.get('line_spacing', 0))
+                spacing_row.pack(anchor='w')
+            if el in extras:
+                colors.pack(anchor='w', pady=2)
         if not from_list:
             elements_list.selection_clear(0, 'end')
             if el:
@@ -352,7 +412,13 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         if mobile_layout or 'mobile' in stored:
             result['mobile'] = {el: fit_pixels(to_pixels(rect, MOBILE), MOBILE)
                                 for el, rect in mobile_layout.items()}
-        if stored.get('version') == 3 or extras:
+        new_style = (TEXT - {'font_size'}) | {'runs', 'align', 'line_spacing'}
+        styled = any(new_style & values.keys() for frame in ('desktop', 'mobile')
+                     for values in result.get(frame, {}).values())
+        styled = styled or any({'underline', 'font_family', 'runs'} & item.keys() for item in extras.values())
+        if stored.get('version') == 4 or styled:
+            result.update(version=4, extras=list(extras.values()))
+        elif stored.get('version') == 3 or extras:
             result.update(version=3, extras=list(extras.values()))
         return validate_layout(result)
 
@@ -415,6 +481,18 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         expand_to(values)
         redraw()
 
+    def reset_geometry():
+        key = active[0]
+        if not key or key in locked or key in extras or not (GEOMETRY & working.get(key, {}).keys()):
+            return
+        snapshot()
+        remaining = {field: value for field, value in working[key].items() if field not in GEOMETRY}
+        if remaining:
+            working[key] = remaining
+        else:
+            del working[key]
+        redraw()
+
     def capture():
         return deepcopy(desktop_layout), deepcopy(mobile_layout), deepcopy(extras), locked.copy(), hidden.copy(), image_path, pending_image
 
@@ -460,7 +538,7 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
             rect = fit_pixels(to_pixels({k:source[k] for k in GEOMETRY}|{
                 'x':source['x']+step_x,'y':source['y']+step_y},tuple(dims)),tuple(dims))
             extra['desktop'] = rect if working is desktop_layout else deepcopy(copy['desktop'])
-            extra.update({k: copy[k] for k in ('text','font_size','bold','italic','color','bg','align')})
+            extra.update({k: copy[k] for k in TEXT | {'text', 'color', 'bg', 'align', 'runs'} if k in copy})
         if working is mobile_layout:
             extra['mobile'] = rect
         extras[key] = extra
@@ -478,11 +556,118 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
 
     def change_text_style(**values):
         key = active[0]
-        if key in extras and key not in locked and any(extras[key][field] != value for field, value in values.items()):
-            snapshot()
+        if not text_element(key) or key in locked:
+            return
+        source = extras[key] if key in extras else current(key)
+        if all(source.get(field) == value for field, value in values.items()):
+            return
+        snapshot()
+        if key in extras:
+            if 'text' in values:
+                extras[key].pop('runs', None)
             extras[key].update(values)
             sync_elements()
-            redraw()
+        else:
+            working[key] = {**working.get(key, {}), **values}
+        redraw()
+
+    def spacing_change():
+        if active[0] not in {'question_text', 'answer_passage'}:
+            return
+        try:
+            value = spacing_var.get()
+        except tk.TclError:
+            return
+        if 0 <= value <= 80:
+            change_text_style(line_spacing=value)
+
+    def edit_text_ranges():
+        from question_rich_text import plain
+
+        key = active[0]
+        source = extras[key] if key in extras else current(key)
+        if key in extras:
+            value = source['text']
+        else:
+            field = 'passage' if key == 'answer_passage' else 'prompt'
+            value = plain(question.get(field) or '')
+        if not value:
+            return
+        dialog = tk.Toplevel(win)
+        dialog.title('Định dạng đoạn chữ')
+        dialog.transient(win)
+        dialog.grab_set()
+        body = ttk.Frame(dialog, padding=10)
+        body.pack(fill='both', expand=True)
+        ttk.Label(body, text='Bôi đen đoạn chữ, chọn định dạng rồi bấm Áp dụng.').pack(anchor='w')
+        content = tk.Text(body, width=59, height=8, wrap='word', exportselection=False)
+        content.pack(fill='both', expand=True, pady=8)
+        content.insert('1.0', value)
+        content.configure(state='disabled')
+        runs = deepcopy(source.get('runs', []))
+        base = {field: source.get(field, False) for field in ('bold', 'italic', 'underline')}
+        base.update(font_family=source.get('font_family', ''), font_size=int(source.get('font_size', 24)))
+
+        def show_range(index, run):
+            style = {**base, **run}
+            flags = ' '.join(flag for flag in ('bold', 'italic', 'underline') if style[flag])
+            tag = f'format_{index}'
+            content.tag_configure(tag, font=(style['font_family'] or 'Segoe UI', style['font_size'], flags or 'normal'))
+            prefix = value[:run['start']]
+            segment = value[run['start']:run['end']]
+            start = f"1.0+{win.tk.call('string', 'length', prefix)}c"
+            units = int(win.tk.call('string', 'length', segment))
+            content.tag_add(tag, start, f'{start}+{units}c')
+            content.tag_raise('sel')
+
+        for i, run in enumerate(runs):
+            show_range(i, run)
+        controls = ttk.Frame(body)
+        controls.pack(anchor='w')
+        font = tk.StringVar(value=base['font_family'])
+        ttk.Combobox(controls, textvariable=font, values=FONT_FAMILIES, state='readonly', width=18).pack(side='left')
+        size = tk.StringVar(value=str(base['font_size']))
+        ttk.Spinbox(controls, from_=8, to=96, textvariable=size, width=5).pack(side='left', padx=5)
+        flags = {name: tk.BooleanVar(value=base[name]) for name in ('bold', 'italic', 'underline')}
+        for name, label in zip(flags, ('Đậm', 'Nghiêng', 'Gạch chân')):
+            ttk.Checkbutton(controls, text=label, variable=flags[name]).pack(side='left')
+
+        def apply_range():
+            if not content.tag_ranges('sel'):
+                return
+            try:
+                points = int(size.get())
+            except ValueError:
+                return
+            if not 8 <= points <= 96 or len(runs) >= 256:
+                return
+            a = len(content.get('1.0', 'sel.first'))
+            b = len(content.get('1.0', 'sel.last'))
+            run = dict(start=a, end=b, font_size=points, font_family=font.get(),
+                       **{name: variable.get() for name, variable in flags.items()})
+            show_range(len(runs), run)
+            runs.append(run)
+
+        def close_ranges(save):
+            dialog.destroy()
+            win.grab_set()
+            if save:
+                change_text_style(runs=runs)
+
+        actions = ttk.Frame(body)
+        actions.pack(fill='x', pady=(8, 0))
+        ttk.Button(actions, text='Áp dụng', command=apply_range).pack(side='left')
+        ttk.Button(actions, text='Lưu', command=lambda: close_ranges(True)).pack(side='right')
+        ttk.Button(actions, text='Hủy', command=lambda: close_ranges(False)).pack(side='right')
+        ttk.Button(actions, text='Xóa tất cả định dạng đoạn', command=lambda: reset_runs()).pack(side='left', padx=8)
+
+        def reset_runs():
+            for i in range(len(runs)):
+                content.tag_delete(f'format_{i}')
+            runs.clear()
+
+        dialog.protocol('WM_DELETE_WINDOW', lambda: close_ranges(False))
+        content.focus_set()
 
     def choose_color(field):
         if active[0] in extras:
@@ -558,7 +743,10 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
                                 width=2 if selected else 1, tags=tag)
 
         def text(x, y, value, size=12, style='normal', **options):
-            canvas.create_text(x,y,text=value,font=('Segoe UI',max(6,round(size*scale)),style),
+            config = extra or v
+            flags = ' '.join(flag for flag in ('bold', 'italic', 'underline') if config.get(flag))
+            family = config.get('font_family') or 'Segoe UI'
+            canvas.create_text(x,y,text=value,font=(family,max(6,round(size*scale)),flags or style),
                                tags=tag,**options)
 
         if not live:
@@ -589,13 +777,14 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
                     text((a+c)/2,(b+d)/2,'ẢNH CÂU HỎI\n(vùng bố cục)',justify='center',fill='#475569')
             elif el == 'audio_player':
                 text((a+c)/2,(b+d)/2,'▶  ~  ~  ~  ~  ~  ~  ~     WAVEFORM',fill='#334155')
-            elif el in ('answer_area','input_area','dropdown_area','word_bank'):
+            elif el in ('answer_area','input_area','dropdown_area','word_bank','answer_preview','answer_passage','answer_panel','answer_menu'):
                 labels = {'answer_area':'VÙNG ĐÁP ÁN','input_area':'Ô NHẬP',
-                          'dropdown_area':'MENU CHỌN','word_bank':'NGÂN HÀNG TỪ'}
+                          'dropdown_area':'MENU CHỌN','word_bank':'NGÂN HÀNG TỪ',
+                          'answer_preview':'CÂU ĐÃ XẾP','answer_passage':'ĐOẠN ĐỌC','answer_panel':'CÂU HỎI CON','answer_menu':'DANH SÁCH LỰA CHỌN'}
                 text(a+8,b+8,labels[el],10,anchor='nw',fill='#64748b')
             else:
                 i = int(el.split('_')[1])
-                label = '%s\n%s' % (chr(65+i), options[i]) if is_image_choice else '%s · Vị trí %d' % (chr(65+i),i+1)
+                label = item_labels[el] or f'Vị trí {i + 1}'
                 text((a+c)/2 if is_image_choice else a+8,(b+d)/2,label,
                      min(40,int(v.get('font_size',18))),anchor='center' if is_image_choice else 'w',
                      width=max(40,c-a-16),fill='#1e293b')
@@ -861,20 +1050,12 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         status.set('Có thay đổi chưa lưu' if dirty() else 'Đã nạp bố cục')
 
     def font_change(_event=None):
-        if active[0] != 'question_text' and active[0] not in option_defaults and active[0] not in extras:
-            return
         try:
             value = int(font_var.get())
         except (ValueError, tk.TclError):
             return
-        if active[0] in extras:
-            if 8 <= value <= 96:
-                change_text_style(font_size=value)
-            return
-        if 8 <= value <= 96 and value != current(active[0]).get('font_size'):
-            snapshot()
-            working[active[0]] = {**current(active[0]), 'font_size': value}
-            redraw()
+        if 8 <= value <= 96:
+            change_text_style(font_size=value)
 
     def restore(state):
         nonlocal preview_image, image_path, pending_image

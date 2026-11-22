@@ -1,4 +1,3 @@
-from question_rich_text import draw as draw_rich, wrap as wrap_rich
 from exercise_buttons import draw_complete
 from exercise_gfx import draw_question_progress, present_frame
 from exercise_gfx import open_exercise_window
@@ -129,8 +128,11 @@ def run(question):
         return result
     from exercise_layout import Page, wrap as flow_wrap, block_top, image_message
     page=Page(screen)
-    prompt=wrap_rich(question.get('prompt',''),font,850)
-    prompt_bottom=90+len(prompt)*28
+    from layout_typography import TextBlock, resolve_font
+    from question_layout_runtime import element as layout_element, rectangle
+    prompt = TextBlock(question.get('prompt', ''), layout_element(question, 'question_text'),
+                       font, 22, (54, 90, 850), 28)
+    prompt_bottom = prompt.bottom
     kind=question['type']
     note=image_message(question,picture) if kind=='image_multi_select' else ''
     passage=flow_wrap(str(question.get('passage','')).strip(),small,835) if kind=='text_multi_select' and str(question.get('passage','')).strip() else []
@@ -140,21 +142,30 @@ def run(question):
     row_heights=[max(55,max((len(v)*(font.get_height()+6)+14 for v in card_lines[i:i+2]),default=55)) for i in range(0,len(opts),2)]
     answer_height=sum(h+9 for h in row_heights)
     # Optional per-option geometry; legacy questions retain their existing layout.
-    from question_layout_runtime import element as layout_element
+    picture_layout = layout_element(question, 'question_image')
+    picture_rect = None
+    if picture is not None and picture_layout:
+        from layout_images import pygame_image
+        picture, picture_rect, _ = pygame_image(question['_pygame_image'], picture_layout,
+                                                             (0, 0, *picture.get_size()))
     option_layouts = [layout_element(question, "option_%d" % i) for i in range(len(opts))]
-    option_fonts = [_cached_font(None, max(8, min(96, v["font_size"])), False)
-                    if v and "font_size" in v else font for v in option_layouts]
+    answer_area = layout_element(question, 'answer_area') or {}
+    option_fonts = [resolve_font({**answer_area, **(geometry or {})}, font, 22) for geometry in option_layouts]
     option_lines = [flow_wrap(str(opt), option_fonts[i],
                     max(30, (v["width"] if v and "width" in v else 433) - 54))
                     for i, (opt, v) in enumerate(zip(opts, option_layouts))]
     group_top=block_top(prompt_bottom,media_height+answer_height)
-    answer_top=group_top+media_height
+    answer_x = answer_area.get('x', 54)
+    answer_top = answer_area.get('y', group_top+media_height)
+    column_width = max(45, (answer_area.get('width', 886) - 20) // 2)
+    passage_box = TextBlock(question.get('passage', ''), layout_element(question, 'answer_passage'),
+                            small, 17, (56, group_top, 835), 23)
     submit_y=max(574,answer_top+answer_height+24)
     # Keep the fixed submit button below independently positioned options.
     # Its position is not editable; only the scrollable page grows if needed.
     custom_bottom = max((v.get('y', 0) + v.get('height', row_heights[i//2])
                          for i, v in enumerate(option_layouts) if v), default=0)
-    play_rect=pygame.Rect(54,group_top,240,58)
+    play_rect = pygame.Rect(rectangle(layout_element(question, 'audio_player'), (54, group_top, 240, 58)))
     # Build 03C.8: content may extend beyond the viewport after layout editing.
     # Page already converts pointer events to content coordinates.
     from layout_scroll_extent import content_bottom as layout_content_bottom
@@ -165,24 +176,23 @@ def run(question):
             screen=page.begin(content_end)
             screen.fill((242,248,252))
             screen.blit(title.render('Tự Học - Bài tập',True,(34,51,78)),(52,33))
-            for i,line in enumerate(prompt):draw_rich(screen,font,line,(34,51,78),54,90+i*28)
+            prompt.draw(screen, (34, 51, 78))
             y=answer_top
             if picture is not None and kind != 'image_multi_select':
-                screen.blit(picture, picture.get_rect(midtop=(480, group_top + base_media_height)))
+                screen.blit(picture, picture_rect or picture.get_rect(midtop=(480, group_top + base_media_height)))
             if question['type']=='image_multi_select':
-                if picture:screen.blit(picture,picture.get_rect(midtop=(480,group_top)))
+                if picture:screen.blit(picture,picture_rect or picture.get_rect(midtop=(480,group_top)))
                 elif note:screen.blit(small.render(note,True,(175,65,65)),(54,group_top))
             elif question['type']=='audio_multi_select':
                 play=play_rect
                 pygame.draw.rect(screen,(204,232,255),play,border_radius=12)
-                screen.blit(font.render('▶  Nghe lại' if audio_ready else 'Không có âm thanh',True,(29,78,123)),(69,play_rect.y+17))
+                screen.blit(font.render('▶  Nghe lại' if audio_ready else 'Không có âm thanh',True,(29,78,123)),(play_rect.x+15,play_rect.y+17))
             else:
-                for i,line in enumerate(passage):
-                    screen.blit(small.render(line,True,(70,88,106)),(56,group_top+i*23))
+                passage_box.draw(screen, (70, 88, 106))
             cells=[]
             for i,opt in enumerate(opts):
                 col=i%2;row=i//2
-                rect=pygame.Rect(54+col*453,y+sum(h+9 for h in row_heights[:row]),433,row_heights[row])
+                rect=pygame.Rect(answer_x+col*(column_width+20),y+sum(h+9 for h in row_heights[:row]),column_width,row_heights[row])
                 custom = option_layouts[i]
                 if custom:
                     rect = pygame.Rect(custom.get('x', rect.x), custom.get('y', rect.y),

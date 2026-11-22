@@ -240,6 +240,9 @@ class ExamBank:
         groups=[g for g in self.reading_groups() if g.get('id')!=gid]
         groups.append(group);_atomic(self.readings_path,groups)
         return gid
+        if 'layout' in group:
+            from question_layout_store import validate_layout
+            group['layout'] = validate_layout(group['layout'])
 
     def delete_reading(self,gid):
         groups=self.reading_groups();remaining=[g for g in groups if g.get('id')!=gid]
@@ -334,6 +337,8 @@ class ExamBank:
             raise ValueError('Ngân hàng chưa đủ câu theo tỷ lệ M1–M5. Câu hỏi bài đọc phải lấy trọn nhóm. '
                              +'Cần: '+str(counts)+'; câu đơn có: '+str(available)+'.')
         remaining=counts[:]
+                if 'layout' in group:
+                    q['reading_layout'] = group['layout']
         selected=[]
         for i in chosen:
             children,vector=groups[i];selected.extend(children)

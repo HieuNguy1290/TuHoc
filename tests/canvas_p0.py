@@ -417,15 +417,21 @@ def run(output, font_path, only, layout_format):
                     layout = legacy_layout(case)
                     if layout_format == "migrated":
                         layout = layout_v2(layout)
-                    elif layout_format in {"authored", "v3"}:
+                    elif layout_format in {"authored", "v3", "v4"}:
                         layout = authored_layout(case)
-                        if layout_format == "v3":
+                        if layout_format in {"v3", "v4"}:
                             layout = layout_v3(layout)
                             layout["extras"] = [dict(
                                 id="matrix_text", kind="text", text="Tiếng Việt",
                                 desktop=dict(x=12,y=660,width=110,height=42),
                                 font_size=16,bold=True,italic=False,color="#223344",bg="#eeeeee",
                                 align="center",z=0)]
+                        if layout_format == "v4":
+                            layout["version"] = 4
+                            prompt = layout["desktop"].setdefault("question_text", {})
+                            prompt.update(font_family="DejaVu Sans", italic=True, underline=True,
+                                          runs=[dict(start=0, end=3, bold=True)])
+                            layout["extras"][0]["underline"] = True
                     q = set_layout(q, layout)
                 for variant, answer in (("right", case.right), ("wrong", case.wrong)):
                     key = f"{mode}/{variant}"
@@ -434,7 +440,7 @@ def run(output, font_path, only, layout_format):
                         detail[key] = play(pygame_exercises._run, q, answer, png, mode == "scroll", font_path)
                         runtime_answer = detail[key]["answer"]
                         if mode == "scroll":
-                            if layout_format in {"authored", "v3"} or case.kind != "listening_image_choice":
+                            if layout_format in {"authored", "v3", "v4"} or case.kind != "listening_image_choice":
                                 assert detail[key]["scrolled_input_clicks"], "no answer hitbox received a scrolled click"
                             centers = detail[key]["submit_centers_by_scroll"].values()
                             assert len(set(centers)) == 1, "completion control moved while scrolling"
@@ -470,7 +476,7 @@ def main():
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--font", default="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
     parser.add_argument("--type", action="append", default=[])
-    parser.add_argument("--layout", choices=("legacy", "migrated", "authored", "v3"), default="legacy")
+    parser.add_argument("--layout", choices=("legacy", "migrated", "authored", "v3", "v4"), default="legacy")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     with TemporaryDirectory(prefix="tuhoc-p0-profile-") as directory:

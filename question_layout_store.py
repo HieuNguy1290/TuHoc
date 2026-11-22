@@ -17,11 +17,38 @@ EDITABLE = frozenset((
     'answer_text', 'answer_image', 'input_area', 'dropdown_area', 'word_bank',
 ))
 GEOMETRY = frozenset(('x', 'y', 'width', 'height'))
-TEXT = frozenset(('font_size',))
+TEXT_FLAGS = frozenset(('bold', 'italic', 'underline'))
+TEXT = frozenset(('font_size', 'font_family')) | TEXT_FLAGS
+FONT_FAMILIES = ('', 'DejaVu Sans', 'DejaVu Serif', 'Liberation Sans', 'Liberation Serif',
+                 'Arial', 'Segoe UI', 'Noto Sans', 'Noto Serif')
+ELEMENT_PREFIXES = ('answer_', 'option_', 'slot_', 'word_')
+
+
+def _valid_text_setting(field, value):
+    if field == 'font_family':
+        return isinstance(value, str) and value in FONT_FAMILIES
+    return type(value) is bool
 IMAGE_FITS = ('contain', 'cover', 'stretch')
 _COLOR = re.compile(r'#[0-9a-fA-F]{6}')
 _EXTRA_ID = re.compile(r'[a-zA-Z][a-zA-Z0-9_-]{0,63}')
 
+
+
+def _validate_runs(value):
+    if not isinstance(value, list) or len(value) > 256:
+        raise ValueError('Mỗi khung chữ có tối đa 256 vùng định dạng.')
+    for run in value:
+        if not isinstance(run, dict) or set(run) - {'start', 'end'} - TEXT:
+            raise ValueError('Vùng định dạng chữ không hợp lệ.')
+        start, end = run.get('start'), run.get('end')
+        if type(start) is not int or type(end) is not int or not 0 <= start < end <= 10000:
+            raise ValueError('Vị trí vùng định dạng chữ không hợp lệ.')
+        for key in run.keys() & TEXT:
+            valid = (type(run[key]) is int and 8 <= run[key] <= 96 if key == 'font_size'
+                     else _valid_text_setting(key, run[key]))
+            if not valid:
+                raise ValueError('Kiểu chữ hoặc phông chữ không hợp lệ.')
+    return deepcopy(value)
 
 def _validate_elements(layout, screen=None):
     """Return a safe detached layout; reject malformed or locked elements."""
@@ -34,15 +61,33 @@ def _validate_elements(layout, screen=None):
         if element in LOCKED:
             raise ValueError('Không thể chỉnh nút Hoàn thành hoặc số câu.')
         if element not in EDITABLE and not (isinstance(element, str) and
-                                            (element.startswith('answer_') or element.startswith('option_'))):
+                                            element.startswith(ELEMENT_PREFIXES)):
             raise ValueError('Thành phần bố cục không hợp lệ: %s' % element)
         if not isinstance(values, dict):
             raise ValueError('Thông số bố cục phải là một đối tượng.')
         cleaned = {}
         for field, value in values.items():
+            if field == 'align':
+                if value not in ('left', 'center', 'right'):
+                    raise ValueError('Cách căn chữ không hợp lệ.')
+                cleaned[field] = value
+                continue
+            if field == 'line_spacing':
+                if type(value) is not int or not 0 <= value <= 80:
+                    raise ValueError('Khoảng cách dòng phải nằm trong khoảng 0–80 px.')
+                cleaned[field] = value
+                continue
+            if field == 'runs':
+                cleaned[field] = _validate_runs(value)
+                continue
             if field == 'image_fit' and element == 'question_image':
                 if value not in IMAGE_FITS:
                     raise ValueError('Cách đặt ảnh không hợp lệ.')
+                cleaned[field] = value
+                continue
+            if field in TEXT_FLAGS or field == 'font_family':
+                if not _valid_text_setting(field, value):
+                    raise ValueError('Kiểu chữ hoặc phông chữ không hợp lệ.')
                 cleaned[field] = value
                 continue
             if field not in GEOMETRY | TEXT:
@@ -68,17 +113,18 @@ def _validate_elements(layout, screen=None):
 def _validate_extras(extras):
     fields = {'id', 'kind', 'text', 'desktop', 'mobile', 'font_size',
               'bold', 'italic', 'color', 'align', 'bg', 'z'}
+    optional = {'mobile', 'font_family', 'underline', 'runs'}
     if not isinstance(extras, list) or len(extras) > 20:
         raise ValueError('Mỗi câu có tối đa 20 hộp văn bản.')
     result = []
     ids = set()
     for extra in extras:
-        if not isinstance(extra, dict) or set(extra) - fields or fields - {'mobile'} - set(extra):
+        if not isinstance(extra, dict) or set(extra) - fields - optional or fields - optional - set(extra):
             raise ValueError('Thuộc tính hộp văn bản không hợp lệ.')
         key = extra['id']
         if (not isinstance(key, str) or not _EXTRA_ID.fullmatch(key) or key in ids
                 or key in LOCKED | EDITABLE | {'version', 'desktop', 'mobile', 'extras'}
-                or key.startswith(('answer_', 'option_'))):
+                or key.startswith(ELEMENT_PREFIXES)):
             raise ValueError('Mã hộp văn bản không hợp lệ hoặc bị trùng.')
         ids.add(key)
         if (extra['kind'] != 'text' or not isinstance(extra['text'], str)
@@ -87,6 +133,11 @@ def _validate_extras(extras):
                 or type(extra['bold']) is not bool or type(extra['italic']) is not bool
                 or extra['align'] not in ('left', 'center', 'right')):
             raise ValueError('Nội dung hoặc kiểu chữ của hộp văn bản không hợp lệ.')
+        if 'runs' in extra:
+            _validate_runs(extra['runs'])
+        for field in ('font_family', 'underline'):
+            if field in extra and not _valid_text_setting(field, extra[field]):
+                raise ValueError('Kiểu chữ hoặc phông chữ không hợp lệ.')
         for name in ('color', 'bg'):
             value = extra[name]
             if not isinstance(value, str) or not (_COLOR.fullmatch(value) or name == 'bg' and value == ''):
@@ -110,9 +161,9 @@ def validate_layout(layout):
         return _validate_elements(layout)
     version = layout['version']
     allowed = {'version', *SCREENS}
-    if version == 3:
+    if version in (3, 4):
         allowed.add('extras')
-    if type(version) is not int or version not in (2, 3) or set(layout) - allowed:
+    if type(version) is not int or version not in (2, 3, 4) or set(layout) - allowed:
         raise ValueError('Phiên bản bố cục không hợp lệ.')
     if 'desktop' not in layout:
         raise ValueError('Bố cục cần khung desktop.')
@@ -122,25 +173,26 @@ def validate_layout(layout):
             if not isinstance(layout[name], dict):
                 raise ValueError('Khung bố cục phải là một đối tượng JSON.')
             checked[name] = _validate_elements(layout[name], screen)
-    if version == 3:
+    if version in (3, 4):
         checked['extras'] = _validate_extras(layout.get('extras', []))
     return checked
 
 
-def pixel_elements(layout, screen=DESKTOP):
+def pixel_elements(layout, screen=DESKTOP, *, mobile=None):
     """Resolve overrides for the requested screen, using desktop for mobile fallbacks."""
     layout = validate_layout(layout)
     if 'version' not in layout:
         return {key: to_pixels(values, screen) for key, values in layout.items()}
     desktop = layout['desktop']
-    if screen == DESKTOP:
+    if screen == DESKTOP and not mobile:
         return desktop
     elements = {key: to_pixels(to_relative(values, DESKTOP), screen)
                 for key, values in desktop.items()}
-    if screen[0] < screen[1]:
-        mobile = SCREENS['mobile']
+    if mobile is None:
+        mobile = screen[0] < screen[1]
+    if mobile:
         for key, values in layout.get('mobile', {}).items():
-            elements[key] = {**elements.get(key, {}), **to_pixels(to_relative(values, mobile), screen)}
+            elements[key] = {**elements.get(key, {}), **to_pixels(to_relative(values, SCREENS['mobile']), screen)}
     return {key: fit_pixels(values, screen) for key, values in elements.items()}
 
 
@@ -155,12 +207,12 @@ def layout_v2(layout):
 
 def layout_v3(layout):
     checked = layout_v2(layout)
-    return validate_layout({**checked, 'version': 3, 'extras': checked.get('extras', [])})
+    return validate_layout({**checked, 'version': max(3, checked['version']), 'extras': checked.get('extras', [])})
 
 
 def pixel_extras(layout, screen=DESKTOP, *, mobile=None):
     """Project decorative text without mixing it into system-element lookup."""
-    if not isinstance(layout, dict) or layout.get('version') != 3:
+    if not isinstance(layout, dict) or layout.get('version') not in (3, 4):
         return []
     result = []
     if mobile is None:
