@@ -333,13 +333,14 @@ def run(question):
         from question_layout_runtime import element as layout_element
         letter_area_geometry = layout_element(question, 'answer_area') or {}
         letter_cell_geometry = layout_element(question, 'option_0') or {}
-        letter_font = resolve_font(letter_cell_geometry, small, 17)
+        letter_text_font = resolve_font(letter_area_geometry, font, 21)
+        letter_font = resolve_font({**letter_area_geometry, **letter_cell_geometry}, small, 17)
         letter_left = min(870, letter_area_geometry.get('x', 70))
         letter_width = min(945-letter_left, max(32, letter_area_geometry.get('width', 820)))
         letter_cell = (min(letter_width, max(20, letter_cell_geometry.get('width', 42))),
                        min(140, max(20, letter_cell_geometry.get('height', 44))))
         letter_positions,letter_height=letter_items(
-            letters, hidden, font, left=letter_left, width=letter_width, cell=letter_cell)
+            letters, hidden, letter_text_font, left=letter_left, width=letter_width, cell=letter_cell)
         letter_group_top=block_top(letter_prompt_bottom,media_height+letter_height)
         letter_top=letter_group_top+media_height
         letter_hint_y=letter_top+letter_height+20
@@ -457,7 +458,7 @@ def run(question):
                                label_font=resolve_font(geometry, letter_font, 17))
                         hits.append((rect,('letter',i)))
                     else:
-                        t=font.render(letters[i],True,navy)
+                        t=letter_text_font.render(letters[i],True,navy)
                         screen.blit(t,t.get_rect(midleft=(x,y+letter_cell[1]//2)))
             else:
                 # The gap passage is a dedicated scroll viewport.  Clip both

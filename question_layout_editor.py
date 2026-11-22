@@ -64,6 +64,8 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     # Use the OS maximized work area (excludes Windows taskbar), not -fullscreen.
     # Defer until the window is mapped so Windows can calculate its work area.
     def maximize_work_area():
+        nonlocal maximize_job
+        maximize_job = None
         try:
             win.state('zoomed')
         except tk.TclError:
@@ -71,7 +73,13 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
                 win.attributes('-zoomed', True)
             except tk.TclError:
                 pass
-    win.after_idle(maximize_work_area)
+    maximize_job = win.after_idle(maximize_work_area)
+
+    def cancel_maximize(event):
+        if event.widget is win and maximize_job is not None:
+            win.after_cancel(maximize_job)
+
+    win.bind('<Destroy>', cancel_maximize, add='+')
     win.minsize(800, 600)
     win.transient(parent)
     win.grab_set()
@@ -168,6 +176,7 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     fields = ttk.Frame(sidebar)
     fields.pack(anchor='w', pady=4)
     pixel_vars = {}
+    pixel_entries = {}
     for row, (field, label) in enumerate(zip(('x', 'y', 'width', 'height'), ('X', 'Y', 'W', 'H'))):
         ttk.Label(fields, text=label).grid(row=row, column=0, sticky='w', padx=(0, 8))
         variable = tk.StringVar()
@@ -175,6 +184,7 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         entry.grid(row=row, column=1, pady=2)
         entry.bind('<Return>', lambda _event: apply_pixels())
         pixel_vars[field] = variable
+        pixel_entries[field] = entry
     ttk.Button(fields, text='Áp dụng (px)', command=lambda: apply_pixels()).grid(row=4, columnspan=2, sticky='ew')
     ttk.Button(fields, text='Tự động bố trí', command=lambda: reset_geometry()).grid(row=5, columnspan=2, sticky='ew')
     ttk.Label(sidebar, text='Khung 960 × 640 px. Nội dung có thể kéo xuống đến Y = 2560 px.',
@@ -341,8 +351,15 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         base = option_defaults.get(el) or DEFAULTS[el]
         return {**base, **desktop_layout.get(el, {}), **working.get(el, {})}
 
+    def properties(el):
+        if el in extras:
+            return GEOMETRY | TEXT | {'align', 'runs'}
+        if el:
+            return controls.properties_for(el, question.get('type'))
+        return set()
+
     def text_element(el):
-        return bool(el and el not in {'question_image', 'audio_player'})
+        return 'font_size' in properties(el)
 
     def select(el, from_list=False, preserve=False):
         if not preserve:
@@ -367,12 +384,12 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
             underline_var.set(style.get('underline', False))
             family_var.set(style.get('font_family', ''))
             text_tools.pack(anchor='w')
-            if el in {'question_text', 'answer_passage'} or el in extras:
+            if 'runs' in properties(el):
                 ranges_button.pack(anchor='w', pady=3)
-            if el in {'question_text', 'answer_passage'} or el in extras:
+            if 'align' in properties(el):
                 align_var.set(style.get('align', 'left'))
                 align_select.pack(anchor='w')
-            if el in {'question_text', 'answer_passage'}:
+            if 'line_spacing' in properties(el):
                 spacing_var.set(style.get('line_spacing', 0))
                 spacing_row.pack(anchor='w')
             if el in extras:
@@ -412,11 +429,15 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         if mobile_layout or 'mobile' in stored:
             result['mobile'] = {el: fit_pixels(to_pixels(rect, MOBILE), MOBILE)
                                 for el, rect in mobile_layout.items()}
-        new_style = (TEXT - {'font_size'}) | {'runs', 'align', 'line_spacing'}
-        styled = any(new_style & values.keys() for frame in ('desktop', 'mobile')
-                     for values in result.get(frame, {}).values())
-        styled = styled or any({'underline', 'font_family', 'runs'} & item.keys() for item in extras.values())
-        if stored.get('version') == 4 or styled:
+        v4_fields = (TEXT - {'font_size'}) | {'runs', 'align', 'line_spacing'}
+        v4_elements = {'answer_passage', 'answer_preview', 'answer_panel', 'answer_menu'}
+        uses_v4 = any(
+            (v4_fields & values.keys()) or el in v4_elements or el.startswith(('slot_', 'word_'))
+            or (el == 'answer_area' and 'height' in values)
+            for frame in ('desktop', 'mobile') for el, values in result.get(frame, {}).items()
+        )
+        uses_v4 = uses_v4 or any({'underline', 'font_family', 'runs'} & item.keys() for item in extras.values())
+        if stored.get('version') == 4 or uses_v4:
             result.update(version=4, extras=list(extras.values()))
         elif stored.get('version') == 3 or extras:
             result.update(version=3, extras=list(extras.values()))
@@ -453,14 +474,12 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         extended_h[0] = max(extended_h[0], min(max_page_h, needed))
 
     def show_pixels():
-        if active[0]:
-            values = current(active[0])
-            for field, variable in pixel_vars.items():
-                scale = page_w if field in ('x', 'width') else page_h
-                variable.set(str(round(values[field] * scale)))
-        else:
-            for variable in pixel_vars.values():
-                variable.set('')
+        allowed = properties(active[0])
+        values = current(active[0]) if active[0] else {}
+        for field, variable in pixel_vars.items():
+            pixel_entries[field].state(['!disabled'] if field in allowed else ['disabled'])
+            scale = page_w if field in ('x', 'width') else page_h
+            variable.set(str(round(values[field] * scale)) if field in allowed else '')
 
     def apply_pixels():
         if not active[0] or active[0] in locked:
@@ -468,6 +487,8 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         try:
             values = current(active[0])
             for field, variable in pixel_vars.items():
+                if field not in properties(active[0]):
+                    continue
                 scale = page_w if field in ('x', 'width') else page_h
                 values[field] = int(variable.get()) / scale
             if values['width'] <= 0 or values['height'] <= 0:
@@ -514,7 +535,8 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
             rect = {k: values[k] for k in GEOMETRY}
             extras[key][frame] = fit_pixels(to_pixels(rect, screen), screen)
         else:
-            working[key] = values
+            allowed = properties(key)
+            working[key] = {name: value for name, value in values.items() if name in allowed}
 
     def add_text(copy=None):
         if len(extras) >= 20:

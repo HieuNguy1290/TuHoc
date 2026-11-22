@@ -488,6 +488,7 @@ class ExamUI:
         pw=max(1,pg.get('width',645))
         font=resolve_font(pg, self.bold, 24)
         area=layout.get('answer_area',{})
+        area_font = resolve_font(area, self.small, 18)
         input_geometry=layout.get('input_area',area)
         count=len(q.get('gap_answers',[]))
         pairs=len(q.get('pairs',[]))
@@ -528,11 +529,11 @@ class ExamUI:
             row_height=max(1,area.get('height',50))
             for i in range(count):
                 geometry = layout.get(f'slot_{i}', layout.get(f'option_{i}', {}))
-                rect=_position(geometry, (x,y+i*(row_height+12),area.get('width',615),row_height))
+                rect=_position(geometry, (area.get('x',x),y+i*(row_height+12),area.get('width',615),row_height))
                 pygame.draw.rect(s,WHITE,rect,border_radius=8)
                 pygame.draw.rect(s,BLUE if i==self.gap_focus else BORDER,rect,3 if i==self.gap_focus else 1,border_radius=8)
                 label=f'{i+1}.  '+values[i]+(' |' if i==self.gap_focus else '')
-                self._text(s,label[:80],rect.x+12,rect.y+11,resolve_font(geometry, self.small, 17),INK)
+                self._text(s,label[:80],rect.x+12,rect.y+11,resolve_font(geometry, area_font, 18),INK)
                 self.buttons.append((rect,lambda ix=i:setattr(self,'gap_focus',ix)))
             draw_extras(s,q,(self.read_area.width,640))
             self._finish_interactive(s,original_buttons,estimated);return
@@ -555,13 +556,15 @@ class ExamUI:
                                 self.font, 22, (x, y, 635), self.font.get_linesize()+5)
             preview.draw(s, BLUE)
             y = max(y+73, preview.bottom+12)
+            column_width = max(1, (area.get('width', 640)-40)//4)
+            row_height = max(1, (area['height']-12)//max(1, (len(sequence)+3)//4)) if 'height' in area else 50
             for i,word in enumerate(sequence):
                 if word in picked:continue
                 col=i%4;row=i//4
                 left=area.get('x',x)
                 top=area.get('y',y)
-                rect=_position(layout.get(f'option_{i}',{}),(left+col*160,top+row*60,150,50))
-                self._button(s,str(word),rect,lambda w=word:self._pick_order(q,w),small=True,geometry=layout.get(f'option_{i}'))
+                rect=_position(layout.get(f'option_{i}',{}),(left+col*(column_width+10),top+row*(row_height+10),column_width,row_height))
+                self._button(s,str(word),rect,lambda w=word:self._pick_order(q,w),small=True,geometry={**area, **layout.get(f'option_{i}', {})})
             self._button(s,'Làm lại',(x,y+155,160,43),lambda:self._reset_order(qid),small=True)
             draw_extras(s,q,(self.read_area.width,640))
             self._finish_interactive(s,original_buttons,estimated);return
@@ -573,15 +576,19 @@ class ExamUI:
             if not isinstance(matched,dict):matched={}
             self._text(s,'Chọn một mục bên trái, sau đó chọn mục tương ứng bên phải.',x,y,self.small,MUTED)
             y=area.get('y',y+40)
+            x=area.get('x',x)
+            width=max(1, (area.get('width', 612)-42)//2)
+            row_height=max(1,(area['height']-6*max(0,len(left)-1))//max(1,len(left))) if 'height' in area else 40
+            step=row_height+6
             for i,word in enumerate(left):
                 active=self.match_pending==(qid,word)
                 label=('✓ ' if word in matched else '→ ' if active else '')+word
-                self._button(s,label,_position(layout.get(f'option_{i}',{}),(x,y+i*46,285,40)),lambda w=word:self._select_match_left(qid,w),small=True,geometry=layout.get(f'option_{i}'))
+                self._button(s,label,_position(layout.get(f'option_{i}',{}),(x,y+i*step,width,row_height)),lambda w=word:self._select_match_left(qid,w),small=True,geometry={**area, **layout.get(f'option_{i}', {})})
             for i,word in enumerate(right):
                 linked=next((a for a,b in matched.items() if b==word),None)
                 label=('✓ ' if linked else '')+word
-                self._button(s,label,_position(layout.get(f'option_{len(left)+i}',{}),(x+327,y+i*46,285,40)),lambda w=word:self._select_match_right(qid,w),small=True,geometry=layout.get(f'option_{len(left)+i}'))
-            self._button(s,'Xóa các cặp',(x,y+len(pairs)*46+9,190,37),lambda:self._clear_match(qid),small=True)
+                self._button(s,label,_position(layout.get(f'option_{len(left)+i}',{}),(x+width+42,y+i*step,width,row_height)),lambda w=word:self._select_match_right(qid,w),small=True,geometry={**area, **layout.get(f'option_{len(left)+i}', {})})
+            self._button(s,'Xóa các cặp',(x,y+len(pairs)*step+9,190,37),lambda:self._clear_match(qid),small=True)
         draw_extras(s,q,(self.read_area.width,640))
         self._finish_interactive(s,original_buttons,estimated)
 
@@ -948,20 +955,21 @@ class ExamUI:
             height=max(height,y+block_height)
         options=q.get('options',[])
         cursor=answer_geo.get('y',height)
+        default_card_height = max(1,(answer_geo['height']-9*max(0,len(options)-1))//max(1,len(options))) if 'height' in answer_geo else None
         for i,opt in enumerate(options):
             geo=layout.get(f'option_{i}',{})
             width=geo.get('width',answer_geo.get('width',w))
             x=answer_geo.get('x',8)
             if q.get('type')=='image_multi_choice':
-                rect=_position(geo,(x,cursor,width,141))
+                rect=_position(geo,(x,cursor,width,default_card_height or 141))
                 items.append(('image_option',(i,str(opt),rect,bool(geo or answer_geo)),cursor,resolve_font(geo, self.small, 17)))
             else:
                 label=f'{chr(65+i)}. {opt}'
-                face=resolve_font(geo, self.font, 22)
+                face=resolve_font({**answer_geo, **geo}, self.font, 22)
                 step=face.get_linesize()+6
                 lines=wrap(face,label,max(1,width-38))
                 card_h=max(50,len(lines)*step+22)
-                rect=_position(geo,(x,cursor,width,card_h))
+                rect=_position(geo,(x,cursor,width,default_card_height or card_h))
                 items.append(('option',(i,str(opt),lines,rect,step,bool(geo or answer_geo)),cursor,face))
             cursor=max(cursor,rect.bottom+(11 if q.get('type')=='image_multi_choice' else 9))
             height=max(height,cursor)

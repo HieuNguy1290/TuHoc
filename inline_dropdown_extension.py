@@ -167,6 +167,8 @@ def run(question):
     answer_layout = layout_element(question, 'dropdown_area') or answer_style
     sent_font = resolve_font(answer_style, sent_font, 28)
     left, right, line_h = 65, 875, 52
+    if (question.get('layout') or {}).get('version') == 4 and answer_layout:
+        line_h = max(15, answer_layout.get('height', line_h))
     if answer_layout:
         left = max(25, min(890, int(answer_layout.get('x', left))))
         width = max(110, int(answer_layout.get('width', right - 65)))
@@ -229,7 +231,7 @@ def run(question):
                     surface.blit(sent_font.render(value, True, navy), (ix, ry))
                 else:
                     geometry = slot_geometry[value] if value < len(slot_geometry) else None
-                    rect = pygame.Rect(rectangle(geometry, (ix, ry - 4, w, 42)))
+                    rect = pygame.Rect(rectangle(geometry, (ix, ry - 4, w, max(1,line_h-10))))
                     field_font = resolve_font(geometry, sent_font, 28)
                     fields[value] = rect
                     hovered = rect.collidepoint((pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1] + page.scroll)) and opened is None

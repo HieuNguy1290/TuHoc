@@ -432,6 +432,11 @@ def run(output, font_path, only, layout_format):
                             prompt.update(font_family="DejaVu Sans", italic=True, underline=True,
                                           runs=[dict(start=0, end=3, bold=True)])
                             layout["extras"][0]["underline"] = True
+                            if case.kind == 'multi_fill_blanks':
+                                layout['desktop']['slot_0'] = dict(x=245,y=409,width=114,height=48)
+                            if case.kind == 'picture_missing_letters':
+                                layout['desktop']['slot_1'] = dict(x=226,y=415,width=64,height=55)
+
                     q = set_layout(q, layout)
                 for variant, answer in (("right", case.right), ("wrong", case.wrong)):
                     key = f"{mode}/{variant}"

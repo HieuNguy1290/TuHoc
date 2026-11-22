@@ -2,8 +2,27 @@
 from functools import lru_cache
 
 
-@lru_cache(maxsize=128)
+_cleanup_registered = False
+
+
+def _clear_fonts():
+    global _cleanup_registered
+    _new_font.cache_clear()
+    _cleanup_registered = False
+
+
 def _font(family, size, bold, italic, underline):
+    import pygame
+
+    global _cleanup_registered
+    if not _cleanup_registered:
+        pygame.register_quit(_clear_fonts)
+        _cleanup_registered = True
+    return _new_font(family, size, bold, italic, underline)
+
+
+@lru_cache(maxsize=128)
+def _new_font(family, size, bold, italic, underline):
     import pygame
 
     font = pygame.font.SysFont(

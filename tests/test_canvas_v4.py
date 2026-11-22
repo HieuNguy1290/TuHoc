@@ -9,7 +9,7 @@ from exam_bank import ALLOWED_TYPES
 from exam_pygame import READ_VIEWPORT, layout_preview
 from layout_registry import controls_for
 from layout_render import MOBILE
-from layout_typography import TextBlock
+from layout_typography import TextBlock, _font
 from question_layout_store import layout_v3, pixel_elements, pixel_extras, validate_layout
 
 
@@ -39,6 +39,15 @@ class LayoutV4Tests(unittest.TestCase):
         self.assertTrue(face.get_italic())
         self.assertTrue(face.get_underline())
         self.assertFalse(fallback.get_italic())
+
+    def test_cached_fonts_are_recreated_after_leaving_exam(self):
+        pygame.font.init()
+        first = _font('DejaVu Sans', 21, False, False, True)
+        pygame.quit()
+        pygame.font.init()
+        second = _font('DejaVu Sans', 21, False, False, True)
+        self.assertIsNot(first, second)
+        self.assertGreater(second.size('Tiếng Việt')[0], 0)
 
     def test_every_exam_type_can_preview_with_saved_style(self):
         pygame.font.init()

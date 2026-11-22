@@ -424,6 +424,7 @@ def _run(question):
     fonts = [make_font(size, bold) for size,bold in ((29,True),(23,False),(22,True),(19,False))]
     navy=(34,51,78); green=(30,146,110); gold=(255,204,89); bg=(240,247,251)
     kind=question.get('type','choice')
+    custom_flow = (question.get('layout') or {}).get('version') == 4
     options=question.get('options') or []
     if isinstance(options,str): options=[s.strip() for s in options.split('|') if s.strip()]
     options=list(options)
@@ -756,19 +757,25 @@ def _run(question):
                     area_w = max(80, int(area.get('width', 828)))
                     updated = []
                     cursor = area_y
+                    spacing = 7
+                    if custom_flow and len(choice_layout) > 1 and 'height' in area:
+                        spacing = max(7, (area['height'] - sum(h for _, h, _ in choice_layout)) // (len(choice_layout)-1))
                     for i, (old_y, old_h, _lines) in enumerate(choice_layout):
                         geom = legacy_choice_geometry.get(i) or {}
                         card_x = int(geom.get('x', area_x))
                         card_y = int(geom.get('y', cursor))
-                        card_w = max(80, int(geom.get('width', area_w)))
+                        card_w = max(1 if custom_flow else 80, int(geom.get('width', area_w)))
                         card_font_width = max(40, card_w - 36)
                         card_font = choice_fonts.get(i, fonts[2])
                         card_lines = wrapped_lines(f'{chr(65+i)}. {options[i]}', card_font, card_font_width)
                         text_h = len(card_lines) * (card_font.get_height()+7) - 7
-                        card_h = max(47, int(geom.get('height', max(old_h, text_h+20))))
-                        card_h = max(card_h, text_h + 20)
+                        natural_height = max(47, old_h, text_h+20)
+                        if custom_flow and 'height' in geom:
+                            card_h = max(1, geom['height'])
+                        else:
+                            card_h = max(47, int(geom.get('height', natural_height)), text_h+20)
                         updated.append((card_x, card_y, card_w, card_h, card_lines))
-                        cursor = max(cursor, card_y + card_h + 7)
+                        cursor = max(cursor, card_y + card_h + spacing)
                     choice_layout = updated
                     content_bottom = max(content_bottom, cursor + 92)
                 else:
@@ -922,6 +929,9 @@ def _run(question):
                 area_x = int(area.get('x', left_x))
                 area_y = int(area.get('y', top))
                 area_w = max(200, int(area.get('width', right_x + card_w - left_x)))
+                if custom_flow and n and 'height' in area:
+                    gap = max(15, area['height'] / n)
+                    card_h = max(15, min(62, gap-5))
                 for side in (0, 1):
                     for row in range(n):
                         slot = row + (n if side else 0)
@@ -931,7 +941,7 @@ def _run(question):
                         match_rects[(side, row)] = pygame.Rect(
                             int(geom.get('x', default_x)), int(geom.get('y', default_y)),
                             max(80, int(geom.get('width', card_w))),
-                            max(30, int(geom.get('height', card_h))))
+                            max(1 if custom_flow else 30, int(geom.get('height', card_h))))
                 match_bottom = max((rect.bottom for rect in match_rects.values()), default=top)
                 centers = [match_rects[(0, i)].centery for i in range(n)]
                 # Keep completed links subtle; emphasize only the pair being inspected.
@@ -1034,9 +1044,15 @@ def _run(question):
                     if selected:
                         aa_rect(screen, green, r, 2, border_radius=10)
                     card_font = choice_fonts.get(i, fonts[2])
-                    for line_no, line in enumerate(lines):
-                        screen.blit(card_font.render(line,True,navy),
-                                    (r.x+18,r.y+10+line_no*(card_font.get_height()+7)))
+                    clip = screen.get_clip()
+                    if custom_flow and i in legacy_choice_geometry:
+                        screen.set_clip(clip.clip(r))
+                    try:
+                        for line_no, line in enumerate(lines):
+                            screen.blit(card_font.render(line,True,navy),
+                                        (r.x+18,r.y+10+line_no*(card_font.get_height()+7)))
+                    finally:
+                        screen.set_clip(clip)
                 # The choice submit control is rendered on the viewport below.
                 # Do not add a scrolling hitbox for the same control.
                 confirm_ready = selected_option is not None
@@ -1061,6 +1077,9 @@ def _run(question):
                 card_h = 84 if cols==2 else 54
                 gap_x = 16 if cols==2 else 13
                 gap_y = 9
+                if custom_flow and legacy_order_area and 'height' in legacy_order_area:
+                    rows = max(1, (len(options)+cols-1)//cols)
+                    card_h = max(15, (legacy_order_area['height'] - gap_y*(rows-1))//rows)
                 order_card_bottom = cards_y
                 for i,opt in enumerate(options[:20]):
                     col=i%cols;row=i//cols
@@ -1074,7 +1093,7 @@ def _run(question):
                         r=pygame.Rect(int(geom.get('x', area_x+col*(slot_w+gap_x))),
                                       int(geom.get('y', area_y+row*(card_h+gap_y))),
                                       max(80,int(geom.get('width', slot_w))),
-                                      max(30,int(geom.get('height', card_h))))
+                                      max(1 if custom_flow else 30,int(geom.get('height', card_h))))
                     else:
                         r=pygame.Rect(66+col*(card_w+gap_x),cards_y+row*(card_h+gap_y),card_w,card_h)
                     order_card_bottom = max(order_card_bottom, r.bottom)

@@ -402,6 +402,8 @@ def run(question, letter_mode=False):
                 items.append(('slot', value, x, y, slot_w))
             x += w
     sentence_h = y + line_h
+    if (question.get('layout') or {}).get('version') == 4:
+        sentence_h = max(sentence_h, answer_area.get('height', 0))
 
     def wrap(text, face, width):
         lines = []

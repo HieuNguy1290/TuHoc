@@ -157,6 +157,10 @@ def run(question):
     group_top=block_top(prompt_bottom,media_height+answer_height)
     answer_x = answer_area.get('x', 54)
     answer_top = answer_area.get('y', group_top+media_height)
+    if (question.get('layout') or {}).get('version') == 4 and 'height' in answer_area:
+        height = max(1, (answer_area['height'] - max(0, len(row_heights)-1)*9)//max(1, len(row_heights)))
+        row_heights = [height for _ in row_heights]
+        answer_height = sum(row_heights) + 9*max(0,len(row_heights)-1)
     column_width = max(45, (answer_area.get('width', 886) - 20) // 2)
     passage_box = TextBlock(question.get('passage', ''), layout_element(question, 'answer_passage'),
                             small, 17, (56, group_top, 835), 23)
