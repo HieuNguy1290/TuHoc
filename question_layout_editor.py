@@ -11,15 +11,7 @@ from uuid import uuid4
 from question_layout_store import GEOMETRY, IMAGE_FITS, layout_v2, validate_layout
 from layout_render import DESKTOP, MOBILE, PAGE_LIMIT, fit_pixels, to_pixels, to_relative
 
-DEFAULTS = {
-    'question_text': dict(x=.06, y=.12, width=.88, height=.15, font_size=24),
-    'question_image': dict(x=.31, y=.31, width=.38, height=.28),
-    'audio_player': dict(x=.08, y=.64, width=.84, height=.09),
-    'answer_area': dict(x=.10, y=.76, width=.80, height=.15),
-    'input_area': dict(x=.08, y=.68, width=.82, height=.10),
-    'dropdown_area': dict(x=.18, y=.58, width=.36, height=.08),
-    'word_bank': dict(x=.07, y=.79, width=.85, height=.055),
-}
+from layout_registry import DEFAULTS, controls_for
 
 
 def resize_rect(start, mode, dx, dy, screen, *, keep_ratio=False):
@@ -252,14 +244,13 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     elif question.get('type') == 'picture_missing_letters':
         options = ['Kích thước ô chữ']
     options = options[:20]
-    area_keys = ['question_text', 'question_image', 'audio_player', 'answer_area']
-    if question.get('type') in {'image_write_answer', 'fill', 'listening_fill', 'error'}:
-        area_keys.append('input_area')
-    if question.get('type') in {'dropdown_fill_blank', 'inline_dropdown_fill'}:
-        area_keys.append('dropdown_area')
-    if question.get('type') in {'sentence_gaps', 'passage_gaps', 'conversation_gaps'}:
-        area_keys.append('word_bank')
-    area_keys.extend(el for el in initial if el in DEFAULTS and el not in area_keys)
+    controls = controls_for(question.get('type'))
+    area_keys = [key for key in controls.editable if key in DEFAULTS]
+    if not area_keys and 'option_N' not in controls.editable:
+        ttk.Label(metadata,text='Dạng này chỉ hỗ trợ hộp văn bản.',
+                  wraplength=168).pack(anchor='w',pady=4)
+    if 'option_N' not in controls.editable:
+        options = []
     # Independent positions; no changes to correctness or answer ordering.
     for i, option in enumerate(options):
         key = 'option_%d' % i

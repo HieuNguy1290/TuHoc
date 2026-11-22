@@ -147,8 +147,15 @@ def run(question):
     opened = None
 
     picture = None; picture_path = question.get('_pygame_image')
+    image_geometry = layout_element(question, 'question_image')
+    image_rect = image_frame = None
     if picture_path:
-        try: picture = _image(picture_path, (420, 200))
+        try:
+            if image_geometry:
+                from layout_images import pygame_image
+                picture, image_rect, image_frame = pygame_image(picture_path,image_geometry,(65,180,420,200))
+            else:
+                picture = _image(picture_path, (420, 200))
         except (OSError, ValueError, pygame.error): picture = None
 
     field_w = [max(110, max(sent_font.size(o)[0] for o in opts) + 54) for opts in options]
@@ -209,9 +216,9 @@ def run(question):
                 draw_rich(surface,font,line,navy,52,109+r*27)
             zoom_rects = []; fields = {}
             if picture:
-                pr = picture.get_rect(topleft=(left, pic_top))
+                pr = image_rect or picture.get_rect(topleft=(left, pic_top))
                 surface.blit(picture, pr)
-                zoom_rects.append((draw_zoom_icon(surface, pr), picture_path))
+                zoom_rects.append((draw_zoom_icon(surface, image_frame or pr), picture_path))
             for typ, value, ix, iy, w in items:
                 ry = sentence_top + iy
                 if typ == 'text':

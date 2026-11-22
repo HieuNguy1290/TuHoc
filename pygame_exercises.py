@@ -515,7 +515,7 @@ def _run(question):
     typed='';chosen=[];selected_option=None;drag=None;hover=-1;particles=[];answer=None
     # Load once per question, not once per animation frame.
     question_image = None
-    image_layout = None
+    from question_layout_runtime import element as runtime_element
     image_frame = image_destination = None
     image_path = str(question.get('_pygame_image') or '').strip()
     if image_path and Path(image_path).is_file():
@@ -524,15 +524,14 @@ def _run(question):
         except (pygame.error, OSError, ValueError):
             question_image = None
     if question_image is not None:
-        from question_layout_runtime import element
         from layout_images import pygame_image
-        image_layout = element(question, 'question_image')
+        image_layout = runtime_element(question, 'question_image')
         if image_layout:
             try:
                 question_image, image_destination, image_frame = pygame_image(
                     image_path, image_layout, (66, 165, *question_image.get_size()))
             except (OSError, ValueError, pygame.error):
-                image_layout = None
+                pass
     zoom_open = False
     zoom_hit = None
     stop_pressed_until = 0.0
@@ -703,14 +702,23 @@ def _run(question):
             top = max(base_top, (image_frame.bottom if image_frame else max(165, ref + 8) + question_image.get_height()) + 16)
             btn_y = int(top + (n - 1) * gap + min(62, gap - 7) + 18)
         return base_top, top, gap, btn_y
+    prompt_geometry = runtime_element(question,'question_text') or {}
+    prompt_x = prompt_geometry.get('x', 60)
+    prompt_y = prompt_geometry.get('y', 123)
+    prompt_width = max(1,prompt_geometry.get('width',825))
+    prompt_font = (_cached_font(font_path,prompt_geometry['font_size'],True)
+                   if 'font_size' in prompt_geometry else fonts[1])
+    prompt = question.get('prompt','Hoàn thành bài tập')
     mini_fade = 0.0      # 0..1 fade of the floating mini player
     mini_rects = None
     try:
         pygame.key.start_text_input()
         while True:
             display_screen = screen
-            prompt_lines = wrapped_lines(question.get('prompt','Hoàn thành bài tập'), fonts[1], 825)
-            prompt_end = 123 + len(prompt_lines) * (fonts[1].get_height()+7) - 7
+            prompt_lines = (wrap_rich(prompt,prompt_font,prompt_width)
+                            if prompt_geometry and '**' in str(prompt)
+                            else wrapped_lines(prompt,prompt_font,prompt_width))
+            prompt_end = prompt_y + len(prompt_lines) * (prompt_font.get_height()+7) - 7
             lis_img = (question_image.get_height() + 12) if (question_image is not None and is_listening and not image_frame) else 0
             answer_top = max(210, prompt_end + (105 if (waveform is not None or waveform_pending) else 85 if is_listening else 24)) + lis_img
             if image_frame:
@@ -826,7 +834,7 @@ def _run(question):
             draw_question_progress(screen, question)
             # Full prompt is rendered with word wrapping; answer controls follow it.
             # The complete content is scrolled together in the vertical direction.
-            prompt_bottom = draw_text(question.get('prompt','Hoàn thành bài tập'),fonts[1],navy,60,123,825)
+            prompt_bottom = draw_text(prompt,prompt_font,navy,prompt_x,prompt_y,prompt_width)
             if waveform is not None:
                 waveform.update()
             if is_listening and waveform is None and playing and not paused and not pygame.mixer.music.get_busy():

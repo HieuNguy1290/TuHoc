@@ -132,16 +132,15 @@ def run(question):
     audio_err = '' if (audio_path or not has_audio) else 'Chưa tìm thấy file nghe. Kiểm tra trong Quản lý nội dung.'
     wf = None; wf_pending = bool(audio_path); wf_rects = None; wf_drag = None
     picture = None
+    authored_rect = authored_frame = None
     if question.get('_pygame_image'):
         try:
-            # Scale directly from the original file to the final target size.
-            # The old path shrank to 340px first, then enlarged that bitmap.
+            bounds = (340, 140 if has_audio else 175)
             if image_layout:
-                image_bounds = (max(1, image_layout.get('width', 340)),
-                                max(1, image_layout.get('height', 140 if has_audio else 175)))
+                from layout_images import pygame_image
+                picture, authored_rect, authored_frame = pygame_image(question['_pygame_image'],image_layout,(55,180,*bounds))
             else:
-                image_bounds = (340, 140 if has_audio else 175)
-            picture = _image(question['_pygame_image'], image_bounds)
+                picture = _image(question['_pygame_image'],bounds)
         except (OSError, ValueError, pygame.error):
             pass
 
@@ -198,15 +197,9 @@ def run(question):
                 y = max(y + (0 if audio_layout else audio_rect.h) + 6, audio_rect.bottom + 6)
             if picture:
                 y += 10
-                if image_layout:
-                    iw = max(1, image_layout.get('width', picture.get_width()))
-                    ih = max(1, image_layout.get('height', picture.get_height()))
-                    # _image already resampled from original pixels, once.
-                    shown = picture
-                    ix = image_layout.get('x', (960-shown.get_width())//2)
-                    iy = image_layout.get('y', y)
-                    screen.blit(shown, (ix, iy))
-                    y = max(y, iy + shown.get_height() + 22)
+                if authored_frame:
+                    screen.blit(picture,authored_rect)
+                    y = max(y,authored_frame.bottom+22)
                 else:
                     screen.blit(picture, picture.get_rect(midtop=(480, y)))
                     y += picture.get_height() + 22

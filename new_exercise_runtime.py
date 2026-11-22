@@ -160,10 +160,17 @@ def run(question):
     exp=expected(question)
     # Optional question illustration, separate from the images used as answers.
     question_picture = None
+    question_picture_rect = question_picture_frame = None
     question_picture_path = str(question.get('_pygame_image') or '').strip()
     if kind == 'image_multi_choice' and question_picture_path and Path(question_picture_path).is_file():
         try:
-            question_picture = _image(question_picture_path, (155, 105))
+            geometry = _audio_layout_element(question,'question_image')
+            if geometry:
+                from layout_images import pygame_image
+                question_picture, question_picture_rect, question_picture_frame = pygame_image(
+                    question_picture_path,geometry,(737,119,155,105))
+            else:
+                question_picture = _image(question_picture_path, (155, 105))
         except (pygame.error, OSError, ValueError):
             pass
     images={}
@@ -220,19 +227,14 @@ def run(question):
         gap_right = min(900, gap_left + max(115, int(gap_area.get('width', 810))))
         if gap_right <= gap_left + 115:
             gap_right = gap_left + 116
+        gap_picture_rect = gap_picture_frame = None
         if sentence_picture is not None and gap_image_area:
-            source_path = optional_picture_path
-            if source_path and Path(source_path).is_file():
-                try:
-                    source_image = pygame.image.load(source_path).convert_alpha()
-                    target_width = max(1, int(gap_image_area.get('width', source_image.get_width())))
-                    target_height = max(1, int(gap_image_area.get('height', source_image.get_height())))
-                    factor = min(target_width / source_image.get_width(), target_height / source_image.get_height())
-                    sentence_picture = pygame.transform.smoothscale(source_image, (
-                        max(1, round(source_image.get_width() * factor)),
-                        max(1, round(source_image.get_height() * factor))))
-                except (pygame.error, OSError, ValueError, ZeroDivisionError):
-                    pass
+            from layout_images import pygame_image
+            try:
+                sentence_picture, gap_picture_rect, gap_picture_frame = pygame_image(
+                    optional_picture_path,gap_image_area,(gap_left,gap_top,*sentence_picture.get_size()))
+            except (OSError,ValueError,pygame.error):
+                pass
     def draw_label(value,x,y,f=font,color=navy):draw_rich(screen,f,str(value),color,x,y)
     def wrap_prompt(value, face, max_width):
         # Keep the complete question; split at word boundaries and preserve newlines.
@@ -342,25 +344,18 @@ def run(question):
             letter_hint_y = letter_top + letter_height + 20
             letter_submit_y = max(553, letter_hint_y)
         letter_image_geometry = layout_element(question, 'question_image') or {}
+        letter_picture_rect = letter_picture_frame = None
         if picture and letter_image_geometry:
-            # Re-render directly from the source when resizing to avoid
-            # magnifying an already downscaled preview bitmap.
-            width = letter_image_geometry.get('width', picture.get_width())
-            height = letter_image_geometry.get('height', picture.get_height())
-            if width > 0 and height > 0 and question.get('_pygame_image'):
-                try:
-                    source = pygame.image.load(question['_pygame_image']).convert_alpha()
-                    ratio = min(width / source.get_width(), height / source.get_height())
-                    picture = pygame.transform.smoothscale(source, (
-                        max(1, round(source.get_width() * ratio)),
-                        max(1, round(source.get_height() * ratio))))
-                except (pygame.error, OSError, ValueError, ZeroDivisionError):
-                    pass
-        letter_picture_x = letter_image_geometry.get('x')
-        letter_picture_y = letter_image_geometry.get('y')
+            from layout_images import pygame_image
+            try:
+                picture, letter_picture_rect, letter_picture_frame = pygame_image(
+                    question['_pygame_image'],letter_image_geometry,
+                    (480-picture.get_width()//2,letter_group_top,*picture.get_size()))
+            except (OSError,ValueError,pygame.error):
+                pass
         letter_content_bottom = max(letter_submit_y + 48,
                                     letter_top + letter_height + 40,
-                                    (letter_picture_y or letter_group_top) + (picture.get_height() if picture else 0) + 30)
+                                    (letter_picture_frame.bottom if letter_picture_frame else letter_group_top + (picture.get_height() if picture else 0)) + 30)
         if audio_doc: letter_content_bottom = max(letter_content_bottom, narration_waveform_area.bottom + 40)
     extras_bottom = max((extra['rect']['y'] + extra['rect']['height']
                          for extra in pixel_extras(question.get('layout'))), default=0)
@@ -373,6 +368,8 @@ def run(question):
                               for i,g in choice_positions.items()), default=640)
                 if audio_doc:
                     lowest = max(lowest, narration_waveform_area.bottom)
+                if question_picture_frame:
+                    lowest = max(lowest,question_picture_frame.bottom)
                 screen = choice_page_surface.begin(max(640, lowest+40, extras_bottom))
             screen.fill(bg);aa_rect(screen,'white',(25,25,910,screen.get_height()-50),border_radius=18)
             # Shared counter badge replaces the former full-width navigation strip.
@@ -402,9 +399,9 @@ def run(question):
                 draw_complete(screen,submit,font,can_submit,submit.collidepoint(_ptr),pygame.mouse.get_pressed()[0])
             if kind=='image_multi_choice':
                 if question_picture is not None:
-                    question_picture_rect = question_picture.get_rect(topright=(892, 119))
-                    screen.blit(question_picture, question_picture_rect)
-                    zoom_regions.append((draw_zoom_icon(screen, question_picture_rect), question_picture_path))
+                    target = question_picture_rect or question_picture.get_rect(topright=(892,119))
+                    screen.blit(question_picture, target)
+                    zoom_regions.append((draw_zoom_icon(screen,question_picture_frame or target),question_picture_path))
                 for i,path in enumerate(items):
                     x=95+(i%3)*280;y=244+(i//3)*140
                     geometry = choice_positions.get(i, {})
@@ -437,12 +434,10 @@ def run(question):
                     hits.append((rect,('choose',i)))
             elif kind=='picture_missing_letters':
                 if picture:
-                    picture_rect=picture.get_rect(midtop=(480,letter_group_top))
-                    if letter_picture_x is not None: picture_rect.x = letter_picture_x
-                    if letter_picture_y is not None: picture_rect.y = letter_picture_y
+                    picture_rect=letter_picture_rect or picture.get_rect(midtop=(480,letter_group_top))
                     screen.blit(picture,picture_rect)
                     if question.get('_pygame_image'):
-                        zoom_regions.append((draw_zoom_icon(screen, picture_rect),question['_pygame_image']))
+                        zoom_regions.append((draw_zoom_icon(screen, letter_picture_frame or picture_rect),question['_pygame_image']))
                 elif letter_note:
                     draw_label(letter_note,70,letter_group_top,small)
                 for i,x,dy in letter_positions:
@@ -463,13 +458,12 @@ def run(question):
                 y=gap_top-scroll;slot_hits=[]
                 pending_gap_zoom = None
                 if sentence_picture is not None:
-                    image_rect=sentence_picture.get_rect(topleft=(
-                        int(gap_image_area.get('x', gap_left)),
-                        int(gap_image_area.get('y', gap_top))-scroll if gap_image_area else y))
+                    image_rect=(gap_picture_rect.move(0,-scroll) if gap_picture_rect
+                                else sentence_picture.get_rect(topleft=(gap_left,y)))
                     if image_rect.bottom>210 and image_rect.top<495:
                         screen.blit(sentence_picture,image_rect)
                         # Draw icon after restoring clip, outside the picture.
-                        pending_gap_zoom = (image_rect, optional_picture_path)
+                        pending_gap_zoom = (gap_picture_frame.move(0,-scroll) if gap_picture_frame else image_rect, optional_picture_path)
                     if not gap_image_area:
                         y+=sentence_picture.get_height()+18
                 content_bottom=y
@@ -502,7 +496,7 @@ def run(question):
                             x+=w+5
                     y+=55
                 content_bottom=max(y+scroll,
-                    int(gap_image_area.get('y', gap_top)) + (sentence_picture.get_height() if sentence_picture else 0) + 18)
+                    (gap_picture_frame.bottom if gap_picture_frame else gap_top + (sentence_picture.get_height() if sentence_picture else 0)) + 18)
                 max_scroll=max(0,content_bottom-465, extras_bottom-490)
                 scroll=min(scroll,max_scroll)
                 screen.set_clip(old_clip)

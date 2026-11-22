@@ -348,8 +348,15 @@ def run(question, letter_mode=False):
     target = None            # slot do học sinh chủ động chọn
 
     picture = None; picture_path = question.get('_pygame_image')
+    image_geometry = layout_element(question, 'question_image')
+    image_rect = image_frame = None
     if picture_path:
-        try: picture = _image(picture_path, (520, 260))
+        try:
+            if image_geometry:
+                from layout_images import pygame_image
+                picture, image_rect, image_frame = pygame_image(picture_path,image_geometry,(65,180,520,260))
+            else:
+                picture = _image(picture_path, (520, 260))
         except (OSError, ValueError, pygame.error): picture = None
 
     # ---- bố cục câu (độ rộng ô cố định nên không bị nhảy khi điền) ----
@@ -454,7 +461,7 @@ def run(question, letter_mode=False):
         hint_y = sentence_top + sentence_h + 10
         chips_top = hint_y + 30
     img_box_h = max(60, sentence_top - 12 - content_top)
-    if picture:
+    if picture and image_frame is None:
         iw, ih = picture.get_size()
         k = min(1.0, img_box_h / max(1, ih))
         if k < 1.0:
@@ -515,10 +522,10 @@ def run(question, letter_mode=False):
                 if audio_err:
                     screen.blit(small.render(audio_err, True, (200, 60, 60)), (audio_rect.x + 22, audio_rect.centery - 8))
             if picture:
-                pr = picture.get_rect(topleft=(left, content_top + 8))
+                pr = image_rect or picture.get_rect(topleft=(left, content_top + 8))
                 pygame.draw.rect(screen, (30, 30, 30), pr.inflate(2, 2), 1)
                 screen.blit(picture, pr)
-                zoom_rects.append((draw_zoom_icon(screen, pr), picture_path))
+                zoom_rects.append((draw_zoom_icon(screen, image_frame or pr), picture_path))
             # câu
             for typ, value, ix, iy, w in items:
                 ry = sentence_top + iy

@@ -4,7 +4,10 @@ Run from the application directory: python audit_layout_coverage.py
 Only reads .py files; does not import pygame or modify application data.
 """
 from __future__ import annotations
+import argparse
 import ast
+from collections import Counter
+from zipfile import ZipFile
 import json
 from pathlib import Path
 import re
@@ -255,7 +258,56 @@ def audit_integration(report):
     }
     return report['integration_audit']
 
+def coverage_matrix(root):
+    from layout_registry import REGISTRY
+    types = Counter()
+
+    def count(value):
+        if isinstance(value, list):
+            for row in value:
+                count(row)
+        elif isinstance(value, dict):
+            if value.get('type') in REGISTRY and 'prompt' in value:
+                types[value['type']] += 1
+            for item in value.values():
+                if isinstance(item, (list, dict)):
+                    count(item)
+
+    for path in root.glob('content_library/**/*.json'):
+        count(json.loads(path.read_text(encoding='utf-8-sig')))
+    archive = root / 'content_library.zip'
+    if archive.is_file():
+        with ZipFile(archive) as bundle:
+            for name in ('content_library/exam_questions.json','content_library/exam_reading_groups.json'):
+                if name in bundle.namelist():
+                    count(json.loads(bundle.read(name).decode('utf-8-sig')))
+    result = {}
+    for kind, spec in sorted(REGISTRY.items()):
+        source = (root / (spec.runtime + '.py')).read_text(encoding='utf-8')
+        result[kind] = {'runtime':spec.runtime,'editable':spec.editable,
+                        'runtime_reads_layout':spec.runtime_reads_layout and 'question_layout_runtime' in source,
+                        'bundled_questions':types[kind]}
+    return result
+
+
+def write_matrix(matrix,path):
+    lines = ['# Ma trận bố cục bài học', '',
+             'Các cột mô tả điều khiển được Studio mở và tín hiệu đọc layout trong mã runtime. '
+             'Hồi quy tương tác chạy riêng bằng tests/canvas_p0.py.', '',
+             '| Dạng | Runtime | Thành phần | Đọc layout | Câu trong gói |',
+             '| --- | --- | --- | --- | ---: |']
+    for kind, row in matrix.items():
+        keys = ', '.join(f'`{key}`' for key in row['editable'])
+        reads = 'Có' if row['runtime_reads_layout'] else 'Chưa'
+        lines.append(f"| `{kind}` | `{row['runtime']}` | {keys} | {reads} | {row['bundled_questions']} |")
+    path.write_text('\n'.join(lines)+'\n', encoding='utf-8')
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--output', type=Path, default=ROOT / 'layout_coverage_audit.json')
+    parser.add_argument('--markdown', type=Path)
+    args = parser.parse_args()
     report = {'root': str(ROOT), 'modules': {}, 'question_types': {}, 'warnings': []}
     for filename, kinds in MODULES.items():
         path = ROOT / filename
@@ -290,7 +342,10 @@ def main():
         'Manual Windows/Pygame testing is required for click, scroll, grading, images and audio.',
         'Legacy checks inspect one shared _run function and cannot prove per-type layout or fixed hitboxes.',
     ]
-    destination = ROOT / 'layout_coverage_audit.json'
+    report['registry_matrix'] = coverage_matrix(ROOT)
+    if args.markdown:
+        write_matrix(report['registry_matrix'],args.markdown)
+    destination = args.output
     destination.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
     print(f'Audited {len(report["modules"])} modules / {report["audited_type_count"]} mapped types')
     print(f'Warnings: {len(report["warnings"])}')
