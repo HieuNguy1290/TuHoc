@@ -45,7 +45,8 @@ def validate_config(cfg):
 def validate_question(q):
     if not isinstance(q,dict):raise ValueError('Câu hỏi không hợp lệ.')
     if subject_of(q) not in SUBJECTS: raise ValueError('Môn học không hợp lệ.')
-    for key in ('grade','lesson','prompt','type'):
+    required = ('grade', 'lesson', 'type') if q.get('type') == 'picture_missing_letters' else ('grade', 'lesson', 'prompt', 'type')
+    for key in required:
         if not str(q.get(key,'')).strip():raise ValueError(f'Thiếu {key}.')
     if not 1<=int(q.get('difficulty',0))<=5:raise ValueError('Mức độ phải từ 1 đến 5.')
     if q['type'] not in ALLOWED_TYPES:raise ValueError('Dạng câu hỏi chưa được hỗ trợ trong Exam Mode.')

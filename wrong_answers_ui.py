@@ -1,4 +1,5 @@
 'Read-only incorrect-answer review using existing attempts and curriculum.'
+from question_prompt import display_prompt
 import tkinter as tk
 from tkinter import ttk
 
@@ -77,7 +78,7 @@ def show_wrong_answers(parent,conn,student_id,curriculum,on_back=None,on_retry=N
             q=item['question']
             card=tk.Frame(content,bg=PALE if idx%2==0 else YELLOW,padx=16,pady=12)
             card.pack(fill='x',pady=(0,6))
-            title=str(q.get('prompt') or item['id']) if q else f'Câu hỏi {item["id"]} (đã thay đổi hoặc bị xóa)'
+            title=str(display_prompt(q) or item['id']) if q else f'Câu hỏi {item["id"]} (đã thay đổi hoặc bị xóa)'
             tk.Label(card,text=title,wraplength=730,justify='left',anchor='w',bg=card['bg'],fg=INK,
                      font=(FONT,11,'bold')).pack(fill='x')
             tk.Label(card,text=f'Đã trả lời: {item["given"]}    ·    {item["date"]}',

@@ -85,3 +85,13 @@ def draw_question_progress(surface, question):
     rect = pygame.Rect(surface.get_width() - w - 42, 44, w, h)
     draw_rect(surface, (33, 52, 79), rect, border_radius=10)
     surface.blit(label, (rect.x + padding_x, rect.y + padding_y))
+
+
+def present_frame(question):
+    """Present the renderer's frame and deliver one RGB snapshot to a studio preview."""
+    import pygame
+
+    pygame.display.flip()
+    capture = question.get('_studio_frame')
+    if capture is not None:
+        capture()

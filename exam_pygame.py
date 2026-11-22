@@ -1,3 +1,4 @@
+from question_prompt import display_prompt
 from pygame_session_guard import shutdown as _app_shutdown
 """Responsive Pygame exam with independently scrollable reading and answer panels."""
 import random
@@ -461,12 +462,12 @@ class ExamUI:
         count=len(q.get('gap_answers',[]))
         pairs=len(q.get('pairs',[]))
         words=len(q.get('sequence',[]))
-        prompt_height=len(wrap(self.bold,str(q.get('prompt','')),645))*(self.bold.get_linesize()+5)+50
+        prompt_height=len(wrap(self.bold,str(display_prompt(q)),645))*(self.bold.get_linesize()+5)+50
         estimated=max(self.read_area.height, prompt_height+max(count*62+80,pairs*46+115,((words+3)//4)*60+230,380 if kind=='picture_missing_letters' else 180))
         canvas=pygame.Surface((self.read_area.width,estimated),pygame.SRCALPHA)
         self._interactive_target=s
         s=canvas
-        y=self._text(s,str(q.get('prompt','')),x,y,self.bold,INK,width=645)+18
+        y=self._text(s,str(display_prompt(q)),x,y,self.bold,INK,width=645)+18
         if kind=='listening_fill':
             self._audio_button(s,q,x,y,local=True);y+=75
         if kind in ('sentence_gaps','conversation_gaps','passage_gaps'):
@@ -557,7 +558,7 @@ class ExamUI:
         if event.key==pygame.K_TAB:
             self.gap_focus=(self.gap_focus+1)%count
             # Keep the newly focused field visible within the scroll viewport.
-            prompt_height=len(wrap(self.bold,str(q.get('prompt','')),645))*(self.bold.get_linesize()+5)+50
+            prompt_height=len(wrap(self.bold,str(display_prompt(q)),645))*(self.bold.get_linesize()+5)+50
             field_top=prompt_height+36+self.gap_focus*62
             if field_top+50>self.scroll+self.read_area.height:
                 self.scroll=field_top+50-self.read_area.height+12
@@ -805,7 +806,7 @@ class ExamUI:
         if q.get('type')=='picture_choice':
             blocks.append(('picture',str(q.get('image',''))))
         blocks.append(('heading',f'CÂU {q.get("reading_index")}/{q.get("reading_total")} TRONG BÀI ĐỌC' if q.get('reading_group') else 'CHỌN ĐÁP ÁN ĐÚNG'))
-        blocks.append(('question',str(q.get('prompt',''))))
+        blocks.append(('question',str(display_prompt(q))))
         items=[]
         for kind,text in blocks:
             if kind=='audio':
@@ -946,7 +947,7 @@ class ExamUI:
         questions=self.exam['questions']
         heights=[]
         for q in questions:
-            prompt=str(q.get('prompt',''))
+            prompt=str(display_prompt(q))
             heights.append(max(72,len(wrap(self.small,prompt,710))*26+38))
         total=sum(heights)+12
         self.review_scroll_limit=max(0,total-area.height)
@@ -960,7 +961,7 @@ class ExamUI:
             pygame.draw.rect(canvas,(44,153,103) if correct else (211,88,83),rect,2,border_radius=8)
             label=f'Câu {i+1}  |  {"Đúng" if correct else "Sai"}'
             self._text(canvas,label,rect.x+12,rect.y+8,self.small,GREEN if correct else (177,65,60))
-            self._text(canvas,str(q.get('prompt',''))[:350],rect.x+145,rect.y+8,self.small,INK,width=710)
+            self._text(canvas,str(display_prompt(q))[:350],rect.x+145,rect.y+8,self.small,INK,width=710)
             targets.append((rect.move(area.x,area.y-int(self.review_scroll)),i))
             y+=h
         s.blit(canvas,area.topleft,pygame.Rect(0,int(self.review_scroll),area.width,area.height))
@@ -992,7 +993,7 @@ class ExamUI:
         panel=pygame.Rect(120,104,860,500)
         pygame.draw.rect(s,WHITE,panel,border_radius=14)
         self._text(s,f'XEM LẠI CÂU {self.review_detail+1}',148,132,self.bold)
-        self._text(s,str(q.get('prompt','')),148,190,self.font,INK,width=800)
+        self._text(s,str(display_prompt(q)),148,190,self.font,INK,width=800)
         answer=self.answers.get(q['id'])
         kind=q.get('type')
         if kind=='order':answer=self.order_inputs.get(q['id'],[])

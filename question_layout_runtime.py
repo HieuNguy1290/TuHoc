@@ -1,28 +1,18 @@
-"""Optional display-only geometry for per-question Pygame layouts.
-
-The stage-2 editor stores normalized coordinates in its preview canvas.
-Existing exercises retain their exact legacy layout when no override exists.
-"""
-from question_layout_store import get_layout
+"""Resolve optional pixel geometry for the active exercise viewport."""
+from layout_render import DESKTOP
+from question_layout_store import get_layout, pixel_elements
 
 
-def element(question, name, screen_size=(960, 640)):
-    """Return optional pixel geometry, or None for legacy rendering.
-
-    Coordinates use the full logical exercise canvas; locked elements are
-    rejected by the storage validator and never consumed here.
-    """
-    values = get_layout(question).get(name)
-    if not values:
-        return None
-    w, h = screen_size
-    result = {}
-    for field in ('x', 'width'):
-        if field in values:
-            result[field] = round(values[field] * w)
-    for field in ('y', 'height'):
-        if field in values:
-            result[field] = round(values[field] * h)
-    if 'font_size' in values:
-        result['font_size'] = int(values['font_size'])
-    return result
+def element(question, name, screen_size=DESKTOP):
+    """Return pixel geometry, or None when the renderer should use its defaults."""
+    elements = pixel_elements(get_layout(question), screen_size)
+    value = elements.get(name)
+    if not value and name in {'input_area', 'dropdown_area'}:
+        value = elements.get('answer_area')
+    if not value and name == 'answer_area':
+        kind = question.get('type')
+        if kind in {'fill', 'error', 'listening_fill', 'image_write_answer'}:
+            value = elements.get('input_area')
+        elif kind in {'dropdown_fill_blank', 'inline_dropdown_fill'}:
+            value = elements.get('dropdown_area')
+    return value or None

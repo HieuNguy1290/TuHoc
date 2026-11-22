@@ -1,5 +1,6 @@
 """Display-only flow layout and vertical scrolling for exercise windows."""
-from exercise_gfx import draw_rect as aa_rect
+from exercise_gfx import draw_rect as aa_rect, draw_question_progress
+from exercise_buttons import draw_complete
 import pygame
 
 
@@ -38,7 +39,7 @@ def image_message(question, picture):
     return ''
 
 
-def letter_items(letters, hidden, font):
+def letter_items(letters, hidden, font, *, left=70, width=820, cell=(42, 44), row_height=54):
     """Measure the original letter controls, including wrapped long words."""
     words = []; current = []
     for i, char in enumerate(letters):
@@ -50,21 +51,24 @@ def letter_items(letters, hidden, font):
             current.append(i)
     if current:
         words.append(current)
-    x = 70; y = 0; items = []
+    cell_width, cell_height = cell
+    right = left + width
+    row_height = max(cell_height + 5, row_height)
+    x = left; y = 0; items = []
     for word in words:
         if word is None:
             x += 18
             continue
-        total = sum(47 if i in hidden else font.size(letters[i])[0]+2 for i in word)
-        if x+total > 890 and x > 70:
-            x = 70; y += 54
+        total = sum(cell_width+5 if i in hidden else font.size(letters[i])[0]+2 for i in word)
+        if x+total > right and x > left:
+            x = left; y += row_height
         for i in word:
-            width = 42 if i in hidden else font.size(letters[i])[0]+2
-            if x+width > 890 and x > 70:
-                x = 70; y += 54
+            char_width = cell_width if i in hidden else font.size(letters[i])[0]+2
+            if x+char_width > right and x > left:
+                x = left; y += row_height
             items.append((i, x, y))
-            x += width + (5 if i in hidden else 0)
-    return items, y+44
+            x += char_width + (5 if i in hidden else 0)
+    return items, y+cell_height
 
 
 class Page:
@@ -75,8 +79,8 @@ class Page:
         self.limit = 0
         self.surface = None
 
-    def begin(self, bottom):
-        height = max(640, int(bottom + 20))
+    def begin(self, bottom, *, padding=20):
+        height = max(640, int(bottom + padding))
         self.limit = height - 640
         self.scroll = max(0, min(self.scroll, self.limit))
         if self.surface is None or self.surface.get_height() != height:
@@ -92,6 +96,12 @@ class Page:
             y = track.y + int((track.height-h) * self.scroll / self.limit)
             aa_rect(self.display, (80, 135, 170), (track.x, y, 7, h), border_radius=3)
 
+    def complete(self, question, rect, font, ready):
+        mouse = pygame.mouse.get_pos()
+        draw_complete(self.display, rect, font, ready, rect.collidepoint(mouse),
+                      pygame.mouse.get_pressed()[0])
+        draw_question_progress(self.display, question)
+
     def events(self, scroll_enabled=True):
         # Match the frame that was actually displayed, even if a wheel event
         # and a click are delivered in the same batch.
@@ -105,6 +115,7 @@ class Page:
                 continue
             if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
                 fields = event.dict.copy()
+                fields['viewport_pos'] = event.pos
                 fields['pos'] = (event.pos[0], event.pos[1]+visible_scroll)
                 event = pygame.event.Event(event.type, fields)
             yield event

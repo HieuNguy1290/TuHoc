@@ -1,6 +1,5 @@
 from question_rich_text import draw as draw_rich, wrap as wrap_rich
-from exercise_buttons import draw_complete
-from exercise_gfx import draw_question_progress
+from exercise_gfx import present_frame
 from exercise_gfx import open_exercise_window
 """Two additive underline exercise types: image choice and sentence word selection."""
 import re
@@ -204,9 +203,9 @@ def run(question):
             adjusted.append((x,dy,i,lines,height,suffix,width))
         rows = adjusted
         answer_height = max((dy+height for _,dy,_,_,height,_,_ in rows), default=42)
-    button_y=max(552,answer_y+answer_height+32)
+    button_y = 552
     # Extend the scrollable drawing surface for elements placed below the page.
-    content_extent = layout_content_bottom(question, button_y + 46)
+    content_extent = layout_content_bottom(question, max(640, answer_y + answer_height + 98))
     try:
         while True:
             screen=page.begin(content_extent)
@@ -226,17 +225,17 @@ def run(question):
                     hit.append((pygame.Rect(x-2,y-3,rendered.get_width()+4,font.get_height()+9),i))
                 if kind==TYPES[0]:screen.blit(font.render(suffix,True,navy),(x+font.size(word_lines[-1])[0],y))
             button=pygame.Rect(704,button_y,200,46)
-            mouse_in_content = (pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1] + page.scroll)
-            draw_complete(screen,button,small,bool(chosen),button.collidepoint(mouse_in_content),pygame.mouse.get_pressed()[0])
-            draw_question_progress(screen, question)
             page.present()
-            pygame.display.flip()
+            page.complete(question, button, small, bool(chosen))
+            present_frame(question)
             for event in page.events():
                 if event.type==pygame.QUIT:return None
                 if event.type==pygame.KEYDOWN and event.key==pygame.K_ESCAPE:return None
                 if event.type==pygame.MOUSEBUTTONDOWN and event.button==1:
-                    if button.collidepoint(event.pos) and chosen:
-                        return ([options[i] for i in sorted(chosen)] if _multiple(question) else options[next(iter(chosen))]) if kind==TYPES[0] else sorted(chosen)
+                    if button.collidepoint(event.viewport_pos):
+                        if chosen:
+                            return ([options[i] for i in sorted(chosen)] if _multiple(question) else options[next(iter(chosen))]) if kind==TYPES[0] else sorted(chosen)
+                        continue
                     for rect,i in hit:
                         if rect.collidepoint(event.pos):
                             if kind==TYPES[0] and not _multiple(question):chosen=set() if i in chosen else {i}

@@ -1,6 +1,6 @@
 from question_rich_text import draw as draw_rich, wrap as wrap_rich
 from exercise_buttons import draw_complete
-from exercise_gfx import draw_question_progress
+from exercise_gfx import draw_question_progress, present_frame
 from exercise_gfx import open_exercise_window
 """Isolated authoring, validation and Pygame display for three multi-answer exercises."""
 from pathlib import Path
@@ -207,7 +207,7 @@ def run(question):
             draw_complete(page.display, fixed_submit, font, bool(selected),
                           fixed_submit.collidepoint(mouse), pygame.mouse.get_pressed()[0])
             draw_question_progress(page.display, question)
-            pygame.display.flip()
+            present_frame(question)
             for event in page.events():
                 if event.type==pygame.QUIT:return None
                 if event.type==pygame.KEYDOWN:
@@ -219,7 +219,7 @@ def run(question):
                 if event.type==pygame.MOUSEBUTTONDOWN and event.button==1:
                     # Page.events() supplies content coordinates; recover the
                     # viewport point only for the fixed completion button.
-                    viewport_pos=(event.pos[0],event.pos[1]-page.scroll)
+                    viewport_pos=event.viewport_pos
                     if fixed_submit.collidepoint(viewport_pos):
                         if selected:
                             return [opt for i,opt in enumerate(opts) if i in selected]
@@ -227,10 +227,11 @@ def run(question):
                     if question['type']=='audio_multi_select' and play_rect.collidepoint(event.pos) and audio_ready:
                         try:pygame.mixer.music.stop();pygame.mixer.music.play()
                         except pygame.error:pass
-                    for rect,i in cells:
+                    for rect, i in reversed(cells):
                         if rect.collidepoint(event.pos):
                             if i in selected:selected.remove(i)
                             else:selected.add(i)
+                            break
             clock.tick(30)
     finally:
         # Always release the SDL window on the same worker thread that opened it.

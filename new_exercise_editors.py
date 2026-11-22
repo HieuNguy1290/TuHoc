@@ -39,29 +39,11 @@ def build(parent, kind, original, import_media, resolve_media=None):
         tk.Button(parent, text='Chọn / thay ảnh', command=browse).pack(anchor='w', pady=3)
         return e
     def tokens_widget(label, text_widget, initial=None, letters=False):
+        from token_picker import TokenPicker
         title(label)
-        holder=tk.Frame(parent,bg=bg);holder.pack(fill='x')
-        selected=set(initial or [])
-        def render(*_):
-            for c in holder.winfo_children():c.destroy()
-            text=value(text_widget)
-            tokens=list(text) if letters else [m.group() for m in TOKEN.finditer(text)]
-            selected.intersection_update(range(len(tokens)))
-            row=None
-            for i,token in enumerate(tokens):
-                if i%10==0:
-                    row=tk.Frame(holder,bg=bg);row.pack(anchor='w',fill='x')
-                def toggle(idx=i):
-                    if idx in selected:selected.remove(idx)
-                    else:selected.add(idx)
-                    render()
-                tk.Button(row,text=token,command=toggle,relief='solid',bd=1,
-                          bg='#B9DAFF' if i in selected else '#F0F3F0',
-                          font=('Segoe UI',10),padx=6,pady=5).pack(side='left',padx=2,pady=2)
-            preview.config(text='Xem trước: '+(' '.join('_'*len(w) if i in selected else w for i,w in enumerate(tokens)) if not letters else ''.join('_' if i in selected else w for i,w in enumerate(tokens))),wraplength=690)
-        preview=tk.Label(parent,bg='#F1F7F2',fg='#285D40',justify='left',anchor='w');preview.pack(fill='x',pady=5)
-        text_widget.bind('<KeyRelease>',render,add='+');render()
-        return selected
+        picker = TokenPicker(parent, text_widget, value, initial, letters=letters)
+        picker.pack(fill='x', pady=5)
+        return picker
     if kind == 'inline_dropdown_fill':
         from inline_dropdown_extension import build_editor
         return build_editor(parent, original, import_media, resolve_media)
@@ -152,9 +134,10 @@ def build(parent, kind, original, import_media, resolve_media=None):
         hidden=tokens_widget('Click các chữ cần ẩn (click lại để bỏ ẩn)',word,original.get('hidden_indices',[0,2]),True)
         def collect():
             w=value(word).strip()
-            if not w or not hidden:raise ValueError('Cần đáp án và ít nhất một chữ được ẩn.')
+            indices = hidden.indices()
+            if not w or not indices:raise ValueError('Cần đáp án và ít nhất một chữ được ẩn.')
             if not value(pic):raise ValueError('Cần chọn ảnh câu hỏi.')
-            return {'image':value(pic),'answer':w,'hidden_indices':sorted(hidden),'options':[]}
+            return {'image':value(pic),'answer':w,'hidden_indices':indices,'options':[]}
     elif kind in ('sentence_gaps','passage_gaps'):
         illustration=image('Hình minh họa (không bắt buộc)' ,original.get('image','')) if kind=='sentence_gaps' else None
         source=textarea('Câu hoàn chỉnh' if kind=='sentence_gaps' else 'Nội dung đoạn văn',original.get('source_text') or original.get('answer') or '',5 if kind=='passage_gaps' else 3)
@@ -162,9 +145,10 @@ def build(parent, kind, original, import_media, resolve_media=None):
         distract=entry('Đáp án nhiễu (phân cách bằng |)', ' | '.join(original.get('distractors',[])))
         def collect():
             text=value(source).strip(); tokens=TOKEN.findall(text)
-            if not text or not hidden:raise ValueError('Cần nội dung và ít nhất một từ cần ẩn.')
-            choices=[tokens[i] for i in sorted(hidden)]+[x.strip() for x in value(distract).split('|') if x.strip()]
-            result={'source_text':text,'hidden_indices':sorted(hidden),'distractors':[x.strip() for x in value(distract).split('|') if x.strip()], 'options':choices,'answer':text}
+            indices = hidden.indices()
+            if not text or not indices:raise ValueError('Cần nội dung và ít nhất một từ cần ẩn.')
+            choices=[tokens[i] for i in indices]+[x.strip() for x in value(distract).split('|') if x.strip()]
+            result={'source_text':text,'hidden_indices':indices,'distractors':[x.strip() for x in value(distract).split('|') if x.strip()], 'options':choices,'answer':text}
             if illustration is not None:result['image']=value(illustration)
             return result
     else:
@@ -175,32 +159,24 @@ def build(parent, kind, original, import_media, resolve_media=None):
             line=tk.Frame(area,bg=bg);line.pack(fill='x',pady=5)
             name=tk.Entry(line,width=13);name.pack(side='left',padx=2);name.insert(0,speaker)
             speech_box=tk.Text(line,width=42,height=3,wrap='word');speech_box.pack(side='left',padx=2);speech_box.insert('1.0',speech)
-            pick=tk.Frame(line,bg=bg);pick.pack(side='left',fill='x',expand=True)
-            selected=set(hidden or [])
-            def draw(*_):
-                for w in pick.winfo_children():w.destroy()
-                for i,token in enumerate(TOKEN.findall(value(speech_box))):
-                    def toggle(index=i):
-                        if index in selected:selected.remove(index)
-                        else:selected.add(index)
-                        draw()
-                    tk.Button(pick,text=token,bg='#B9DAFF' if i in selected else '#F0F3F0',command=toggle).grid(row=i//4,column=i%4,sticky='w',padx=1,pady=1)
-            speech_box.bind('<KeyRelease>',draw,add='+');draw()
+            from token_picker import TokenPicker
+            picker = TokenPicker(line, speech_box, value, hidden, columns=4)
+            picker.pack(side='left', fill='x', expand=True)
             def remove():line.destroy();rows.remove(record)
             tk.Button(line,text='X',command=remove).pack(side='right')
-            record=(name,speech_box,selected);rows.append(record)
+            record=(name,speech_box,picker);rows.append(record)
         for item in original.get('dialogue',[]):add(item.get('speaker',''),item.get('text',''),item.get('hidden_indices',[]))
         if not rows:add('An','Happy birthday!',[]);add('Phong','Thank you! Do you like the cake?',[0,1])
         tk.Button(parent,text='+ Thêm lượt thoại',command=add).pack(anchor='w',pady=5)
         distract=entry('Đáp án nhiễu (phân cách bằng |)',' | '.join(original.get('distractors',[])))
         def collect():
             dialogue=[];answers=[]
-            for name,speech,selected in rows:
+            for name,speech,picker in rows:
                 speaker=value(name);text=value(speech).strip();tokens=TOKEN.findall(text)
                 if not speaker or not text:raise ValueError('Mỗi lượt thoại cần tên và nội dung.')
-                if any(i>=len(tokens) for i in selected):raise ValueError('Vị trí từ ẩn không hợp lệ.')
-                dialogue.append({'speaker':speaker,'text':text,'hidden_indices':sorted(selected)})
-                answers.extend(tokens[i] for i in sorted(selected))
+                indices = picker.indices()
+                dialogue.append({'speaker':speaker,'text':text,'hidden_indices':indices})
+                answers.extend(tokens[i] for i in indices)
             if not answers:raise ValueError('Cần chọn ít nhất một từ ẩn trong hội thoại.')
             extras=[x.strip() for x in value(distract).split('|') if x.strip()]
             return {'dialogue':dialogue,'distractors':extras,'options':answers+extras,'answer':' | '.join(answers)}

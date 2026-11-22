@@ -58,7 +58,7 @@ DATA = Path(os.environ.get('LOCALAPPDATA') or (Path.home() / 'AppData' / 'Local'
 DATA.mkdir(parents=True, exist_ok=True)
 # New installations create a clean database through Storage().
 # Never import the developer's testing database into a user's profile.
-if not (DATA / 'content_library').exists() and (BASE / 'content_library').exists():
+if not (DATA / 'content_library').exists() and (BASE / 'content_library').is_dir():
     _runtime_shutil.copytree(BASE / 'content_library', DATA / 'content_library')
 DB = DATA / 'tu_hoc.sqlite3' 
 AVATAR_OPTIONS = [('👤', 'Mặc định', 0), ('🐱', 'Mèo', 1), ('🐼', 'Gấu trúc', 2), ('🦊', 'Cáo', 3), ('🐸', 'Ếch', 4), ('🐰', 'Thỏ', 2), ('🐻', 'Gấu', 3), ('🐨', 'Koala', 3), ('🐯', 'Hổ', 4), ('🦁', 'Sư tử', 4), ('🐧', 'Chim cánh cụt', 4), ('🦄', 'Kỳ lân', 5), ('🐲', 'Rồng', 7), ('👑', 'Vương miện', 8), ('🚀', 'Tên lửa', 6), ('🌈', 'Cầu vồng', 5), ('🌟', 'Ngôi sao', 5)]

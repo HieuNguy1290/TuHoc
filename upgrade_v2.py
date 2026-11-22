@@ -44,7 +44,7 @@ class Curriculum:
                         if kind=='questions' and not obj.get('answer') and obj.get('blank_answers'):
                             # Multi-blank rows (e.g. dropdown_fill_blank) store answers per blank; heal older rows saved with answer=''.
                             obj=dict(obj,answer=' | '.join(str(x) for x in obj['blank_answers']))
-                        if kind=='questions' and (not obj.get('answer') or not obj.get('prompt')):raise ValueError('Thiếu prompt hoặc answer')
+                        if kind=='questions' and (not obj.get('answer') or (obj.get('type') != 'picture_missing_letters' and not obj.get('prompt'))):raise ValueError('Thiếu prompt hoặc answer')
                         if kind=='vocab' and (not obj.get('word') or (self.language=='en' and not obj.get('meaning'))):raise ValueError('Thiếu word hoặc meaning')
                         unique=obj.get('id') or f'{kind}:{theme}:{level}:{obj.get("word",obj.get("order",number))}'
                         if unique in ids and kind=='blocks' and not obj.get('id'):
@@ -149,7 +149,7 @@ class LearningService:
                 try:
                     obj['theme']=normalize_code(obj['theme'],self.content.data_dir);obj['level']=int(obj['level'])
                     if obj['theme'] not in {t[0] for t in theme_tuples(self.content.data_dir)} or not 1<=obj['level']<=theme_max(self.content.data_dir,obj['theme']):raise ValueError('theme hoặc level không hợp lệ')
-                    if kind=='questions' and (not obj['prompt'] or not obj['answer']):raise ValueError('Thiếu prompt / answer')
+                    if kind=='questions' and (not obj['answer'] or (obj['type'] != 'picture_missing_letters' and not obj['prompt'])):raise ValueError('Thiếu prompt / answer')
                     if kind=='vocab' and (not obj['word'] or (self.language=='en' and not obj['meaning'])):raise ValueError('Thiếu từ hoặc nghĩa')
                     for key in ('options','accepted_answers'):
                         if key in obj:obj[key]=[a.strip() for a in str(obj[key]).split('|') if a.strip()]
@@ -840,7 +840,8 @@ class GameAppMixin:
                 self.session_quiz(index)
             self.button(status,'Thử lại Pygame',try_pygame_again).pack(side='right',padx=(8,0))
         c=self._card(body)
-        prompt_label=tk.Label(c,text=str(q.get('prompt','')),bg='white',fg=INK,font=('Segoe UI',int(self._display_settings.get('text_size',18)),'bold'),wraplength=760,justify='left')
+        from question_prompt import display_prompt
+        prompt_label=tk.Label(c,text=str(display_prompt(q)),bg='white',fg=INK,font=('Segoe UI',int(self._display_settings.get('text_size',18)),'bold'),wraplength=760,justify='left')
         prompt_label.pack(anchor='w',pady=10)
         # Fit long prompts to the actual card width (including small screens/DPI).
         c.bind('<Configure>',lambda event:prompt_label.configure(wraplength=max(180,event.width-36)),add='+')

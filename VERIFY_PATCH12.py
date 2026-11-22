@@ -6,6 +6,7 @@ import importlib.util
 import pathlib
 import sys
 import unittest
+from unittest.mock import Mock, patch
 
 ROOT = pathlib.Path(__file__).resolve().parent
 
@@ -38,8 +39,25 @@ class Phase3Regression(unittest.TestCase):
         self.assertTrue(index_keywords, 'Quiz must pass _index to Pygame')
         self.assertTrue(any(isinstance(v, ast.BinOp) and isinstance(v.op, ast.Add) and isinstance(v.right, ast.Constant) and v.right.value == 1 for v in index_keywords), 'Quiz must pass 1-based _index')
         runtime_source = (ROOT / 'new_exercise_runtime.py').read_text(encoding='utf-8-sig')
-        self.assertIn("int(question.get('_index') or 1)", runtime_source)
+        self.assertIn('draw_question_progress(', runtime_source)
         self.assertNotIn("_index', 1)) - 1", runtime_source)
+
+        import pygame
+        from exercise_gfx import draw_question_progress
+
+        pygame.font.init()
+        try:
+            surface = pygame.Surface((960, 640))
+            font = pygame.font.Font(None, 24)
+            # Observe the string through a real font renderer.
+            spy = Mock(wraps=font)
+            with patch('pygame.font.SysFont', return_value=spy):
+                draw_question_progress(surface, {'_index': 1, '_total': 26})
+                draw_question_progress(surface, {'_index': 26, '_total': 26})
+                self.assertEqual([call.args[0] for call in spy.render.call_args_list],
+                                 ['Câu: 1/26', 'Câu: 26/26'])
+        finally:
+            pygame.font.quit()
 
     def test_sequential_progress_guard(self):
         self.assertIn('len(getattr(self, "s_answers", []))', self.quiz_source)
@@ -50,7 +68,10 @@ class Phase3Regression(unittest.TestCase):
     def test_extended_types_coverage(self):
         self.assertEqual(self.runtime.NEW_TYPES, frozenset({
             'image_multi_choice', 'picture_missing_letters', 'sentence_gaps',
-            'conversation_gaps', 'passage_gaps'}))
+            'conversation_gaps', 'passage_gaps', 'image_multi_select', 'text_multi_select',
+            'audio_multi_select', 'image_write_answer', 'image_underline_choice', 'sentence_underline_words',
+            'dropdown_fill_blank', 'multi_fill_blanks', 'image_sentence_fill', 'image_letter_pick',
+            'inline_dropdown_fill'}))
         self.assertIn('NEW_TYPES', self.exercise_source)
 
     def test_extended_grading(self):
@@ -80,5 +101,5 @@ class Phase3Regression(unittest.TestCase):
 if __name__ == '__main__':
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(Phase3Regression)
     result = unittest.TextTestRunner(verbosity=2).run(suite)
-    print('\nNOTE: Headless checks only; verify 16 questions and SDL on Windows manually.')
+    print('\nNOTE: Headless checks only; verify the native SDL window on Windows manually.')
     sys.exit(0 if result.wasSuccessful() else 1)

@@ -1680,7 +1680,8 @@ class LevelFlowMixin:
                 if obj['theme'] not in {t[0] for t in self._themes()}: raise ValueError('Chủ đề không hợp lệ.')
                 obj['level'] = validate_level(obj['level'])
                 if obj['level'] > self._max_level(obj['theme']): raise ValueError('Level vượt giới hạn.')
-                if not obj['id'] or not obj['prompt']: raise ValueError('Cần nhập mã câu hỏi và nội dung câu hỏi.')
+                if not obj['id'] or (typ != 'picture_missing_letters' and not obj['prompt']):
+                    raise ValueError('Cần nhập mã câu hỏi và nội dung câu hỏi.')
                 if typ in NEW_TYPES:
                     obj.update(entries['_collect_new']())
                 elif typ == 'matching':
@@ -1795,11 +1796,12 @@ class LevelFlowMixin:
                          if type_widget.get() in type_names else kind_var.get())
             type_widget.set(type_names[QUESTION_TYPES.index(kind_var.get())])
             rebuild()
-        def preview():
+        def preview(layout_override=None, owner=None, on_frame=None):
             """Use the actual exercise window for previews; never save or score."""
             typ = kind_var.get()
             try:
-                question = {'type': typ, 'prompt': get(controls['prompt']) or 'Xem trước bài tập'}
+                prompt = get(controls['prompt'])
+                question = {'type': typ, 'prompt': prompt if typ == 'picture_missing_letters' else prompt or 'Xem trước bài tập'}
                 if typ in NEW_TYPES:
                     question.update(entries['_collect_new']())
                 elif typ == 'matching':
@@ -1842,11 +1844,11 @@ class LevelFlowMixin:
                 # Preview the current staged visual layout, including unsaved edits.
                 # This is a copy only: preview must never persist or mutate a question.
                 from question_layout_store import get_layout
-                question['layout'] = get_layout({'layout': pending_layout['value']})
+                question['layout'] = get_layout({'layout': pending_layout['value'] if layout_override is None else layout_override})
                 if typ == 'listening_image_choice':
                     import listening_image_choice  # thieu file nay thi bao loi ro rang, khong im lang
                 import pygame_exercises
-                if not pygame_exercises.launch(self, question, lambda _answer: None):
+                if not pygame_exercises.launch(owner or self, question, lambda _answer: None, allow_feedback=False, on_frame=on_frame):
                     messagebox.showwarning('Xem trước',
                         'Không mở được cửa sổ xem trước. Hãy đóng cửa sổ bài tập khác rồi thử lại.', parent=self)
             except (ValueError, OSError, TypeError, KeyError, ImportError) as exc:
@@ -1856,7 +1858,9 @@ class LevelFlowMixin:
             # remains unchanged until the rendering integration in Stage 3.
             from question_layout_editor import edit_layout
             typ = kind_var.get()
-            question = {'type': typ, 'prompt': get(controls['prompt'])}
+            question = {'type': typ, 'prompt': get(controls['prompt']), 'id': get(controls['id']),
+                        'theme': get(controls['theme']), 'level': get(controls['level']),
+                        'lesson': get(controls['lesson'])}
             try:
                 # Read current editor values, including unsaved answer changes.
                 # This is a preview-only copy; no answer/scoring logic is changed.
@@ -1873,7 +1877,7 @@ class LevelFlowMixin:
                     question['options'] = [get(entries['left_%d' % i]) + ' = ' + get(entries['right_%d' % i])
                                            for i in range(20) if 'left_%d' % i in entries and 'right_%d' % i in entries
                                            and get(entries['left_%d' % i]) and get(entries['right_%d' % i])]
-                updated = edit_layout(self, question, pending_layout['value'])
+                updated = edit_layout(self, question, pending_layout['value'], preview=preview)
                 if updated is not None:
                     pending_layout['value'] = updated
             except (ValueError, tk.TclError) as exc:

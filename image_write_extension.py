@@ -1,6 +1,5 @@
 from question_rich_text import draw as draw_rich, wrap as wrap_rich
-from exercise_buttons import draw_complete
-from exercise_gfx import draw_question_progress
+from exercise_gfx import present_frame
 from exercise_gfx import open_exercise_window
 """Standalone image-to-written-answer editor and Pygame exercise."""
 import re
@@ -60,7 +59,10 @@ def run(question):
     navy=(32,52,77); bg=(241,247,252)
     text_layout=element(question,'question_text')
     image_layout=element(question,'question_image')
-    input_layout=element(question,'answer_area') or element(question,'input_area')
+    if (question.get('layout') or {}).get('version') == 2:
+        input_layout = element(question, 'input_area')
+    else:
+        input_layout = element(question, 'answer_area')
     if text_layout and text_layout.get('font_size'):
         font=_cached_font(None,text_layout['font_size'],False)
     picture=None
@@ -88,12 +90,13 @@ def run(question):
     legacy_content_bottom=max(field_y+field_height+25,
                        (image_layout.get('y',group_top)+image_height+25) if image_layout else 0,
                        (text_layout.get('y',95)+len(lines)*32+25) if text_layout else 0)
-    submit_y=max(561,field_y+75)
+    submit_y = 561
+    content_end = layout_content_bottom(question, max(640, legacy_content_bottom, field_y + field_height + 98))
     answer='';active=True;zoom_open=False;zoom_hit=None
     pygame.key.start_text_input()
     try:
         while True:
-            screen=page.begin(layout_content_bottom(question, max(submit_y+42, legacy_content_bottom)))
+            screen=page.begin(content_end)
             screen.fill(bg)
             pygame.draw.rect(screen,'white',(25,25,910,screen.get_height()-50),border_radius=18)
             prompt=str(question.get('prompt') or 'Nhìn hình và ghi đáp án')
@@ -121,12 +124,10 @@ def run(question):
             screen.blit(font.render(visible+('| ' if active else ''),True,navy),(field_x+13,field_y+max(4,(field_height-font.get_height())//2)))
             submit=pygame.Rect(705,submit_y,185,42)
             enabled=bool(answer.strip())
-            draw_complete(screen,submit,small,enabled,submit.collidepoint((pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1] + page.scroll)),pygame.mouse.get_pressed()[0])
-
-            draw_question_progress(screen, question)
             page.present()
-            if zoom_open and path:draw_zoom(screen,path)
-            pygame.display.flip()
+            page.complete(question, submit, small, enabled)
+            if zoom_open and path:draw_zoom(page.display,path)
+            present_frame(question)
             for event in page.events():
                 if zoom_open:
                     if event.type in (pygame.MOUSEBUTTONDOWN,pygame.QUIT) or (event.type==pygame.KEYDOWN and event.key==pygame.K_ESCAPE):zoom_open=False
@@ -141,7 +142,10 @@ def run(question):
                 if event.type==pygame.MOUSEBUTTONDOWN and event.button==1:
                     if zoom_hit is not None and zoom_hit.collidepoint(event.pos):
                         zoom_open=True;continue
-                    if submit.collidepoint(event.pos) and enabled:return answer.strip()
+                    if submit.collidepoint(event.viewport_pos):
+                        if enabled:
+                            return answer.strip()
+                        continue
                     if input_layout:active=field.collidepoint(event.pos)
             clock.tick(45)
     finally:

@@ -1,4 +1,5 @@
 """Offscreen Pygame review embedded in a Tk Frame; no SDL display or worker."""
+from question_prompt import display_prompt
 import logging
 import math
 import os
@@ -456,7 +457,7 @@ class ReviewPanel(tk.Frame):
             self.surface.set_clip(viewport)
 
             y = top + 10 - self.scroll
-            y = self._text(q.get('prompt', ''), 29, y, w - 58, 21, bold=True) + 10
+            y = self._text(display_prompt(q), 29, y, w - 58, 21, bold=True) + 10
             state = 'Chờ đánh giá' if ok is None else 'ĐÚNG' if ok else 'SAI'
             mark = 'wait' if ok is None else 'ok' if ok else 'no'
             color = GRAY if ok is None else GREEN if ok else RED

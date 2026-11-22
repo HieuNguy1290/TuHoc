@@ -1,6 +1,6 @@
 from question_rich_text import draw as draw_rich, wrap as wrap_rich
 from exercise_buttons import draw_complete
-from exercise_gfx import draw_question_progress
+from exercise_gfx import draw_question_progress, present_frame
 from exercise_gfx import open_exercise_window
 """Independent inline text fields for a single multi-blank exercise."""
 import re
@@ -260,7 +260,7 @@ def run(question):
             draw_complete(page.display, fixed_submit, small, ready,
                           fixed_submit.collidepoint(mouse), pygame.mouse.get_pressed()[0])
             draw_question_progress(page.display, question)
-            pygame.display.flip()
+            present_frame(question)
             if wf_pending:      # giải mã âm thanh SAU khung hình đầu tiên, tránh màn hình đen
                 wf_pending = False
                 try:
@@ -305,7 +305,7 @@ def run(question):
                             wf.speed_menu_open = not getattr(wf, 'speed_menu_open', False); continue
                         if vr.inflate(0, 18).collidepoint(event.pos):
                             wf.set_volume((event.pos[0] - vr.x) / max(1, vr.width)); wf_drag = 'volume'; continue
-                    viewport_pos = (event.pos[0], event.pos[1] - page.scroll)
+                    viewport_pos = event.viewport_pos
                     if fixed_submit.collidepoint(viewport_pos):
                         if ready: return list(values)
                         continue

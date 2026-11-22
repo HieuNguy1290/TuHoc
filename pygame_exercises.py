@@ -1,4 +1,4 @@
-from exercise_gfx import draw_question_progress
+from exercise_gfx import draw_question_progress, present_frame
 from question_rich_text import draw as draw_rich, wrap as wrap_rich
 """Optional Pygame exercise renderer. Does not own scoring, data, or navigation."""
 import math
@@ -200,12 +200,28 @@ def _exercise_worker():
             if pending is None:
                 _close_display()
 
-def launch(parent, question, on_answer, on_cancel=None):
-    """Open an independent SDL window; poll results on Tk's main thread."""
+def launch(parent, question, on_answer, on_cancel=None, *, allow_feedback=True, on_frame=None):
+    """Open an independent SDL window and poll results on Tk's main thread.
+
+    Editor previews opt out of feedback grading via allow_feedback.
+    """
     if not available() or question.get('type') not in SUPPORTED:
         return False
     # Resolve media on Tk thread before launching the SDL worker.
     prepared = dict(question)
+    frames = queue.Queue(maxsize=1) if on_frame is not None else None
+    if frames is not None:
+        frame_sent = False
+
+        def capture_frame():
+            nonlocal frame_sent
+            if not frame_sent:
+                import pygame
+                surface = pygame.display.get_surface()
+                frames.put_nowait((surface.get_size(), pygame.image.tobytes(surface, 'RGB')))
+                frame_sent = True
+
+        prepared['_studio_frame'] = capture_frame
     # The quiz flow normally supplies _pygame_image; resolve image fields
     # as well for callers that only pass the original question object.
     if not prepared.get('_pygame_image') and prepared.get('image') and hasattr(parent, 'media_file'):
@@ -288,7 +304,7 @@ def launch(parent, question, on_answer, on_cancel=None):
         modal_owner = None
     # Optional effect, controlled from the existing Settings page.
     settings = getattr(parent, '_display_settings', {}) or {}
-    feedback_enabled = bool(settings.get('dragon_feedback_enabled', False))
+    feedback_enabled = allow_feedback and bool(settings.get('dragon_feedback_enabled', False))
     results = queue.Queue(maxsize=1)
     global _worker_thread
     try:
@@ -302,6 +318,17 @@ def launch(parent, question, on_answer, on_cancel=None):
         release_sdl_session()
         raise
     def poll():
+        if frames is not None:
+            try:
+                size, pixels = frames.get_nowait()
+            except queue.Empty:
+                pass
+            else:
+                if parent.winfo_exists():
+                    try:
+                        on_frame(size, pixels)
+                    except Exception:
+                        traceback.print_exc()
         try:
             result = results.get_nowait()
         except queue.Empty:
@@ -422,7 +449,8 @@ def _run(question):
     if kind in ('fill', 'listening_fill', 'error'):
         try:
             from question_layout_runtime import element as _text_element
-            legacy_text_area = _text_element(question, 'answer_area')
+            field = 'input_area' if (question.get('layout') or {}).get('version') == 2 else 'answer_area'
+            legacy_text_area = _text_element(question, field)
         except (ImportError, AttributeError, TypeError, ValueError):
             pass
     # Order-card geometry is read once; slot indices follow the shuffled display.
@@ -1396,7 +1424,7 @@ def _run(question):
                         elif isinstance(index, int):
                             # Selecting an answer must never submit it immediately.
                             selected_option = index
-            pygame.display.flip()
+            present_frame(question)
             # Show the actual question before loading/decoding audio.
             if waveform_pending:
                 waveform_pending = False

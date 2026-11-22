@@ -1,6 +1,6 @@
 from question_rich_text import draw as draw_rich, wrap as wrap_rich
 from exercise_buttons import draw_complete
-from exercise_gfx import draw_question_progress
+from exercise_gfx import draw_question_progress, present_frame
 from exercise_gfx import open_exercise_window
 """Nhìn hình - hoàn thành câu: bấm từ trong ngân hàng để tự điền vào chỗ chấm.
 
@@ -355,7 +355,9 @@ def run(question, letter_mode=False):
     widest = max([sent_font.size(c)[0] for c in choices] + [0])
     slot_w = max(34, widest + 14) if letter_mode else max(96, widest + 26)
     slot_gap = 2 if letter_mode else 8
-    left, right = 65, 875
+    answer_area = layout_element(question, 'answer_area') or {}
+    left = min(840, answer_area.get('x', 65))
+    right = min(930, left + max(90, answer_area.get('width', 810)))
     items = []; x = left; y = 0; line_h = 46
     # Gom các mảnh chữ + ô trống dính liền nhau thành "từ" để xuống dòng theo cả từ
     # (ví dụ Hap....y không bị cắt giữa chữ và ô trống).
@@ -446,6 +448,10 @@ def run(question, letter_mode=False):
         sentence_top = content_top + 40
         hint_y = sentence_top + sentence_h + 30
         chips_top = hint_y + 34
+    if 'y' in answer_area:
+        sentence_top = answer_area['y']
+        hint_y = sentence_top + sentence_h + 10
+        chips_top = hint_y + 30
     img_box_h = max(60, sentence_top - 12 - content_top)
     if picture:
         iw, ih = picture.get_size()
@@ -629,7 +635,7 @@ def run(question, letter_mode=False):
                             target = None
                         break
             draw_question_progress(display_screen, question)
-            pygame.display.flip()
+            present_frame(question)
             if wf_pending:      # giải mã âm thanh SAU khung hình đầu tiên, tránh màn hình đen
                 wf_pending = False
                 try:

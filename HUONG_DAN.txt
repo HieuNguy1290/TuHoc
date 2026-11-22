@@ -1,0 +1,49 @@
+TUHOC CANVAS — HƯỚNG DẪN BÀN GIAO P6
+
+Cài đặt và chạy
+1. Dùng bản sao làm việc của TuHoc ở mốc ba40df1 hoặc checkout hiện tại.
+   Gói bàn giao có thư mục source/ chứa các tệp thay đổi. Nếu áp dụng vào
+   checkout khác, đối chiếu mã nguồn trước khi chép đúng đường dẫn tương ứng.
+   Lưu bản sao những tệp đã chỉnh ở máy đích.
+2. Dùng Python 3.12 có Tkinter. Tạo một môi trường ảo rồi cài các gói đã thử:
+   python -m venv .venv
+   python -m pip install pygame==2.6.1 Pillow==13.0.0 numpy==2.4.3 mutagen==1.47.0
+   Dùng Python trong .venv để cài và chạy. Trên Windows, chương trình nằm ở
+   .venv\Scripts\python.exe. Trên Linux, dùng .venv/bin/python.
+3. Từ gốc checkout, chạy python main.py. Có thể đặt LOCALAPPDATA trỏ tới
+   một thư mục thử riêng trước khi mở ứng dụng để tách hồ sơ và điểm thử.
+
+Chỉnh một câu
+- Mở Thêm / sửa bài tập, chọn dòng, rồi chọn Chỉnh bố cục.
+- Chọn phần tử ở cột trái hoặc trên canvas. Kéo hoặc nhập X/Y/W/H và bấm
+  Áp dụng. Dùng thanh cuộn, Ctrl+cuộn để zoom và nút Bám lưới 8 px khi cần.
+- Công tắc Máy tính / Điện thoại cho phép xem trước khung soạn và chỉnh
+  độc lập tọa độ. Pygame của ứng dụng sử dụng khung desktop 960×640.
+- Xem trước Pygame chạy bản nháp và gửi ảnh khung đầu về Studio. Có thể
+  thử đáp án trong cửa sổ này. Lưu bố cục để đưa bản nháp về màn hình
+  câu hỏi, sau đó Lưu bài tập để ghi JSON.
+- Với dạng điền chữ hoặc từ ẩn, tick các chữ/từ cần ẩn trong biểu mẫu.
+  Riêng Nhìn hình – điền chữ thiếu có thể để câu dẫn trống.
+
+Di trú JSON
+- Với dữ liệu quan trọng, chạy trên bản sao UTF-8 và đóng ứng dụng đang
+  sửa file trong lúc chạy lệnh.
+- Chuyển layout đang có: python layout_migrate.py ban_sao_cau_hoi.json
+- Phục hồi từ .bak: python layout_migrate.py ban_sao_cau_hoi.json --restore
+- Phục hồi thay nội dung file đích bằng bản .bak. Lưu riêng các chỉnh sửa
+  sau di trú cần giữ trước khi thực hiện. Lệnh giữ .bak để đối chiếu.
+- Tệp không có bố cục có thể tiếp tục dùng như trước.
+
+Checklist xác nhận trên Windows
+[ ] Chạy trên máy Windows thật. Ghi bản Python, Pygame, Windows và DPI.
+[ ] Ở DPI 100%, 125% và 150%, đổi kích thước Tk/SDL và kiểm tra tâm hitbox.
+[ ] Thử đủ 26 dạng theo ma trận docs/canvas-p0.md với câu không layout,
+    bố cục cũ và v2. Thử chuột, Tab, Enter, kéo, cuộn sâu và nút Hoàn thành.
+[ ] Gõ Tiếng Việt bằng bộ gõ đang dùng. Thử cả ô nhập và chữ thiếu.
+[ ] Nghe WAV/MP3 bằng thiết bị thật và kiểm tra phát, dừng, tua, âm lượng.
+[ ] Trong Studio, thử nhập pixel, kéo sau zoom/cuộn, hoàn tác và làm lại.
+[ ] Xem trước khi bật/tắt phản hồi. Đối chiếu 0 lượt chấm và 0 kết quả.
+[ ] Chạy di trú và phục hồi trên bản sao học liệu có bố cục đang sử dụng.
+
+Xem docs/canvas-p0.md để biết ma trận dạng bài và docs/canvas-p6.md để
+biết kết quả bàn giao. Gói không bao gồm dữ liệu học viên hoặc môi trường ảo.

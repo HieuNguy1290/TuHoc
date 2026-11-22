@@ -1,4 +1,5 @@
 """Read-only, paginated history UI using existing learning_sessions records."""
+from question_prompt import display_prompt
 import datetime
 import csv
 import io
@@ -79,7 +80,7 @@ def format_exam_detail(record):
         status = 'ĐÚNG' if graded.get(qid) is True else 'SAI' if graded.get(qid) is False else 'CHƯA CÓ KẾT QUẢ'
         answer = ordered.get(qid, []) if kind == 'order' else answers.get(qid)
         lines.extend((f'CÂU {index} — {status} ({kind})',
-                      str(question.get('prompt', '')),
+                      str(display_prompt(question)),
                       'Đã trả lời: ' + _answer_text(answer),
                       'Đáp án đúng: ' + _answer_text(_correct_answer(question))))
         if question.get('passage'):
@@ -264,7 +265,7 @@ def _reading_group_overview(items, index):
     for number in context['members']:
         item = items[number]
         children.append({'number': number + 1,
-                         'prompt': str(item['question'].get('prompt') or ''),
+                         'prompt': str(display_prompt(item['question'])),
                          'answer': item.get('answer'), 'expected': item.get('expected'),
                          'graded': item.get('graded'), 'type': item.get('type')})
     return dict(context, children=children,
@@ -332,7 +333,7 @@ def _exam_review_csv(record):
     for number, item in enumerate(_review_items(record), 1):
         grade = item['graded']
         writer.writerow([number, item['id'], item['type'],
-                         item['question'].get('prompt', ''),
+                         display_prompt(item['question']),
                          _answer_text(item['answer']),
                          _answer_text(item['expected']),
                          'Dung' if grade is True else 'Sai' if grade is False else 'Chua cham'])
@@ -528,7 +529,7 @@ def show_exam_detail(parent, record, library_dir=None):
                     line('Đáp án đúng: ' + _answer_text(child['expected']), 'expected')
             else:
                 line(f'CÂU {state["index"]+1} — {status} ({kind})', 'question')
-                line(q.get('prompt', ''))
+                line(display_prompt(q))
                 reading = _reading_context(items, state['index'])
                 if reading:
                     line(f'BÀI ĐỌC: {reading["title"]}', 'heading')

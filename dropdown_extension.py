@@ -1,6 +1,5 @@
 from question_rich_text import draw as draw_rich, wrap as wrap_rich
-from exercise_buttons import draw_complete
-from exercise_gfx import draw_question_progress
+from exercise_gfx import present_frame
 from exercise_gfx import open_exercise_window
 """Dropdown answer: Tk authoring widget and Pygame exercise window."""
 from pathlib import Path
@@ -90,10 +89,10 @@ def run(question):
     media_height=picture.get_height()+22 if picture else 32 if note else 0
     group_top=block_top(bottom,media_height+48)
     field_y=group_top+media_height
-    submit_y=max(560,field_y+80)
+    submit_y = 560
     # Optional per-question geometry. The field and its popup share one origin,
     # so pointer hit testing always follows the rendered answer control.
-    answer_layout = layout_element(question, 'answer_area')
+    answer_layout = layout_element(question, 'dropdown_area') if (question.get('layout') or {}).get('version') == 2 else layout_element(question, 'answer_area')
     if answer_layout:
         field_x = max(30, min(900, int(answer_layout.get('x', 175))))
         field_y = max(60, int(answer_layout.get('y', field_y)))
@@ -101,10 +100,9 @@ def run(question):
         field_height = max(40, min(90, int(answer_layout.get('height', 48))))
     else:
         field_x, field_width, field_height = 175, 340, 48
-    submit_y=max(submit_y,field_y+field_height+28)
     # Reserve space for the expanded popup and any elements placed below the page.
     content_extent = layout_content_bottom(
-        question, max(submit_y+45, field_y+field_height+min(5,len(options))*43+12)
+        question, max(640, field_y+field_height+min(5,len(options))*43+80)
     )
     try:
         while True:
@@ -123,13 +121,13 @@ def run(question):
             screen.blit(small.render(shown,True,navy if selected is not None else (126,138,150)),(field.x+15,field.y+max(5,(field.height-small.get_height())//2)))
             pygame.draw.polygon(screen,navy,[(field.right-34,field.centery-5),(field.right-20,field.centery-5),(field.right-27,field.centery+4)])
             submit=pygame.Rect(690,submit_y,200,45)
-            draw_complete(screen,submit,small,selected is not None,submit.collidepoint((pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1] + page.scroll)),pygame.mouse.get_pressed()[0])
 
             menu=[]
             if opened:
                 max_visible=min(5,len(options));menu_height=max_visible*43
                 menu_y=field.bottom+3
-                if menu_y+menu_height>submit_y-10:menu_y=max(bottom+8,field.top-menu_height-3)
+                if menu_y + menu_height > submit_y - 10 + page.scroll:
+                    menu_y = max(bottom+8, field.top-menu_height-3)
                 menu_rect=pygame.Rect(field.x,menu_y,field.width,menu_height)
                 pygame.draw.rect(screen,'white',menu_rect,border_radius=6)
                 pygame.draw.rect(screen,(95,130,167),menu_rect,2,border_radius=6)
@@ -140,9 +138,9 @@ def run(question):
                     while val and small.size(val)[0]>rect.width-20:val=val[:-2]+'…'
                     screen.blit(small.render(val,True,navy),(rect.x+10,rect.y+11))
                     menu.append((rect,j))
-            draw_question_progress(screen, question)
             page.present()
-            pygame.display.flip()
+            page.complete(question, submit, small, selected is not None)
+            present_frame(question)
             for event in page.events(scroll_enabled=not opened):
                 if event.type==pygame.QUIT:return None
                 if event.type==pygame.KEYDOWN:
@@ -154,10 +152,13 @@ def run(question):
                     if event.key==pygame.K_UP and opened:scroll=max(0,scroll-1)
                 if event.type==pygame.MOUSEWHEEL and opened:scroll=max(0,min(max(0,len(options)-5),scroll-event.y))
                 if event.type==pygame.MOUSEBUTTONDOWN and event.button==1:
+                    if submit.collidepoint(event.viewport_pos):
+                        if selected is not None:
+                            return options[selected]
+                        continue
                     if opened and any(rect.collidepoint(event.pos) for rect,_ in menu):
                         selected=next(i for rect,i in menu if rect.collidepoint(event.pos));opened=False
                     elif field.collidepoint(event.pos):opened=not opened
-                    elif submit.collidepoint(event.pos) and selected is not None:return options[selected]
                     else:opened=False
             clock.tick(45)
     finally:

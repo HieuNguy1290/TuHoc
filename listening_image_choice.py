@@ -1,5 +1,5 @@
 from question_rich_text import draw as draw_rich, wrap as wrap_rich
-from exercise_gfx import draw_question_progress
+from exercise_gfx import draw_question_progress, present_frame
 """Dang bai 'Nghe va chon dap an bang hinh' (type: listening_image_choice).
 
 Cau hoi:
@@ -85,7 +85,10 @@ def _run(question):
     prompt = str(question.get('question') or question.get('prompt') or 'Nghe và chọn hình đúng.')
 
     from exercise_gfx import open_exercise_window, draw_rect as aa_rect
+    from exercise_layout import Page
+    from layout_scroll_extent import content_bottom
     screen = open_exercise_window((W, H))
+    page = Page(screen)
     pygame.event.clear()
     pygame.display.set_caption('Tự Học - Bài tập')
     clock = pygame.time.Clock()
@@ -120,6 +123,7 @@ def _run(question):
             cards[i] = (custom.get('x', x), custom.get('y', y),
                         max(48, custom.get('width', w)),
                         max(48, custom.get('height', h)))
+    extent = content_bottom(question, max(620, max(pygame.Rect(r).bottom + 78 for r in cards)))
     pics = []
     # Keep the original pixels for custom-sized cards (never enlarge a thumbnail).
     def original_picture(path, max_width, max_height):
@@ -236,7 +240,7 @@ def _run(question):
     play_btn = pygame.Rect(60, 118, 64, 64)
     replay_btn = pygame.Rect(140, 126, 48, 48)
     bar = pygame.Rect(210, 142, 620, 12)
-    from exercise_buttons import complete_rect, draw_complete
+    from exercise_buttons import complete_rect
     submit = complete_rect(572)
     # Text size follows the matching saved answer slot, if specified.
     option_label_fonts = [host._cached_font(font_path, max(10, min(72, c['font_size'])), True)
@@ -281,7 +285,7 @@ def _run(question):
         if st['playing'] and not st['paused'] and pygame.mixer.get_init() and not pygame.mixer.music.get_busy():
             st.update(playing=False, since=None, played=total)
 
-        for ev in pygame.event.get():
+        for ev in page.events(scroll_enabled=not bool(zoom_open)):
             if zoom_open:
                 if ev.type in (pygame.MOUSEBUTTONDOWN,pygame.QUIT) or (ev.type==pygame.KEYDOWN and ev.key==pygame.K_ESCAPE):zoom_open=None
                 continue
@@ -310,6 +314,11 @@ def _run(question):
             elif ev.type == pygame.MOUSEMOTION:
                 hover = next((i for i, r in enumerate(cards) if pygame.Rect(r).collidepoint(ev.pos)), None)
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                if submit.collidepoint(ev.viewport_pos):
+                    if selected is not None:
+                        stop_audio()
+                        return options[selected][0]
+                    continue
                 zoom_target=next((path for rect,path in zoom_hits if rect.collidepoint(ev.pos)),None)
                 if zoom_target:
                     zoom_open=zoom_target;continue
@@ -334,14 +343,12 @@ def _run(question):
                     toggle_audio()
                 elif wf is None and replay_btn.collidepoint(ev.pos):
                     replay()
-                elif submit.collidepoint(ev.pos) and selected is not None:
-                    press_until['submit'] = now + 0.12
-                    stop_audio(); return options[selected][0]
                 else:
                     for i, r in enumerate(cards):
                         if pygame.Rect(r).collidepoint(ev.pos):
                             selected = i; press_until[i] = now + 0.12
 
+        screen = page.begin(extent, padding=0)
         screen.fill(BG)
         # tieu de
         #text('NGHE VÀ CHỌN HÌNH', f_small, GREEN, 40, 22)
@@ -438,7 +445,6 @@ def _run(question):
             text(str(i + 1), f_small, NAVY, badge.centerx, badge.centery, True)
         # nut xac nhan
         ready = selected is not None
-        draw_complete(screen, submit, f_bold, ready, submit.collidepoint(pygame.mouse.get_pos()), pygame.mouse.get_pressed()[0])
         # hieu ung click
         alive = []
         for x, y, t0 in ripples:
@@ -448,9 +454,11 @@ def _run(question):
                 pygame.draw.circle(s, (30, 146, 110, int(120 * (1 - age / 0.45))), (x, y), int(8 + age * 90), 3)
                 screen.blit(s, (0, 0)); alive.append((x, y, t0))
         ripples = alive
-        draw_question_progress(screen, question)
+        page.present()
+        page.complete(question, submit, f_bold, ready)
+        screen = page.display
         if zoom_open:draw_zoom(screen,zoom_open)
-        pygame.display.flip()
+        present_frame(question)
         if wf_pending:      # giai ma am thanh SAU khung hinh dau tien, tranh man hinh den
             wf_pending = False
             try:

@@ -11,7 +11,8 @@ def content_bottom(question, minimum, margin=48):
     layout = question.get('layout') or {}
     if not isinstance(layout, dict):
         return bottom
-    for key in layout:
+    elements = layout.get('desktop', {}) if layout.get('version') == 2 else layout
+    for key in elements:
         if key in ('complete_button', 'question_counter'):
             continue
         geometry = element(question, key)

@@ -1,6 +1,5 @@
 from question_rich_text import draw as draw_rich, wrap as wrap_rich
-from exercise_buttons import draw_complete
-from exercise_gfx import draw_question_progress
+from exercise_gfx import present_frame
 from exercise_gfx import open_exercise_window
 """Chọn đáp án từ danh sách thả xuống ngay trong câu (một hoặc nhiều chỗ).
 
@@ -233,16 +232,13 @@ def run(question):
                     pygame.draw.polygon(surface, navy, [(cx - 6, cy - 3), (cx + 6, cy - 3), (cx, cy + 4)])
             can = can_submit()
             submit = pygame.Rect(375, 556, 210, 46)
-            sub_hover = can and opened is None and submit.collidepoint((pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1] + page.scroll))
-            sub_down = sub_hover and pygame.mouse.get_pressed()[0]
-            draw_complete(surface,submit,small,can,sub_hover,sub_down)
 
             menu = []
             if opened is not None and opened in fields:
                 f = fields[opened]; n = len(options[opened]); row_h = 44; pad = 6; gap = 3
                 mh = n * row_h + (n - 1) * gap + pad * 2
                 my = f.bottom + 4
-                if my + mh > 548:
+                if my + mh > 548 + page.scroll:
                     my = f.top - mh - 4
                 mr = pygame.Rect(f.x, my, f.width, mh)
                 pygame.draw.rect(surface, (214, 223, 233), mr.move(0, 4), border_radius=10)
@@ -263,11 +259,11 @@ def run(question):
                     label_surf = ft.render(o, True, navy)
                     surface.blit(label_surf, label_surf.get_rect(midleft=(rr.x + 14, rr.centery)))
                     menu.append((rr, j))
-            draw_question_progress(surface, question)
             page.present()
+            page.complete(question, submit, small, can and opened is None)
             if zoom:
                 draw_zoom(screen, zoom)
-            pygame.display.flip()
+            present_frame(question)
             for event in page.events(scroll_enabled=(opened is None and zoom is None)):
                 if zoom:
                     if event.type in (pygame.MOUSEBUTTONDOWN, pygame.QUIT) or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
@@ -285,6 +281,10 @@ def run(question):
                     if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and can and opened is None:
                         return answer()
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if submit.collidepoint(event.viewport_pos):
+                        if can and opened is None:
+                            return answer()
+                        continue
                     z = next((p for r, p in zoom_rects if r.collidepoint(event.pos)), None)
                     if z:
                         zoom = z; continue
@@ -299,8 +299,6 @@ def run(question):
                     if fh is not None:
                         opened = None if opened == fh else fh; continue
                     opened = None
-                    if can and submit.collidepoint(event.pos):
-                        return answer()
             clock.tick(30)
     finally:
         pass  # Session worker owns the shared SDL display
