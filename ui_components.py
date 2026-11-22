@@ -1,4 +1,5 @@
 """Lightweight shared Tk canvas primitives; no external packages."""
+from ui_tokens import font_at
 import tkinter as tk
 from theme_config import UI_COLORS
 
@@ -13,7 +14,7 @@ class RoundedButton(tk.Canvas):
         bg={'primary':UI_COLORS['primary'],'outline':'white','ghost':UI_COLORS['background']}[variant]
         fg='white' if variant=='primary' else UI_COLORS['text']
         rounded_rect(self,2,2,width-2,max(44,height)-2,14,fill=bg,outline=UI_COLORS['border'] if variant=='outline' else '')
-        self.create_text(width/2,max(44,height)/2,text=text,fill=fg,font=('Segoe UI',12,'bold'))
+        self.create_text(width/2,max(44,height)/2,text=text,fill=fg,font=font_at(12, 'bold'))
         if command:
             self.bind('<Button-1>',lambda e:command())
             self.bind('<Return>',lambda e:command())
@@ -69,7 +70,7 @@ class ProgressRing(tk.Canvas):
 
 class Chip(tk.Label):
     def __init__(self,parent,text,**kw):
-        opts=dict(bg=UI_COLORS['tint'],fg=UI_COLORS['text'],padx=12,pady=6,font=('Segoe UI',11));opts.update(kw)
+        opts=dict(bg=UI_COLORS['tint'],fg=UI_COLORS['text'],padx=12,pady=6,font=font_at(11));opts.update(kw)
         super().__init__(parent,text=text,**opts)
 
 class Toast:

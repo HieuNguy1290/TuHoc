@@ -226,6 +226,14 @@ class GameAppMixin:
         tk.Label(c,text='Thiết lập dùng cho cả hai môn học',bg='white',fg=INK,font=('Segoe UI',15,'bold')).pack(anchor='w',pady=8)
         settings=self._display_settings
         controls={}
+        from ui_tokens import FONT_SCALES
+        labels=dict(zip(FONT_SCALES,('Nhỏ','Vừa','Lớn')))
+        selected=tk.StringVar(value=labels.get(settings.get('ui_font_scale'),'Vừa'))
+        font_row=tk.Frame(c,bg='white')
+        font_row.pack(fill='x',pady=4)
+        tk.Label(font_row,text='Cỡ chữ giao diện',bg='white',fg=INK).pack(side='left',padx=(0,12))
+        ttk.Combobox(font_row,values=tuple(labels.values()),textvariable=selected,
+                     state='readonly',width=8).pack(side='left')
         def slider(key,caption,minimum,maximum,default):
             row=tk.Frame(c,bg='white');row.pack(fill='x',pady=(4,7))
             tk.Label(row,text=caption,bg='white',fg=INK).pack(anchor='w')
@@ -273,6 +281,8 @@ class GameAppMixin:
             for key,var in controls.items():settings[key]=var.get()
             for key,var in colors.items():settings[key]=var.get()
             # Keep text_size for older quiz/vocabulary views, without coupling it to lesson content.
+            settings['ui_font_scale']=next(key for key,label in labels.items() if label==selected.get())
+            self.apply_font_preferences()
             settings['auto_next']=auto.get()
             settings['dragon_feedback_enabled']=dragon_enabled.get()
             self._save_display_settings()

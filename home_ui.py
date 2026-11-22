@@ -1,4 +1,5 @@
 """Home dashboard UI only. Reads existing storage; writes only via existing claim API."""
+from ui_tokens import COLORS as TOKEN_COLORS, font_at
 import datetime
 import time
 import tkinter as tk
@@ -6,7 +7,7 @@ from ui_components import Card, ProgressRing, ProgressBar, Toast, bind_hover
 from ui_motion import smoothstep, MotionJobs
 from theme_config import UI_COLORS
 
-GREEN='#2F7A50'; DARK='#1F3A2B'; MUTED='#5B6B60'; BG='#F8FAF5'
+GREEN=TOKEN_COLORS['primary']; DARK=TOKEN_COLORS['text']; MUTED=TOKEN_COLORS['muted']; BG=TOKEN_COLORS['background']
 
 class HomeDashboard:
     def __init__(self, app, body):
@@ -38,9 +39,9 @@ class HomeDashboard:
         return tk.Label(parent,text=text,font=('Segoe UI',size,'bold' if bold else 'normal'),fg=fg,bg=bg or parent.cget('bg'),**kw)
 
     def button(self,parent,text,command,primary=True):
-        button=tk.Button(parent,text=text,command=command,font=('Segoe UI',11,'bold'),bg=GREEN if primary else 'white',fg='white' if primary else GREEN,activebackground='#1F5A3A' if primary else '#E8F2E9',activeforeground='white' if primary else GREEN,relief='flat',bd=0,padx=12,pady=10,cursor='hand2',takefocus=True,highlightthickness=2,highlightcolor=GREEN)
+        button=tk.Button(parent,text=text,command=command,font=font_at(11, 'bold'),bg=GREEN if primary else 'white',fg='white' if primary else GREEN,activebackground=TOKEN_COLORS['primary_dark'] if primary else TOKEN_COLORS['tint'],activeforeground='white' if primary else GREEN,relief='flat',bd=0,padx=12,pady=10,cursor='hand2',takefocus=True,highlightthickness=2,highlightcolor=GREEN)
         normal=GREEN if primary else 'white'
-        hover='#236743' if primary else '#E8F2E9'
+        hover='#236743' if primary else TOKEN_COLORS['tint']
         def paint(color):
             if getattr(button,'_ready',True) and str(button.cget('state')) != 'disabled':button.configure(bg=color)
         button.bind('<Enter>',lambda e:paint(hover),add='+')
@@ -156,7 +157,7 @@ class HomeDashboard:
             new=not completed
             title='Bắt đầu học · Start' if new else f'Tiếp tục: {next_lesson[0]} · Level {next_lesson[1]}' if next_lesson else 'Bắt đầu học · Start'
             self.label(hero,title,19,True,'white',GREEN,wraplength=510,justify='left').grid(row=1,column=0,sticky='w',pady=(9,5))
-            self.label(hero,f'Bài {next_lesson[2]}/{self._lessons(next_lesson[3],next_lesson[1])}' if next_lesson else 'Chọn bài học đầu tiên',11,fg='#E8F2E9',bg=GREEN).grid(row=2,column=0,sticky='w')
+            self.label(hero,f'Bài {next_lesson[2]}/{self._lessons(next_lesson[3],next_lesson[1])}' if next_lesson else 'Chọn bài học đầu tiên',11,fg=TOKEN_COLORS['tint'],bg=GREEN).grid(row=2,column=0,sticky='w')
             btn=self.button(hero,'Học tiếp · Continue' if not new else 'Bắt đầu học · Start',app.topic_page,False)
             btn.grid(row=3,column=0,sticky='w',pady=(16,0))
             btn.bind('<Return>',lambda e:app.topic_page(),add='+')
@@ -409,8 +410,8 @@ class HomeDashboard:
     def _ring_value(self,ring,value):
         ring.delete('all');s=96
         ring.create_oval(7,7,s-7,s-7,outline='#A5D0B4',width=8)
-        ring.create_arc(7,7,s-7,s-7,start=90,extent=-360*value,style='arc',outline='#FFE58B',width=8)
-        ring.create_text(s/2,s/2,text=f'{value:.0%}',fill='white',font=('Segoe UI',16,'bold'))
+        ring.create_arc(7,7,s-7,s-7,start=90,extent=-360*value,style='arc',outline=TOKEN_COLORS['accent'],width=8)
+        ring.create_text(s/2,s/2,text=f'{value:.0%}',fill='white',font=font_at(16, 'bold'))
 
     def animate_bar(self,bar,target):
         if self.jobs.reduced:bar.value=target;bar.draw(265,8);return

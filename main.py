@@ -1,4 +1,5 @@
 """Tu Hoc v1.0 - offline desktop prototype (Python standard library)."""
+from ui_tokens import COLORS as TOKEN_COLORS, font_at, set_font_scale
 import json
 import os
 import sqlite3
@@ -62,7 +63,7 @@ if not (DATA / 'content_library').exists() and (BASE / 'content_library').is_dir
     _runtime_shutil.copytree(BASE / 'content_library', DATA / 'content_library')
 DB = DATA / 'tu_hoc.sqlite3' 
 AVATAR_OPTIONS = [('👤', 'Mặc định', 0), ('🐱', 'Mèo', 1), ('🐼', 'Gấu trúc', 2), ('🦊', 'Cáo', 3), ('🐸', 'Ếch', 4), ('🐰', 'Thỏ', 2), ('🐻', 'Gấu', 3), ('🐨', 'Koala', 3), ('🐯', 'Hổ', 4), ('🦁', 'Sư tử', 4), ('🐧', 'Chim cánh cụt', 4), ('🦄', 'Kỳ lân', 5), ('🐲', 'Rồng', 7), ('👑', 'Vương miện', 8), ('🚀', 'Tên lửa', 6), ('🌈', 'Cầu vồng', 5), ('🌟', 'Ngôi sao', 5)]
-GREEN, DARK, PALE, YELLOW, BG = '#39865B', '#285D40', '#E2F0E2', '#F9E9AC', '#F8FAF5'
+GREEN, DARK, PALE, YELLOW, BG = '#39865B', '#285D40', '#E2F0E2', '#F9E9AC', TOKEN_COLORS['background']
 
 
 def normalize(text):
@@ -432,11 +433,11 @@ class TeachingTooltip:
             except tk.TclError: pass
             frame = tk.Frame(popup, bg='#173D2C', padx=11, pady=8, bd=1, relief='solid')
             frame.pack()
-            tk.Label(frame, text=self.title, bg='#173D2C', fg='white', font=('Segoe UI',10,'bold')).pack(anchor='w')
+            tk.Label(frame, text=self.title, bg='#173D2C', fg='white', font=font_at(10, 'bold')).pack(anchor='w')
             if self.shortcut:
-                tk.Label(frame, text=''+self.shortcut, bg='#173D2C', fg='#C8F5D5', font=('Segoe UI',9)).pack(anchor='w')
+                tk.Label(frame, text=''+self.shortcut, bg='#173D2C', fg='#C8F5D5', font=font_at(9)).pack(anchor='w')
             if self.detail:
-                tk.Label(frame, text=self.detail, bg='#173D2C', fg='white', font=('Segoe UI',9), wraplength=280, justify='left').pack(anchor='w')
+                tk.Label(frame, text=self.detail, bg='#173D2C', fg='white', font=font_at(9), wraplength=280, justify='left').pack(anchor='w')
             popup.update_idletasks()
             root = self.widget.winfo_toplevel()
             left, top = root.winfo_rootx(), root.winfo_rooty()
@@ -475,9 +476,9 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         self.configure(bg=BG)
         self.data_dir=DATA; self.db=Storage(); self.exercises=self.reload_exercises(); self.student=None; self.started=0; self.audio=Audio();self.learning_audio=LearningAudio();self.mouse_effects=MouseEffects(self)
         self.style=ttk.Style(self); self.style.theme_use('clam')
-        self.style.configure('TButton',font=('Segoe UI',11),padding=8)
-        self.style.configure('TCombobox',font=('Segoe UI',11))
-        self.option_add('*Font', ('Segoe UI', 11))
+        self.style.configure('TButton',font=font_at(11),padding=8)
+        self.style.configure('TCombobox',font=font_at(11))
+        self.option_add('*Font', font_at(11))
         self._shell = None
         self._navigation_history = []
         self._navigation_current = None
@@ -488,6 +489,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         self.recording_session = None
         self.recording_busy = False
         self.setup_upgrade()
+        self.apply_font_preferences()
         self.ui_grid = UIGrid(self)
         install_wheel_scroll(self)
         install_drag_scroll(self)
@@ -500,6 +502,12 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         self.after(1000,self._time_heartbeat)
         self.protocol("WM_DELETE_WINDOW", self._shutdown_app)
         self.show_profiles()
+
+    def apply_font_preferences(self):
+        set_font_scale(self._display_settings.get('ui_font_scale','medium'))
+        self.option_add('*Font',font_at(11))
+        self.style.configure('TButton',font=font_at(11))
+        self.style.configure('TCombobox',font=font_at(11))
 
     def _stop_reading_tts(self):
         """Stop every speech subprocess started by this application."""
@@ -884,7 +892,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
             layer = tk.Toplevel(self)
             layer.withdraw()
             layer.overrideredirect(True)
-            layer.configure(bg='#FFFFFF')
+            layer.configure(bg=TOKEN_COLORS['surface'])
             layer.geometry(f'{w}x{h}+{x}+{y}')
             # 0.999 (not 1.0) keeps the window layered from creation, so the first
             # fade step does not switch window style and flash.
@@ -1037,14 +1045,14 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
                           f'root_children={_destroy_count}')
 
     def label(self,parent,text,size=12,bold=False,color=DARK,**kw):
-        return tk.Label(parent,text=text,font=('Segoe UI',size,'bold' if bold else 'normal'),fg=color,bg=parent.cget('bg'),wraplength=750,justify='left',**kw)
+        return tk.Label(parent,text=text,font=font_at(size,'bold' if bold else 'normal'),fg=color,bg=parent.cget('bg'),wraplength=750,justify='left',**kw)
 
     def button(self,parent,text,command):
         # A short, visible selection pulse before page navigation.  The event
         # loop gets time to paint the pressed state before a heavy page builds.
         button = tk.Button(parent,text=text,bg=GREEN,fg='white',
                            activebackground=DARK,activeforeground='white',
-                           font=('Segoe UI',11,'bold'),bd=0,padx=17,pady=10,
+                           font=font_at(11, 'bold'),bd=0,padx=17,pady=10,
                            cursor='hand2')
         def activate():
             if getattr(button, '_selection_pending', False):
@@ -1100,7 +1108,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         """Button for repeatable actions; do not register it as page navigation."""
         button = tk.Button(parent, text=text, bg=GREEN, fg='white',
                            activebackground=DARK, activeforeground='white',
-                           font=('Segoe UI', 11, 'bold'), bd=0, padx=17, pady=10,
+                           font=font_at(11, 'bold'), bd=0, padx=17, pady=10,
                            cursor='hand2', command=command)
         button.bind('<Enter>', lambda e, b=button: b.configure(bg='#257B56'), add='+')
         button.bind('<Leave>', lambda e, b=button: b.configure(bg=GREEN), add='+')
@@ -1120,8 +1128,8 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         dialog.minsize(390,390)
         dialog.transient(self)
         dialog.configure(bg='#F5FAF6')
-        tk.Label(dialog,text='⌨  Hướng dẫn phím tắt',font=('Segoe UI',16,'bold'),bg='#F5FAF6',fg='#285D40').pack(anchor='w',padx=20,pady=(18,4))
-        tk.Label(dialog,text='Các lệnh chỉ tác động lên trang đang mở.',font=('Segoe UI',10),bg='#F5FAF6',fg='#52675B').pack(anchor='w',padx=20,pady=(0,10))
+        tk.Label(dialog,text='⌨  Hướng dẫn phím tắt',font=font_at(16, 'bold'),bg='#F5FAF6',fg='#285D40').pack(anchor='w',padx=20,pady=(18,4))
+        tk.Label(dialog,text='Các lệnh chỉ tác động lên trang đang mở.',font=font_at(10),bg='#F5FAF6',fg='#52675B').pack(anchor='w',padx=20,pady=(0,10))
         holder=tk.Frame(dialog,bg='#F5FAF6');holder.pack(fill='both',expand=True,padx=18)
         canvas=tk.Canvas(holder,bg='#F5FAF6',highlightthickness=0)
         scroll=tk.Scrollbar(holder,orient='vertical',command=canvas.yview)
@@ -1132,11 +1140,11 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         canvas.bind('<Configure>',lambda e=None:canvas.itemconfigure(win,width=e.width if e is not None else canvas.winfo_width()))
         sections=[('Toàn chương trình', [('F1','Mở bảng phím tắt'),('Esc','Tắt công cụ đang bật'),('Ctrl + Q','Viết ghi chú tự do'),('Ctrl + D','Vẽ đường'),('Ctrl + E','Xóa đối tượng'),('Ctrl + K','Chọn màu'),('Ctrl + Z','Hoàn tác nét vẽ'),('Ctrl + Shift + X','Xóa tất cả chú thích')]),('Riêng Tập đọc',[('Ctrl + H','Tô màu chữ'),('Ctrl + U','Gạch chân'),('Ctrl + B','In đậm'),('Ctrl + M','Đổi màu chữ'),('Ctrl + P','Chọn màu bút'),('Ctrl + +','Phóng to chữ'),('Ctrl + -','Thu nhỏ chữ')])]
         for section,items in sections:
-            tk.Label(rows,text=section,bg='#F5FAF6',fg='#285D40',font=('Segoe UI',12,'bold')).pack(anchor='w',pady=(12,5))
+            tk.Label(rows,text=section,bg='#F5FAF6',fg='#285D40',font=font_at(12, 'bold')).pack(anchor='w',pady=(12,5))
             for shortcut,meaning in items:
                 line=tk.Frame(rows,bg='white',pady=5,padx=8);line.pack(fill='x',pady=2)
-                tk.Label(line,text=shortcut,width=14,anchor='w',bg='white',fg='#12603A',font=('Segoe UI',10,'bold')).pack(side='left')
-                tk.Label(line,text=meaning,anchor='w',bg='white',fg='#283D31',font=('Segoe UI',10)).pack(side='left')
+                tk.Label(line,text=shortcut,width=14,anchor='w',bg='white',fg='#12603A',font=font_at(10, 'bold')).pack(side='left')
+                tk.Label(line,text=meaning,anchor='w',bg='white',fg='#283D31',font=font_at(10)).pack(side='left')
         tk.Button(dialog,text='Đóng',command=dialog.destroy,bg='#D9EFE0',fg='#285D40',bd=0,padx=16,pady=7).pack(pady=12)
         dialog.bind('<Escape>',lambda e:dialog.destroy())
 
@@ -1168,7 +1176,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         button = tk.Button(
             panel, text='⚙',
             command=open_content_manager,
-            bg='#FFFFFF', fg='#285D40', activebackground='#D3EBDD',
+            bg=TOKEN_COLORS['surface'], fg='#285D40', activebackground='#D3EBDD',
             font=('Segoe UI Symbol', 16, 'bold'), bd=0,
             padx=10, pady=5, cursor='hand2',
         )
@@ -1462,13 +1470,13 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         # An opaque Canvas backdrop would conceal the display on some Windows
         # setups, even if a screenshot was attempted. No backdrop is created.
         self._nav_backdrop=None
-        drawer=tk.Frame(host,bg='#FFFFFF',highlightthickness=1,highlightbackground='#DDE4E8')
+        drawer=tk.Frame(host,bg=TOKEN_COLORS['surface'],highlightthickness=1,highlightbackground='#DDE4E8')
         self._nav_drawer=drawer
         drawer.place(x=-315,y=0,width=315,relheight=1)
         drawer.lift()
         title=tk.Frame(drawer,bg='#E2F0E2',padx=15,pady=10);title.pack(fill='x')
-        tk.Label(title,text='☰  MENU',bg='#E2F0E2',fg=DARK,font=('Segoe UI',17,'bold')).pack(side='left')
-        tk.Button(title,text='✕',command=self._close_navigation_drawer,bg='#E2F0E2',bd=0,font=('Segoe UI',16)).pack(side='right')
+        tk.Label(title,text='☰  MENU',bg='#E2F0E2',fg=DARK,font=font_at(17, 'bold')).pack(side='left')
+        tk.Button(title,text='✕',command=self._close_navigation_drawer,bg='#E2F0E2',bd=0,font=font_at(16)).pack(side='right')
         items=[('⌂  Trang chủ',self.home),
                ('📖  Bài học & bài tập',self.topic_page),('📚  Tập đọc / Reading',self.reading_menu),('📝  Kiểm tra',self.exam_page),
                ('🎧  Chính tả MP3',self.dictation_page),('🎮  Trò chơi',self.games_page),
@@ -1502,10 +1510,10 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
                     navigate_when_ready()
                 self._close_navigation_drawer(animate=True, on_complete=finish)
             item=tk.Button(inner,text=label,command=navigate,bg='white',fg=DARK,bd=0,
-                      font=('Segoe UI',12),anchor='w',padx=17,pady=11,
+                      font=font_at(12),anchor='w',padx=17,pady=11,
                       activebackground='#E8F3EB',cursor='hand2')
             item.pack(fill='x',padx=7,pady=2)
-            add_hover(item,'#FFFFFF','#E8F3EB')
+            add_hover(item,TOKEN_COLORS['surface'],'#E8F3EB')
         # Menu has its own wheel/drag scrolling, independent of the lesson canvas.
         self._menu_scroll_canvas=canvas
         self._menu_drag_start=None
@@ -1608,7 +1616,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
             canvas.create_oval(9,10,36,32,fill=core,outline='#B50E2B',width=1)
             canvas.create_text(22,21,text='♥',font=('Segoe UI Symbol',17,'bold'),fill='white')
             canvas.create_text(48,21,text='Donate',anchor='w',
-                               font=('Segoe UI',13,'bold'),fill='#D7193F')
+                               font=font_at(13, 'bold'),fill='#D7193F')
             # Twinkles travel around the heart; extra bright every ~2 seconds.
             angle=tick*0.22
             for offset in (0,2.45):
@@ -1628,10 +1636,10 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         """Shared accessible button with consistent subject-picker hover feedback."""
         normal = '#FFF0EF' if danger else (PALE if secondary else GREEN)
         hover = '#FFE0DD' if danger else ('#D9EFE0' if secondary else '#257B56')
-        foreground = '#A52D24' if danger else (DARK if secondary else 'white')
+        foreground = TOKEN_COLORS['error'] if danger else (DARK if secondary else 'white')
         button = tk.Button(parent,text=text,command=command,
             bg=normal,fg=foreground,activebackground=hover,
-            activeforeground=foreground,font=('Segoe UI',11,'bold'),
+            activeforeground=foreground,font=font_at(11, 'bold'),
             relief='flat',bd=0,padx=14,pady=9,cursor='hand2',
             takefocus=True,highlightthickness=2,highlightcolor=GREEN)
         def set_hover(active):
@@ -1665,11 +1673,11 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         panel.lift()
         heading=tk.Frame(panel,bg=PALE,padx=12,pady=9);heading.pack(fill='x')
         tk.Label(heading,text='💝 Donate · Ủng hộ kênh',bg=PALE,fg=DARK,
-                 font=('Segoe UI',11,'bold')).pack(side='left')
+                 font=font_at(11, 'bold')).pack(side='left')
         tk.Button(heading,text='✕',command=self._close_donate_panel,
                   bg=PALE,fg=DARK,bd=0,cursor='hand2').pack(side='right')
         tk.Button(panel,text='▶  Subscribe kênh YouTube',command=self._open_donate_youtube,
-                  font=('Segoe UI',11,'bold'),bg='#E7F3EA',fg=DARK,
+                  font=font_at(11, 'bold'),bg='#E7F3EA',fg=DARK,
                   activebackground='#CDE7D6',relief='flat',bd=0,
                   padx=14,pady=10,cursor='hand2').pack(fill='x',padx=12,pady=14)
         self.after_idle(lambda p=panel: self._animate_donate_panel(p,8,320)
@@ -1718,13 +1726,13 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         panel.place(x=12,y=-650,width=width,height=620)
         panel.lift()
         top=tk.Frame(panel,bg=PALE,padx=15,pady=11);top.pack(fill='x')
-        tk.Label(top,text=self.db.selected_avatar(self.student['id'])+'  '+self.student['name'],bg=PALE,fg=DARK,font=('Segoe UI',14,'bold')).pack(side='left')
-        tk.Button(top,text='✕',command=self._close_account_panel,bg=PALE,bd=0,font=('Segoe UI',15)).pack(side='right')
+        tk.Label(top,text=self.db.selected_avatar(self.student['id'])+'  '+self.student['name'],bg=PALE,fg=DARK,font=font_at(14, 'bold')).pack(side='left')
+        tk.Button(top,text='✕',command=self._close_account_panel,bg=PALE,bd=0,font=font_at(15)).pack(side='right')
         balance=tk.Frame(panel,bg='white',padx=14,pady=12);balance.pack(fill='x')
         for label,value in [('💎 Ngọc',self.db.gems(self.student['id'])),('⭐ Sao',stars),('🏆 Điểm',points)]:
             line=tk.Frame(balance,bg='white');line.pack(fill='x',pady=3)
-            tk.Label(line,text=label,bg='white',fg=DARK,font=('Segoe UI',12)).pack(side='left')
-            tk.Label(line,text=str(value),bg='white',fg=GREEN,font=('Segoe UI',12,'bold')).pack(side='right')
+            tk.Label(line,text=label,bg='white',fg=DARK,font=font_at(12)).pack(side='left')
+            tk.Label(line,text=str(value),bg='white',fg=GREEN,font=font_at(12, 'bold')).pack(side='right')
         actions=[('🏅  Achievement · Nhận ngọc',self.level_achievements_page),('🎨  Đổi icon tài khoản',self.owned_avatar_page),('🛍  Cửa hàng icon',self.avatar_shop_page),('⏱  Thống kê thời gian',self.time_statistics_page),('🏅  Thành tích & Kỷ lục',self.achievement_page),('📊  Báo cáo học tập',self.report_page),('▥  Tiến độ học tập',self.lesson_progress_page),('👤  Đổi tài khoản',self.show_profiles)]
         for title,callback in actions:
             def navigate(fn=callback):
@@ -1734,7 +1742,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
                     self._account_navigation_pending=False
                     self._navigate_to(fn)
                 self._close_account_panel(animate=True,on_complete=finish)
-            tk.Button(panel,text=title,command=navigate,bg='white',fg=DARK,activebackground=PALE,bd=0,font=('Segoe UI',11),anchor='w',padx=20,pady=11,cursor='hand2').pack(fill='x',padx=7,pady=2)
+            tk.Button(panel,text=title,command=navigate,bg='white',fg=DARK,activebackground=PALE,bd=0,font=font_at(11),anchor='w',padx=20,pady=11,cursor='hand2').pack(fill='x',padx=7,pady=2)
         self.after_idle(lambda p=panel:self._animate_account_panel(p,8)
                         if p.winfo_exists() and self._account_panel is p else None)
 
@@ -1785,7 +1793,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
             line=tk.Frame(body,bg='white',padx=12,pady=9,highlightbackground='#D5E6DC',highlightthickness=1)
             line.pack(fill='x',pady=4)
             tk.Label(line,text=avatar,font=('Segoe UI Emoji',25),bg='white').pack(side='left',padx=12)
-            tk.Label(line,text=name,font=('Segoe UI',12,'bold'),bg='white',fg=DARK).pack(side='left')
+            tk.Label(line,text=name,font=font_at(12, 'bold'),bg='white',fg=DARK).pack(side='left')
             def select(icon=avatar):
                 self.db.buy_or_select_avatar(sid,icon)
                 self.owned_avatar_page()
@@ -1805,7 +1813,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
             line=tk.Frame(body,bg='white',padx=12,pady=9,highlightbackground='#D5E6DC',highlightthickness=1)
             line.pack(fill='x',pady=4)
             tk.Label(line,text=avatar,font=('Segoe UI Emoji',26),bg='white').pack(side='left',padx=(0,14))
-            tk.Label(line,text=name,bg='white',fg=DARK,font=('Segoe UI',12,'bold')).pack(side='left')
+            tk.Label(line,text=name,bg='white',fg=DARK,font=font_at(12, 'bold')).pack(side='left')
             is_owned=avatar in owned
             label='Đang dùng' if selected==avatar else ('Sử dụng' if is_owned else f'💎 {price} ngọc')
             def choose(icon=avatar,title=name,cost=price,has_it=is_owned):
@@ -1922,7 +1930,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
                 root_y=text_widget.winfo_rooty()+box[1]-15
                 x=max(5,min(self.winfo_width()-35,root_x-self.winfo_rootx()))
                 y=max(5,min(self.winfo_height()-35,root_y-self.winfo_rooty()))
-                plus=tk.Button(self,text='+',font=('Segoe UI',12,'bold'),bg='#3B9B65',fg='white',
+                plus=tk.Button(self,text='+',font=font_at(12, 'bold'),bg='#3B9B65',fg='white',
                     activebackground='#237548',activeforeground='white',bd=0,width=2,height=1,
                     cursor='hand2',command=lambda:(self._hide_selection_plus(),save_callback(text_widget)))
                 self._selection_plus=plus
@@ -1972,9 +1980,9 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         dialog.resizable(False, False)
         dialog.transient(self)
         dialog.grab_set()
-        frame = tk.Frame(dialog, bg='#FFFFFF', padx=18, pady=16)
+        frame = tk.Frame(dialog, bg=TOKEN_COLORS['surface'], padx=18, pady=16)
         frame.pack(fill='both', expand=True)
-        tk.Label(frame, text='MICRO GHI ÂM', font=('Segoe UI', 14, 'bold'), bg='white', fg=DARK).pack(anchor='w')
+        tk.Label(frame, text='MICRO GHI ÂM', font=font_at(14, 'bold'), bg='white', fg=DARK).pack(anchor='w')
         tk.Label(frame, text='Micro được dùng cho cả Ghi âm và Ghi hình + tiếng micro.',
                  bg='white', fg=DARK).pack(anchor='w', pady=(7, 12))
         options = [('Mặc định Windows (tự thay khi đổi thiết bị)', None)]
@@ -2129,9 +2137,9 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         self._v8_dock=dock;self._v8_dock_job=None
         dock.lift()  # tools remain in front of the reader
         head=tk.Frame(dock,bg='white');head.pack(fill='x',padx=8,pady=(10,4))
-        title=tk.Label(head,text='Công cụ · Tools',bg='white',fg=K['text'],font=('Segoe UI',13,'bold'))
+        title=tk.Label(head,text='Công cụ · Tools',bg='white',fg=K['text'],font=font_at(13, 'bold'))
         toggle=tk.Button(head,bd=0,bg='white',fg=K['primary'],activebackground=K['tint'],
-                         font=('Segoe UI',14,'bold'),width=3,cursor='hand2',takefocus=True)
+                         font=font_at(14, 'bold'),width=3,cursor='hand2',takefocus=True)
         toggle.pack(side='right')
         wrap=tk.Frame(dock,bg='white')
         canvas=tk.Canvas(wrap,bg='white',highlightthickness=0,bd=0)
@@ -2176,17 +2184,17 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
             r=getattr(self,'_v8_active_reader',None)
             if alive(r):r.set_tool_color(key,chosen)
         def section(text):
-            tk.Label(inner,text=text,bg='white',fg=K['muted'],font=('Segoe UI',9,'bold'),anchor='w').pack(fill='x',padx=12,pady=(12,3))
+            tk.Label(inner,text=text,bg='white',fg=K['muted'],font=font_at(9, 'bold'),anchor='w').pack(fill='x',padx=12,pady=(12,3))
         def plain(parent,text,cmd,**grid):
             b=tk.Button(parent,text=text,command=cmd,bg='white',fg=K['primary_dark'],activebackground=K['tint'],
-                        font=('Segoe UI',10,'bold'),bd=1,relief='solid',highlightthickness=0,cursor='hand2',pady=7,takefocus=True)
+                        font=font_at(10, 'bold'),bd=1,relief='solid',highlightthickness=0,cursor='hand2',pady=7,takefocus=True)
             return b
         section('VIẾT & ĐÁNH DẤU · MARK UP')
         for key,label in [('draw','✎  Vẽ · Draw'),('fill','▨  Tô vùng · Fill'),('highlight','🖍  Highlight chữ'),
                           ('underline','U̲  Gạch chân · Underline'),('textbox','▣  Textbox'),('note','✍  Ghi chú · Note')]:
             row=tk.Frame(inner,bg='white');row.pack(fill='x',padx=10,pady=2)
             b=tk.Button(row,text=label,command=lambda k=key:pick(k),anchor='w',bg='white',fg=K['primary_dark'],
-                        activebackground=K['tint'],font=('Segoe UI',10,'bold'),bd=1,relief='flat',highlightthickness=1,
+                        activebackground=K['tint'],font=font_at(10, 'bold'),bd=1,relief='flat',highlightthickness=1,
                         highlightbackground=K['border'],cursor='hand2',padx=10,pady=8,takefocus=True)
             b.pack(side='left',fill='x',expand=True)
             tool_buttons[key]=b
@@ -2378,11 +2386,11 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         panel.place(x=x,y=-height-8,width=width,height=height)
         panel.lift()
         heading=tk.Frame(panel,bg=PALE,padx=12,pady=11);heading.pack(fill='x')
-        tk.Label(heading,text='🔔 Thông báo',font=('Segoe UI',13,'bold'),fg=DARK,bg=PALE).pack(side='left')
-        tk.Button(heading,text='✕',command=self._close_notification_panel,bg=PALE,bd=0,font=('Segoe UI',13)).pack(side='right')
+        tk.Label(heading,text='🔔 Thông báo',font=font_at(13, 'bold'),fg=DARK,bg=PALE).pack(side='left')
+        tk.Button(heading,text='✕',command=self._close_notification_panel,bg=PALE,bd=0,font=font_at(13)).pack(side='right')
         notification_cards=[]
         if quests:
-            tk.Label(panel,text=f'🎁 {len(quests)} phần thưởng đang chờ nhận',bg='white',fg='#A46A00',font=('Segoe UI',10,'bold'),anchor='w').pack(fill='x',padx=13,pady=(10,5))
+            tk.Label(panel,text=f'🎁 {len(quests)} phần thưởng đang chờ nhận',bg='white',fg='#A46A00',font=font_at(10, 'bold'),anchor='w').pack(fill='x',padx=13,pady=(10,5))
             outer=tk.Frame(panel,bg='white');outer.pack(fill='both',expand=True,padx=8)
             canvas=tk.Canvas(outer,bg='white',bd=0,highlightthickness=0)
             scrollbar=tk.Scrollbar(outer,orient='vertical',command=canvas.yview)
@@ -2415,10 +2423,10 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
             for widget in (canvas,inner):
                 for seq in ('<MouseWheel>','<Button-4>','<Button-5>'):widget.bind(seq,scroll)
         else:
-            tk.Label(panel,text='✓ Chưa có phần thưởng mới',font=('Segoe UI',12,'bold'),bg='white',fg=GREEN).pack(pady=(32,9))
-            tk.Label(panel,text='Khi hoàn thành nhiệm vụ Achievement,\nphần thưởng sẽ xuất hiện ở đây.',font=('Segoe UI',10),bg='white',fg='#667A6C',justify='center').pack()
+            tk.Label(panel,text='✓ Chưa có phần thưởng mới',font=font_at(12, 'bold'),bg='white',fg=GREEN).pack(pady=(32,9))
+            tk.Label(panel,text='Khi hoàn thành nhiệm vụ Achievement,\nphần thưởng sẽ xuất hiện ở đây.',font=font_at(10),bg='white',fg='#667A6C',justify='center').pack()
         tk.Button(panel,text='🏅 Xem tất cả Achievement',command=lambda:self._close_notification_panel(animate=True,on_complete=self.level_achievements_page),
-                  bg=PALE,fg=DARK,bd=0,font=('Segoe UI',10,'bold'),pady=10,cursor='hand2').pack(fill='x',padx=12,pady=10)
+                  bg=PALE,fg=DARK,bd=0,font=font_at(10, 'bold'),pady=10,cursor='hand2').pack(fill='x',padx=12,pady=10)
         # Keep unread cards glowing while the panel opens, then softly settle
         # them to their normal appearance after the user has viewed them.
         if unread_ids:
@@ -2555,7 +2563,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         for key,label in [('id','Mã thành tựu'),('title','Tên thành tựu'),('theme','Mã chủ đề'),('level','Level'),('lesson','Lesson (1–10; để trống = legacy Level)'),('required','Số lần đạt'),('max_seconds','Thời gian tối đa (giây, dấu <)'),('gems','Ngọc thưởng')]:
             row=tk.Frame(body,bg='white');row.pack(fill='x',pady=3)
             tk.Label(row,text=label,bg='white',width=30,anchor='w').pack(side='left')
-            field=tk.Entry(row,font=('Segoe UI',11));field.pack(side='left',fill='x',expand=True);fields[key]=field
+            field=tk.Entry(row,font=font_at(11));field.pack(side='left',fill='x',expand=True);fields[key]=field
         selected=[None]
         def load(i=None):
             selected[0]=i
@@ -2752,7 +2760,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
                 self.label(card,self._flashcard_source_name(g),13,True).pack(side='left',fill='x',expand=True)
                 self.button(card,'Ôn bài →',lambda a=g:self.flashcard_deck(a)).pack(side='right')
                 tk.Button(card,text='🗑 Xóa',command=lambda a=g:self.delete_flashcard_deck(a),
-                          bg='#FFF0EF',fg='#A52D24',bd=0,padx=10,pady=8,cursor='hand2').pack(side='right',padx=4)
+                          bg='#FFF0EF',fg=TOKEN_COLORS['error'],bd=0,padx=10,pady=8,cursor='hand2').pack(side='right',padx=4)
                 tk.Button(card,text='✎ Sửa tên',command=lambda a=g:self.rename_flashcard_deck(a),
                           bg=PALE,fg=DARK,bd=0,padx=10,pady=8,cursor='hand2').pack(side='right',padx=4)
                 self.label(card,f"{g['total']} từ · {g['due']} đến hạn",10,color='#718678').pack(side='right',padx=14)
@@ -2779,7 +2787,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
             tk.Button(controls,text='✎ Đổi tên bộ thẻ',command=lambda:self.rename_flashcard_deck(group),
                       bg=PALE,fg=DARK,bd=0,padx=12,pady=8,cursor='hand2').pack(side='left',padx=(0,8))
             tk.Button(controls,text='🗑 Xóa bộ thẻ',command=lambda:self.delete_flashcard_deck(group),
-                      bg='#FFF0EF',fg='#A52D24',bd=0,padx=12,pady=8,cursor='hand2').pack(side='left')
+                      bg='#FFF0EF',fg=TOKEN_COLORS['error'],bd=0,padx=12,pady=8,cursor='hand2').pack(side='left')
         due=self._deck_words(group,due=True)
         self.label(body,f'{len(words)} từ trong bộ · {len(due)} từ đến hạn ôn',13,True).pack(anchor='w',pady=6)
         if words:

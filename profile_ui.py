@@ -1,4 +1,5 @@
 """Account chooser UI only; database operations stay in the application."""
+from ui_tokens import COLORS as TOKEN_COLORS, font_at
 import tkinter as tk
 from tkinter import ttk
 import time
@@ -56,12 +57,12 @@ class ProfilePage:
         head=tk.Frame(self.root,bg=BG);head.pack(pady=(65,24))
         logo=tk.Canvas(head,width=76,height=76,bg=BG,highlightthickness=0)
         logo.pack();logo.create_rectangle(5,5,71,71,fill=GREEN,outline='')
-        logo.create_text(38,38,text='T',fill='white',font=('Segoe UI',32,'bold'))
-        tk.Label(head,text='Cùng Học Cùng Vui xin chào các bạn',font=('Segoe UI',30,'bold'),fg=INK,bg=BG).pack(pady=(15,2))
-        tk.Label(head,text='Hãy tạo tài khoản nếu chưa có',font=('Segoe UI',13),fg=MUTED,bg=BG).pack()
-        tk.Label(head,text='Phần mềm được phát triển by HiHieu Ver 1.0',font=('Segoe UI',8),fg=MUTED,bg=BG).pack(pady=(15,4))
+        logo.create_text(38,38,text='T',fill='white',font=font_at(32, 'bold'))
+        tk.Label(head,text='Cùng Học Cùng Vui xin chào các bạn',font=font_at(30, 'bold'),fg=INK,bg=BG).pack(pady=(15,2))
+        tk.Label(head,text='Hãy tạo tài khoản nếu chưa có',font=font_at(13),fg=MUTED,bg=BG).pack()
+        tk.Label(head,text='Phần mềm được phát triển by HiHieu Ver 1.0',font=font_at(8),fg=MUTED,bg=BG).pack(pady=(15,4))
         people=list(self.app.db.students())
-        if not people:tk.Label(self.root,text='Chào bạn! Hãy tạo tài khoản để bắt đầu.',font=('Segoe UI',13),fg=MUTED,bg=BG).pack(pady=(0,12))
+        if not people:tk.Label(self.root,text='Chào bạn! Hãy tạo tài khoản để bắt đầu.',font=font_at(13),fg=MUTED,bg=BG).pack(pady=(0,12))
         holder=tk.Frame(self.root,bg=BG);holder.pack(fill='x',padx=24)
         canvas=tk.Canvas(holder,bg=BG,height=355,highlightthickness=0)
         canvas.pack(fill='x',expand=True)
@@ -89,8 +90,8 @@ class ProfilePage:
         avatar=self.app.db.selected_avatar(s['id']) or s['name'][:1].upper()
         av=tk.Canvas(card,width=80,height=80,bg='white',highlightthickness=0);av.pack(pady=(18,5))
         av.create_oval(4,4,76,76,fill=C['tint'],outline='');av.create_text(40,40,text=avatar if avatar!='👤' else s['name'][:1].upper(),font=('Segoe UI Emoji',28),fill=GREEN)
-        tk.Label(card,text=s['name'],bg='white',fg=INK,font=('Segoe UI',17,'bold'),wraplength=235).pack()
-        tk.Label(card,text=f"Lớp {s['grade']} · Grade {s['grade']}",bg='white',fg=MUTED,font=('Segoe UI',11)).pack(pady=(4,12))
+        tk.Label(card,text=s['name'],bg='white',fg=INK,font=font_at(17, 'bold'),wraplength=235).pack()
+        tk.Label(card,text=f"Lớp {s['grade']} · Grade {s['grade']}",bg='white',fg=MUTED,font=font_at(11)).pack(pady=(4,12))
         start=self.button(card,'Chọn',lambda:self.enter(s),True);start.pack(fill='x',padx=16,ipady=8)
         row=tk.Frame(card,bg='white');row.pack(pady=10)
         self.button(row,'Đổi tên',lambda:self.rename(s)).pack(side='left',padx=8)
@@ -132,9 +133,9 @@ class ProfilePage:
         for y in range(4,297,15):
             border_items.append(c.create_line(3,y,3,min(y+8,297),fill=GREEN,width=2))
             border_items.append(c.create_line(257,y,257,min(y+8,297),fill=GREEN,width=2))
-        c.create_text(130,115,text='+',font=('Segoe UI',46),fill=GREEN)
-        c.create_text(130,185,text='Tạo tài khoản',font=('Segoe UI',16,'bold'),fill=INK)
-        c.create_text(130,211,text='New profile',font=('Segoe UI',12),fill=MUTED)
+        c.create_text(130,115,text='+',font=font_at(46),fill=GREEN)
+        c.create_text(130,185,text='Tạo tài khoản',font=font_at(16, 'bold'),fill=INK)
+        c.create_text(130,211,text='New profile',font=font_at(12),fill=MUTED)
         def new_hover(on):
             c.configure(bg=C['tint'] if on else BG)
             c.place_configure(y=14 if on else 16)
@@ -146,10 +147,10 @@ class ProfilePage:
 
     def dialog(self,title):
         if self.popup:self.close_popup()
-        overlay=tk.Frame(self.root,bg='#E8F2E9');overlay.place(relx=0,rely=0,relwidth=1,relheight=1);overlay.lift()
+        overlay=tk.Frame(self.root,bg=TOKEN_COLORS['tint']);overlay.place(relx=0,rely=0,relwidth=1,relheight=1);overlay.lift()
         panel=tk.Frame(overlay,bg='white',highlightthickness=2,highlightbackground=C['border'],padx=30,pady=25)
         panel.place(relx=.5,rely=.5,anchor='center',width=420,height=350)
-        tk.Label(panel,text=title,font=('Segoe UI',20,'bold'),fg=INK,bg='white').pack(anchor='w',pady=(0,14))
+        tk.Label(panel,text=title,font=font_at(20, 'bold'),fg=INK,bg='white').pack(anchor='w',pady=(0,14))
         self.popup=overlay
         self.animate(180,lambda t:panel.place_configure(width=round(399+21*t),height=round(333+17*t)))
         return panel
@@ -159,12 +160,12 @@ class ProfilePage:
             self.popup.destroy();self.popup=None
 
     def field(self,panel,label):
-        tk.Label(panel,text=label,bg='white',fg=INK,font=('Segoe UI',12)).pack(anchor='w')
-        entry=tk.Entry(panel,font=('Segoe UI',13),highlightthickness=1,highlightcolor=GREEN,relief='solid')
+        tk.Label(panel,text=label,bg='white',fg=INK,font=font_at(12)).pack(anchor='w')
+        entry=tk.Entry(panel,font=font_at(13),highlightthickness=1,highlightcolor=GREEN,relief='solid')
         entry.pack(fill='x',ipady=7,pady=(4,8));return entry
 
     def error(self,panel,msg,field):
-        tk.Label(panel,text=msg,fg=ERR,bg='white',font=('Segoe UI',10)).pack(anchor='w')
+        tk.Label(panel,text=msg,fg=ERR,bg='white',font=font_at(10)).pack(anchor='w')
         if self.jobs.reduced:return
         x=field.winfo_manager()
         self.animate(200,lambda t:field.configure(highlightbackground=ERR if int(t*10)%2==0 else C['border']))
@@ -172,8 +173,8 @@ class ProfilePage:
     def create_popup(self):
         p=self.dialog('Tạo tài khoản · New profile')
         name=self.field(p,'Họ tên · Full name')
-        tk.Label(p,text='Lớp · Grade',bg='white',fg=INK,font=('Segoe UI',12)).pack(anchor='w')
-        grade=ttk.Combobox(p,values=[str(i) for i in range(1,13)],state='readonly',font=('Segoe UI',12));grade.pack(fill='x',pady=5)
+        tk.Label(p,text='Lớp · Grade',bg='white',fg=INK,font=font_at(12)).pack(anchor='w')
+        grade=ttk.Combobox(p,values=[str(i) for i in range(1,13)],state='readonly',font=font_at(12));grade.pack(fill='x',pady=5)
         def save():
             n=name.get().strip();g=grade.get()
             if not n or not g:self.error(p,'Vui lòng nhập họ tên và chọn lớp.',name if not n else grade);return
@@ -216,5 +217,5 @@ class ProfilePage:
         self.app.choose(s)
 
     def toast(self,text):
-        t=tk.Label(self.root,text=text,bg=GREEN,fg='white',font=('Segoe UI',12,'bold'),padx=20,pady=10)
+        t=tk.Label(self.root,text=text,bg=GREEN,fg='white',font=font_at(12, 'bold'),padx=20,pady=10)
         t.place(relx=.5,rely=.93,anchor='center');self.later(lambda:t.destroy() if t.winfo_exists() else None,2000)

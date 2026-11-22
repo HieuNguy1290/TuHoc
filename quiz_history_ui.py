@@ -1,4 +1,5 @@
 """Read-only, paginated history UI using existing learning_sessions records."""
+from ui_tokens import COLORS as TOKEN_COLORS, font_at
 from question_prompt import display_prompt
 import datetime
 import csv
@@ -352,35 +353,35 @@ def show_exam_detail(parent, record, library_dir=None):
     state = {'index': 0, 'filter': 'all', 'type': 'all', 'group_view': False}
     summary = _review_summary(items)
     type_summary = _review_type_summary(items)
-    header = tk.Frame(dialog, bg='#F8FAF5', padx=20, pady=14)
+    header = tk.Frame(dialog, bg=TOKEN_COLORS['background'], padx=20, pady=14)
     header.pack(fill='x')
-    tk.Label(header, text='CHI TIẾT BÀI KIỂM TRA', bg='#F8FAF5', fg='#173E2B',
-             font=('Segoe UI', 16, 'bold')).pack(anchor='w')
+    tk.Label(header, text='CHI TIẾT BÀI KIỂM TRA', bg=TOKEN_COLORS['background'], fg='#173E2B',
+             font=font_at(16, 'bold')).pack(anchor='w')
     score = f"{record.get('correct', 0)}/{record.get('total', 0)} câu đúng • {record.get('score_percent', 0)}%"
-    tk.Label(header, text=score, bg='#F8FAF5', fg='#287A51',
-             font=('Segoe UI', 11)).pack(anchor='w', pady=(4, 0))
+    tk.Label(header, text=score, bg=TOKEN_COLORS['background'], fg='#287A51',
+             font=font_at(11)).pack(anchor='w', pady=(4, 0))
     frame = tk.Frame(dialog, padx=18, pady=6)
     frame.pack(fill='both', expand=True)
     bar = ttk.Scrollbar(frame)
     bar.pack(side='right', fill='y')
     detail = tk.Text(frame, wrap='word', yscrollcommand=bar.set,
-                     font=('Segoe UI', 11), padx=14, pady=12, spacing2=5,
-                     bg='#FFFFFF', fg='#173E2B', relief='flat', cursor='arrow')
+                     font=font_at(11), padx=14, pady=12, spacing2=5,
+                     bg=TOKEN_COLORS['surface'], fg='#173E2B', relief='flat', cursor='arrow')
     detail.pack(side='left', fill='both', expand=True)
     bar.configure(command=detail.yview)
     for tag, opts in {
-        'question': {'foreground': '#173E2B', 'font': ('Segoe UI', 13, 'bold'), 'spacing1': 12},
-        'heading': {'foreground': '#617669', 'font': ('Segoe UI', 10, 'bold'), 'spacing1': 12},
+        'question': {'foreground': '#173E2B', 'font': font_at(13, 'bold'), 'spacing1': 12},
+        'heading': {'foreground': '#617669', 'font': font_at(10, 'bold'), 'spacing1': 12},
         'correct': {'foreground': '#287A51'}, 'wrong': {'foreground': '#B54747'},
         'answer': {'foreground': '#173E2B'}, 'expected': {'foreground': '#287A51'},
         'muted': {'foreground': '#617669'},
     }.items():
         detail.tag_configure(tag, **opts)
 
-    filter_bar = tk.Frame(dialog, bg='#F8FAF5', padx=18, pady=7)
+    filter_bar = tk.Frame(dialog, bg=TOKEN_COLORS['background'], padx=18, pady=7)
     filter_bar.pack(fill='x')
-    tk.Label(filter_bar, text='Lọc câu:', bg='#F8FAF5', fg='#173E2B',
-             font=('Segoe UI', 10, 'bold')).pack(side='left', padx=(0, 9))
+    tk.Label(filter_bar, text='Lọc câu:', bg=TOKEN_COLORS['background'], fg='#173E2B',
+             font=font_at(10, 'bold')).pack(side='left', padx=(0, 9))
     filter_buttons = {}
     filter_options = [
         ('all', 'Tất cả', summary['total']),
@@ -396,10 +397,10 @@ def show_exam_detail(parent, record, library_dir=None):
         filter_buttons[mode] = button
 
     # Compact breakdown by question type; counts are read from saved grading.
-    types_bar = tk.Frame(dialog, bg='#F8FAF5', padx=18, pady=5)
+    types_bar = tk.Frame(dialog, bg=TOKEN_COLORS['background'], padx=18, pady=5)
     types_bar.pack(fill='x')
-    tk.Label(types_bar, text='Theo dạng:', bg='#F8FAF5', fg='#173E2B',
-             font=('Segoe UI', 10, 'bold')).pack(side='left', padx=(0, 8))
+    tk.Label(types_bar, text='Theo dạng:', bg=TOKEN_COLORS['background'], fg='#173E2B',
+             font=font_at(10, 'bold')).pack(side='left', padx=(0, 8))
     type_names = {'all': 'Tất cả dạng'}
     type_names.update({kind: f'{kind} ({counts["correct"]}/{counts["total"]} đúng)'
                        for kind, counts in sorted(type_summary.items())})
@@ -408,8 +409,8 @@ def show_exam_detail(parent, record, library_dir=None):
     type_combo = ttk.Combobox(types_bar, textvariable=type_var,
                               values=type_values, state='readonly', width=38)
     type_combo.pack(side='left', padx=(0, 12))
-    type_stats = tk.Label(types_bar, bg='#F8FAF5', fg='#617669',
-                          font=('Segoe UI', 10))
+    type_stats = tk.Label(types_bar, bg=TOKEN_COLORS['background'], fg='#617669',
+                          font=font_at(10))
     type_stats.pack(side='left')
 
     # One-click targeted revision, based only on the saved attempt.
@@ -421,9 +422,9 @@ def show_exam_detail(parent, record, library_dir=None):
     if weakest_kind is None:
         weakest_button.configure(state='disabled', text='Không có câu sai')
 
-    nav = tk.Frame(dialog, bg='#F8FAF5', padx=18, pady=12)
+    nav = tk.Frame(dialog, bg=TOKEN_COLORS['background'], padx=18, pady=12)
     nav.pack(fill='x')
-    counter = tk.Label(nav, bg='#F8FAF5', fg='#617669', font=('Segoe UI', 10))
+    counter = tk.Label(nav, bg=TOKEN_COLORS['background'], fg='#617669', font=font_at(10))
     counter.pack(side='left')
     tk.Button(nav, text='Đóng', command=dialog.destroy, bg='#EFF8EF',
               fg='#173E2B', padx=14, pady=8, cursor='hand2').pack(side='right', padx=(8, 0))
@@ -565,11 +566,11 @@ def show_exam_detail(parent, record, library_dir=None):
                         fg = '#287A51' if entry['ok'] else '#B54747'
                         cell = tk.Frame(detail, bg=bg, padx=12, pady=9)
                         tk.Label(cell, text=entry['left'], bg=bg, fg='#173E2B',
-                                 font=('Segoe UI', 10, 'bold'), width=13, anchor='w').pack(side='left')
+                                 font=font_at(10, 'bold'), width=13, anchor='w').pack(side='left')
                         tk.Label(cell, text='→  ' + entry['right'], bg=bg, fg=fg,
-                                 font=('Segoe UI', 10), anchor='w', wraplength=330).pack(side='left')
+                                 font=font_at(10), anchor='w', wraplength=330).pack(side='left')
                         tk.Label(cell, text='✓' if entry['ok'] else '✕', bg=bg, fg=fg,
-                                 font=('Segoe UI', 12, 'bold')).pack(side='right')
+                                 font=font_at(12, 'bold')).pack(side='right')
                         detail.window_create('end', window=cell, stretch=1)
                         line('')
                         if not entry['ok']:
@@ -592,7 +593,7 @@ def show_exam_detail(parent, record, library_dir=None):
         for mode, button in filter_buttons.items():
             active = mode == state['filter']
             button.configure(bg='#287A51' if active else '#EFF8EF',
-                             fg='#FFFFFF' if active else '#173E2B',
+                             fg=TOKEN_COLORS['surface'] if active else '#173E2B',
                              relief='sunken' if active else 'solid')
 
     def move(step):
@@ -680,7 +681,7 @@ def show_exam_detail(parent, record, library_dir=None):
 
 def show_history(parent, conn, student_id, on_back=None):
     """Modern, borderless learning-history table. Read-only database access."""
-    BG = '#F8FAF5'
+    BG = TOKEN_COLORS['background']
     INK = '#173E2B'
     MUTED = '#617669'
     GREEN = '#287A51'
@@ -688,7 +689,7 @@ def show_history(parent, conn, student_id, on_back=None):
     PALE_YELLOW = '#FFF9E8'
     HOVER = '#DDF1DE'
     HEADER = '#E7F1E7'
-    WHITE = '#FFFFFF'
+    WHITE = TOKEN_COLORS['surface']
     font = 'Segoe UI'
     outer = tk.Frame(parent, bg=BG)
     outer.pack(fill='both', expand=True)

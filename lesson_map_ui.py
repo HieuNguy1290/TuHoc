@@ -1,4 +1,5 @@
 """Presentation-only lesson map; existing learning and DB APIs remain authoritative."""
+from ui_tokens import COLORS as TOKEN_COLORS, font_at
 import tkinter as tk
 import tkinter.font as tkfont
 import math
@@ -402,7 +403,7 @@ class LessonMap:
             self.label(row,status,9,fg=C['muted'],bg='white').pack(anchor='w')
             actions=tk.Frame(row,bg='white');actions.pack(fill='x',pady=(5,0))
             for mode,text in [('lesson','Học'),('quiz','Bài tập')]:
-                b=tk.Button(actions,text=text,font=('Segoe UI',10,'bold'),bg='white' if mode=='lesson' else C['primary'],fg=C['primary'] if mode=='lesson' else 'white',relief='solid',bd=1,padx=12,pady=5,cursor='hand2' if unlocked else 'arrow',state='normal' if unlocked else 'disabled',command=lambda k=i,m=mode:self.open_lesson(k,m))
+                b=tk.Button(actions,text=text,font=font_at(10, 'bold'),bg='white' if mode=='lesson' else C['primary'],fg=C['primary'] if mode=='lesson' else 'white',relief='solid',bd=1,padx=12,pady=5,cursor='hand2' if unlocked else 'arrow',state='normal' if unlocked else 'disabled',command=lambda k=i,m=mode:self.open_lesson(k,m))
                 b.pack(side='left',padx=(0,8))
                 if unlocked:
                     base='white' if mode=='lesson' else C['primary']

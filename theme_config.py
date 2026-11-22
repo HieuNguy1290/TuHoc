@@ -96,16 +96,11 @@ def icon_file(data_dir, entry):
     if target.is_file() and target.is_relative_to(base):return target
     return None
 
-# Shared UI tokens; existing subject catalog remains unchanged.
-UI_COLORS = {
-    'primary':'#2F7A50','primary_dark':'#1F5A3A','text':'#1F3A2B',
-    'muted':'#5B6B60','border':'#DDE7DE','background':'#F8FAF5',
-    'surface':'#FFFFFF','tint':'#E8F2E9','accent':'#FFE58B',
-    'studying':'#FFF3C4','error':'#A52D24',
-}
-UI_FONTS = {'page':('Segoe UI',20,'bold'),'card':('Segoe UI',16,'bold'),
-            'body':('Segoe UI',13),'small':('Segoe UI',11)}
-UI_SPACING = (4,8,12,16,20,24,32)
+# Compatibility names used by the existing UI.
+from ui_tokens import COLORS as UI_COLORS, LegacyFonts, SPACING
+
+UI_FONTS = LegacyFonts()
+UI_SPACING = (*SPACING[:4],20,*SPACING[4:])
 
 def lesson_count(data_dir,code,level):
     row=next((r for r in _shared(data_dir) if r['code']==code),{})

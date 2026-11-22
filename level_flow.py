@@ -1,4 +1,5 @@
 """Five themes, three modes and ten levels per theme. User content overrides bundled demo."""
+from ui_tokens import COLORS as TOKEN_COLORS, font_at
 import json, random, time, tkinter as tk
 from pathlib import Path
 from card_motion import animate_card
@@ -146,10 +147,10 @@ class LevelFlowMixin:
         for key,title,icon,image_path in self._mode_cards():
             panel=tk.Frame(body,bg='white',padx=12,pady=10)
             panel.pack(fill='x',pady=7)
-            tk.Label(panel,text=title,bg='white',fg='#285D40',font=('Segoe UI',12,'bold')).pack(anchor='w')
+            tk.Label(panel,text=title,bg='white',fg='#285D40',font=font_at(12, 'bold')).pack(anchor='w')
             row=tk.Frame(panel,bg='white');row.pack(fill='x',pady=5)
             tk.Label(row,text='Tên hiển thị',bg='white',width=15,anchor='w').pack(side='left')
-            name=tk.Entry(row,font=('Segoe UI',11));name.insert(0,title);name.pack(side='left',fill='x',expand=True)
+            name=tk.Entry(row,font=font_at(11));name.insert(0,title);name.pack(side='left',fill='x',expand=True)
             row2=tk.Frame(panel,bg='white');row2.pack(fill='x',pady=5)
             tk.Label(row2,text='Icon chữ',bg='white',width=15,anchor='w').pack(side='left')
             symbol=tk.Entry(row2);symbol.insert(0,icon);symbol.pack(side='left',fill='x',expand=True)
@@ -225,7 +226,7 @@ class LevelFlowMixin:
                     label.configure(image='',text=symbol,font=('Segoe UI Symbol',max(24,int(size*.57)),'bold'),
                                     fg='#285D40',width=3,height=2)
             render(56)
-            label=tk.Label(tile,text=name,font=('Segoe UI',13,'bold'),bg=bg,fg='#285D40',
+            label=tk.Label(tile,text=name,font=font_at(13, 'bold'),bg=bg,fg='#285D40',
                            cursor='hand2',wraplength=166,justify='center')
             label.pack(fill='x')
             register_icon('mode:'+key,image_label)
@@ -244,7 +245,7 @@ class LevelFlowMixin:
         for level in range(1,self._max_level(theme)+1):
             done=self.db.lesson_completed(self.student['id'],f'{theme}_{level}')
             card=tk.Frame(grid,bg='white',height=112,highlightthickness=1,highlightbackground='#DCE7DC',cursor='hand2');card.grid(row=(level-1)//5,column=(level-1)%5,padx=8,pady=8,sticky='nsew');card.grid_propagate(False)
-            text=tk.Label(card,text=self._display_name('level',theme,level),font=('Segoe UI',15,'bold'),fg='#285D40',bg='white',cursor='hand2');text.pack(pady=(20,7))
+            text=tk.Label(card,text=self._display_name('level',theme,level),font=font_at(15, 'bold'),fg='#285D40',bg='white',cursor='hand2');text.pack(pady=(20,7))
             status=tk.Label(card,text='✓ Đã học' if done else self._display_name('level',theme,level),fg='#39865B' if done else '#778A7B',bg='white',cursor='hand2');status.pack()
             action=lambda t,l:self.lesson_list(t,l,mode)
             for w in (card,text,status):w.bind('<Button-1>',lambda e=None,l=level,fn=action,c=card:animate_card(c, lambda t=theme,n=l:fn(t,n)))
@@ -258,7 +259,7 @@ class LevelFlowMixin:
         for lesson in range(1,self._lesson_count(theme,level)+1):
             card=tk.Frame(grid,bg='white',height=105,highlightthickness=1,highlightbackground='#DCE7DC',cursor='hand2')
             card.grid(row=(lesson-1)//5,column=(lesson-1)%5,padx=8,pady=8,sticky='nsew');card.grid_propagate(False)
-            label=tk.Label(card,text=self._display_name('lesson',theme,level,lesson),font=('Segoe UI',14,'bold'),fg='#285D40',bg='white',cursor='hand2');label.pack(expand=True)
+            label=tk.Label(card,text=self._display_name('lesson',theme,level,lesson),font=font_at(14, 'bold'),fg='#285D40',bg='white',cursor='hand2');label.pack(expand=True)
             def go(n=lesson):
                 self._selected_lesson=n
                 action={'lesson':self.level_lesson,'quiz':self.level_quiz,'vocab':self.level_vocab,'reading':self.level_reading}[mode]
@@ -280,7 +281,7 @@ class LevelFlowMixin:
             except (ImportError,OSError,ValueError,tk.TclError):
                 pass
         tk.Label(panel,text=self._theme(theme)[2],font=('Segoe UI Symbol',82),bg='#F0F3FF',fg='#5269E8').pack(expand=True)
-        tk.Label(panel,text=self._theme(theme)[1],font=('Segoe UI',17,'bold'),bg='#E8F3EB',fg='#285D40').pack(pady=24)
+        tk.Label(panel,text=self._theme(theme)[1],font=font_at(17, 'bold'),bg='#E8F3EB',fg='#285D40').pack(pady=24)
     def _selection_button(self,parent,textbox):
         def save():
             try:word=textbox.get('sel.first','sel.last').strip()
@@ -294,22 +295,22 @@ class LevelFlowMixin:
         bar=tk.Frame(body,bg='#EDF3FF',padx=12,pady=9)
         bar.pack(fill='x',pady=(0,15))
         tk.Button(bar,text='←  Chọn Lesson',command=self.topic_page,
-                  bg='#FFFFFF',fg='#26345E',font=('Segoe UI',11,'bold'),
+                  bg=TOKEN_COLORS['surface'],fg='#26345E',font=font_at(11, 'bold'),
                   bd=0,padx=12,pady=9,cursor='hand2').pack(side='left',padx=(0,9))
         tk.Button(bar,text='⌂  Chủ đề',command=self.topic_page,
-                  bg='#FFFFFF',fg='#26345E',font=('Segoe UI',11),
+                  bg=TOKEN_COLORS['surface'],fg='#26345E',font=font_at(11),
                   bd=0,padx=12,pady=9,cursor='hand2').pack(side='left')
         tk.Label(bar,text=f'LEVEL {level} / {self._max_level(theme)}',
-                 bg='#EDF3FF',fg='#4F46A5',font=('Segoe UI',11,'bold')).pack(side='left',padx=18)
+                 bg='#EDF3FF',fg='#4F46A5',font=font_at(11, 'bold')).pack(side='left',padx=18)
         if not getattr(self,'_selected_lesson',None) and level < self._max_level(theme):
             action=self.level_lesson if mode=='lesson' else self.level_reading
             tk.Button(bar,text='Level tiếp  →',command=lambda:action(theme,level+1),
-                      bg='#6A5AE0',fg='white',font=('Segoe UI',11,'bold'),
+                      bg='#6A5AE0',fg='white',font=font_at(11, 'bold'),
                       bd=0,padx=13,pady=9,cursor='hand2').pack(side='right')
         if not getattr(self,'_selected_lesson',None) and level > 1:
             action=self.level_lesson if mode=='lesson' else self.level_reading
             tk.Button(bar,text='←  Level trước',command=lambda:action(theme,level-1),
-                      bg='#FFFFFF',fg='#26345E',font=('Segoe UI',11),
+                      bg=TOKEN_COLORS['surface'],fg='#26345E',font=font_at(11),
                       bd=0,padx=12,pady=9,cursor='hand2').pack(side='right',padx=8)
 
     def level_lesson(self,theme,level):
@@ -320,11 +321,11 @@ class LevelFlowMixin:
                         highlightbackground='#DCE3FF',highlightthickness=1)
         banner.pack(fill='x',pady=(0,14))
         tk.Label(banner,text='HÀNH TRÌNH HỌC TẬP  /  BÀI HỌC',
-                 bg='#EDF1FF',fg='#5269E8',font=('Segoe UI',10,'bold')).pack(anchor='w')
+                 bg='#EDF1FF',fg='#5269E8',font=font_at(10, 'bold')).pack(anchor='w')
         tk.Label(banner,text=self._lesson_breadcrumb(theme, level, getattr(self, '_selected_lesson', 1) or 1),
-                 bg='#EDF1FF',fg='#26345E',font=('Segoe UI',17,'bold')).pack(anchor='w',pady=(5,3))
+                 bg='#EDF1FF',fg='#26345E',font=font_at(17, 'bold')).pack(anchor='w',pady=(5,3))
         tk.Label(banner,text='Đọc nội dung, nghe phát âm và lưu từ mới bằng cách bôi đen.',
-                 bg='#EDF1FF',fg='#687694',font=('Segoe UI',10)).pack(anchor='w')
+                 bg='#EDF1FF',fg='#687694',font=font_at(10)).pack(anchor='w')
         # Expanded Pygame companion; original Tkinter lesson stays intact.
         def open_expanded_lesson():
             from pygame_lesson_window import available, launch
@@ -391,7 +392,7 @@ class LevelFlowMixin:
             if not started:
                 messagebox.showinfo('Lesson Studio', 'Mot cua so Pygame khac dang mo.', parent=self)
         expand_button = tk.Button(banner, text='⛶  MỞ RỘNG TOÀN MÀN HÌNH', command=open_expanded_lesson,
-                  font=('Segoe UI', 10, 'bold'), bg='#405ED5', fg='white',
+                  font=font_at(10, 'bold'), bg='#405ED5', fg='white',
                   bd=0, padx=12, pady=8, cursor='hand2')
         expand_button.pack(anchor='e', pady=(6,0))
         data=self._row('lessons',theme,level)
@@ -439,7 +440,7 @@ class LevelFlowMixin:
             blocks=[{'title':item.get('title','Nội dung bài học'), 'content':item.get('content',''), 'image':item.get('image',''),'audio':item.get('audio','')}]
         single_block = len(blocks) == 1
         for i,block in enumerate(blocks,1):
-            outer=tk.Frame(body,bg='#FFFFFF',padx=20,pady=18,highlightbackground='#DFE5F4',highlightthickness=1)
+            outer=tk.Frame(body,bg=TOKEN_COLORS['surface'],padx=20,pady=18,highlightbackground='#DFE5F4',highlightthickness=1)
             outer.pack(fill='x',pady=10)
             # Opt-in textbook layout. Existing navigation, data selection, audio,
             # vocabulary, and legacy multi-block layouts remain unchanged.
@@ -491,35 +492,35 @@ class LevelFlowMixin:
             chars_per_line=max(18,int(850/max(content_size,10)*1.6))
             lines=max(4,min(16,sum(max(1,(len(line)+chars_per_line-1)//chars_per_line) for line in content.split('\n'))+1))
             right_min_height=max(h+20,int(title_size*2.4)+int(content_size*1.9*lines)+28)
-            right=tk.Frame(outer,bg='#FFFFFF',height=right_min_height)
+            right=tk.Frame(outer,bg=TOKEN_COLORS['surface'],height=right_min_height)
             right.pack(side='left',fill='both',expand=True)
             right.pack_propagate(False)
-            content_wrap=tk.Frame(right,bg='#FFFFFF')
+            content_wrap=tk.Frame(right,bg=TOKEN_COLORS['surface'])
             # The pointer in the reference screenshot is at the CENTER of the
             # right-hand content area (roughly X=874, Y=279). Center the actual
             # title/content text on that point, not just the containing frame.
             content_wrap.place(relx=0.5,rely=0.5,anchor='center',relwidth=1.0)
-            title_row=tk.Frame(content_wrap,bg='#FFFFFF')
+            title_row=tk.Frame(content_wrap,bg=TOKEN_COLORS['surface'])
             title_row.pack(fill='x',pady=(1,6))
             title_label=tk.Label(title_row,text=title_value,
-                     font=('Segoe UI',title_size,'bold'),fg=title_color,bg='#FFFFFF',
+                     font=('Segoe UI',title_size,'bold'),fg=title_color,bg=TOKEN_COLORS['surface'],
                      anchor='center',justify='center',wraplength=480)
             title_label.pack(side='left',fill='x',expand=True)
             title_label.bind('<Configure>',lambda e,w=title_label:w.configure(wraplength=max(100,e.width-16)))
             if title_value:
-                tk.Button(title_row,text='🔊',font=('Segoe UI',11),bg='#EDF5FF',fg='#2563A8',
+                tk.Button(title_row,text='🔊',font=font_at(11),bg='#EDF5FF',fg='#2563A8',
                           activebackground='#D9EBFF',bd=0,padx=7,pady=3,cursor='hand2',
                           command=lambda value=title_value,audio=title_audio:play_part(value,audio)
                           ).pack(side='right',padx=(6,0))
-            content_row=tk.Frame(content_wrap,bg='#FFFFFF')
+            content_row=tk.Frame(content_wrap,bg=TOKEN_COLORS['surface'])
             content_row.pack(fill='x')
             if content_value:
-                tk.Button(content_row,text='🔊',font=('Segoe UI',11),bg='#EDF5FF',fg='#2563A8',
+                tk.Button(content_row,text='🔊',font=font_at(11),bg='#EDF5FF',fg='#2563A8',
                           activebackground='#D9EBFF',bd=0,padx=7,pady=3,cursor='hand2',
                           command=lambda value=content_value,audio=content_audio:play_part(value,audio)
                           ).pack(side='right',anchor='n',padx=(6,0))
             text=tk.Text(content_row,height=lines,wrap='word',font=('Segoe UI',content_size),
-                         bg='#FFFFFF',fg=content_color,relief='flat',borderwidth=0,
+                         bg=TOKEN_COLORS['surface'],fg=content_color,relief='flat',borderwidth=0,
                          exportselection=False,padx=0,pady=3)
             text.insert('1.0',content)
             text.tag_configure('centered',justify='center')
@@ -535,14 +536,14 @@ class LevelFlowMixin:
         words=self._row('vocab',theme,level)
         if words:
             vocab_panel=tk.Frame(body,bg='#F0F5FF',padx=20,pady=16);vocab_panel.pack(fill='x',pady=(12,8))
-            tk.Label(vocab_panel,text='TỪ VỰNG LEVEL NÀY ('+str(len(words))+' từ)',bg='#F0F5FF',fg='#5269E8',font=('Segoe UI',13,'bold')).pack(anchor='w')
+            tk.Label(vocab_panel,text='TỪ VỰNG LEVEL NÀY ('+str(len(words))+' từ)',bg='#F0F5FF',fg='#5269E8',font=font_at(13, 'bold')).pack(anchor='w')
             for entry in words:
                 label=str(entry.get('word',''))
                 example=str(entry.get('example','')).strip()
-                tk.Label(vocab_panel,text='• '+label+(' — '+example if example else ''),bg='#F0F5FF',fg='#26345E',font=('Segoe UI',11),wraplength=740,justify='left').pack(anchor='w',pady=3)
+                tk.Label(vocab_panel,text='• '+label+(' — '+example if example else ''),bg='#F0F5FF',fg='#26345E',font=font_at(11),wraplength=740,justify='left').pack(anchor='w',pady=3)
         actions=tk.Frame(body,bg=body['bg']);actions.pack(fill='x',pady=8)
         for caption,cb in [('✎  Bài tập của bài học',lambda:self.level_quiz(theme,level)),('☆  Từ vựng bài học',lambda:self.level_vocab(theme,level))]:
-            tile=tk.Button(actions,text=caption,command=cb,font=('Segoe UI',13,'bold'),bg='#E8EDFF',fg='#354EB5',bd=0,padx=18,pady=18,cursor='hand2');tile.pack(side='left',fill='x',expand=True,padx=8)
+            tile=tk.Button(actions,text=caption,command=cb,font=font_at(13, 'bold'),bg='#E8EDFF',fg='#354EB5',bd=0,padx=18,pady=18,cursor='hand2');tile.pack(side='left',fill='x',expand=True,padx=8)
         self.button(body,'← Chọn level khác',lambda:self.level_list(theme,'lesson')).pack(anchor='w',pady=12)
     def _v8_open_reading(self,theme,level,item):
         from pygame_embedded_reader import EmbeddedReader, available
@@ -747,7 +748,7 @@ class LevelFlowMixin:
             stroke_history.clear()
             status.set('Đã xóa toàn bộ nét vẽ, ghi chú và đánh dấu')
         def make_button(row, key, label, command):
-            btn = tk.Button(row,text=label,command=command,font=('Segoe UI',8,'bold'),bg='white',fg='#285D40',bd=1,relief='raised',padx=3,pady=1,cursor='hand2')
+            btn = tk.Button(row,text=label,command=command,font=font_at(8, 'bold'),bg='white',fg='#285D40',bd=1,relief='raised',padx=3,pady=1,cursor='hand2')
             btn.pack(side='left',padx=2,pady=2)
             toolbuttons[key] = btn
             from main import TeachingTooltip
@@ -775,7 +776,7 @@ class LevelFlowMixin:
             ('plus','A+',lambda:zoom(2)),('minus','A−',lambda:zoom(-2)),
         ]
         for i,(key,label,callback) in enumerate(specs): make_button(rows[0 if i<9 else 1],key,label,callback)
-        tk.Label(rows[1],textvariable=status,bg='#E8F3EB',fg='#42614D',font=('Segoe UI',9)).pack(side='left',padx=6)
+        tk.Label(rows[1],textvariable=status,bg='#E8F3EB',fg='#42614D',font=font_at(9)).pack(side='left',padx=6)
         # Keyboard commands are page-local and replaced at each navigation.
         self._teaching_shortcuts={
             'ctrl+q':lambda:set_mode_with_overlay('note'),
@@ -813,7 +814,7 @@ class LevelFlowMixin:
                     # session. Nothing is persisted to disk.
                     self.level_reading(theme,level)
                 tk.Button(host,text='← Thoát bài đọc tương tác',command=exit_reader,
-                          bg='#245c80',fg='white',font=('Segoe UI',10,'bold'),padx=12,pady=7).pack(anchor='w',padx=8,pady=5)
+                          bg='#245c80',fg='white',font=font_at(10, 'bold'),padx=12,pady=7).pack(anchor='w',padx=8,pady=5)
                 studio=EmbeddedReader(host,item,media)
                 studio.pack(fill='both',expand=True)
             except Exception as exc:
@@ -830,7 +831,7 @@ class LevelFlowMixin:
             title.bind('<Configure>',lambda e,w=title:w.configure(wraplength=max(140,e.width-12)))
             tk.Button(card, text='✎ Đọc tương tác Pygame · Trong giao diện · Nét vẽ tạm thời',
                       command=lambda it=item:open_pygame_reader(it), bg='#E9F3FA',fg='#245C80',
-                      font=('Segoe UI',10,'bold'),bd=1,padx=12,pady=7,cursor='hand2').pack(anchor='w',pady=(0,9))
+                      font=font_at(10, 'bold'),bd=1,padx=12,pady=7,cursor='hand2').pack(anchor='w',pady=(0,9))
             image_path = item.get('image','')
             if image_path:
                 media = self.media_file(image_path)
@@ -995,7 +996,7 @@ class LevelFlowMixin:
         entries=self._row('vocab',theme,level)
         self.label(body,f'{len(entries)} từ vựng · Nhấn Lưu để thêm vào Flashcard',12).pack(anchor='w',pady=8)
         for idx,entry in enumerate(entries):
-            card=tk.Frame(body,bg='#FFFFFF',padx=12,pady=9);card.pack(fill='x',pady=4)
+            card=tk.Frame(body,bg=TOKEN_COLORS['surface'],padx=12,pady=9);card.pack(fill='x',pady=4)
             self.label(card,f"{idx+1}.  {entry.get('word','')}",13,True).pack(side='left',padx=(0,20))
             self.label(card,str(entry.get('meaning','')),12).pack(side='left',expand=True,fill='x')
             self.action_button(card,'☆ Lưu',lambda e=entry,t=theme,l=level:self._save_vocab(e,t,l)).pack(side='right')
@@ -1065,7 +1066,7 @@ class LevelFlowMixin:
         for key,label in [('code','Mã nội bộ (tự cấp khi tạo)'),('title','Tên hiển thị'),('icon','Biểu tượng'),('icon_image','Ảnh icon 256×256 PNG'),('color','Màu nền HEX'),('max_level','Số level tối đa')]:
             r=tk.Frame(editor,bg='white');r.pack(fill='x',pady=4)
             tk.Label(r,text=label,bg='white',width=28,anchor='w').pack(side='left')
-            w=tk.Entry(r,font=('Segoe UI',11));w.pack(side='left',fill='x',expand=True);fields[key]=w
+            w=tk.Entry(r,font=font_at(11));w.pack(side='left',fill='x',expand=True);fields[key]=w
         # Per-level lesson count; stored on the selected theme only.
         count_row=tk.Frame(editor,bg='white');count_row.pack(fill='x',pady=5)
         tk.Label(count_row,text='Số Lesson của Level',bg='white',width=28,anchor='w').pack(side='left')
@@ -1308,16 +1309,16 @@ class LevelFlowMixin:
             tree.heading(key, text=heading)
             tree.column(key, width=width, minwidth=width, stretch=False, anchor='center')
         style = ttk.Style(tree)
-        style.configure('ContentGrid.Treeview', rowheight=31, font=('Segoe UI', 10),
-                        background='#FFFFFF', fieldbackground='#FFFFFF', foreground='#243D50', borderwidth=0, relief='flat')
-        style.configure('ContentGrid.Treeview.Heading', font=('Segoe UI', 10, 'bold'),
+        style.configure('ContentGrid.Treeview', rowheight=31, font=font_at(10),
+                        background=TOKEN_COLORS['surface'], fieldbackground=TOKEN_COLORS['surface'], foreground='#243D50', borderwidth=0, relief='flat')
+        style.configure('ContentGrid.Treeview.Heading', font=font_at(10, 'bold'),
                         background='#4E91C8', foreground='#172C3A', borderwidth=0, relief='flat')
         tree.configure(style='ContentGrid.Treeview', selectmode='browse', takefocus=True)
         for number, original_index, values in display_rows:
             tree.insert('', 'end', iid=str(original_index), values=values,
                         tags=('even' if number % 2 == 0 else 'odd',))
         tree.tag_configure('even', background='#E4F0FB')
-        tree.tag_configure('odd', background='#FFFFFF')
+        tree.tag_configure('odd', background=TOKEN_COLORS['surface'])
         # No embedded scrollbars or visible outer frame; the parent page handles scrolling.
         tree.pack(fill='x', expand=True)
         def activate(event):
@@ -1355,14 +1356,14 @@ class LevelFlowMixin:
         dynamic = tk.Frame(panel, bg='white')
         sample_hints = {'choice':'Ví dụ: A. Apple | B. Banana | C. Cat | D. Dog. Chọn đáp án đúng bên dưới.', 'picture_choice':'Ví dụ: A. Cat, B. Dog, C. Bird, D. Fish. Ảnh minh họa nằm ở phần tệp đính kèm.', 'listening_choice':'Ví dụ: A. Hello, B. Goodbye, C. Thanks, D. Sorry. Tải tệp âm thanh ở dưới.', 'true_false':'Ví dụ: The sky is blue. Đáp án: Đúng.', 'fill':'Ví dụ: She ___ a student. Đáp án: is.', 'listening_fill':'Ví dụ: Listen and complete: I ___ happy. Đáp án: am.', 'order':'Ví dụ: Em | đi | đến trường | mỗi ngày. Mỗi thẻ có thể là từ, cụm từ hoặc cả câu.', 'matching':'Ví dụ: cat = con mèo; dog = con chó.', 'error':'Ví dụ: He go to school. Đáp án: go → goes.'}
         def hint(parent, message):
-            icon = tk.Label(parent, text='ⓘ', fg='#357A60', bg='white', cursor='question_arrow', font=('Segoe UI', 12, 'bold'))
+            icon = tk.Label(parent, text='ⓘ', fg='#357A60', bg='white', cursor='question_arrow', font=font_at(12, 'bold'))
             icon.pack(side='left', padx=(6, 0))
             popup = {'window': None}
             def show(event):
                 if popup['window'] is not None: return
                 tip = tk.Toplevel(icon); tip.wm_overrideredirect(True)
                 tip.configure(bg='#D3E6D7')
-                tk.Label(tip, text=message, bg='#F4FAF4', fg='#285D40', justify='left', wraplength=330, padx=10, pady=8, font=('Segoe UI', 10)).pack(padx=1, pady=1)
+                tk.Label(tip, text=message, bg='#F4FAF4', fg='#285D40', justify='left', wraplength=330, padx=10, pady=8, font=font_at(10)).pack(padx=1, pady=1)
                 # Keep the tooltip inside the application's visible client area.
                 tip.update_idletasks()
                 root = icon.winfo_toplevel()
@@ -1394,13 +1395,13 @@ class LevelFlowMixin:
         def line(title, widget_type='entry', values=None, parent=panel, height=3, tooltip=None):
             row = tk.Frame(parent, bg='white')
             row.pack(fill='x', pady=4)
-            tk.Label(row, text=title, bg='white', fg='#285D40', width=23, anchor='w', font=('Segoe UI', 10)).pack(side='left')
+            tk.Label(row, text=title, bg='white', fg='#285D40', width=23, anchor='w', font=font_at(10)).pack(side='left')
             if widget_type == 'combo':
-                widget = ttk.Combobox(row, values=values or [], state='readonly', font=('Segoe UI', 11))
+                widget = ttk.Combobox(row, values=values or [], state='readonly', font=font_at(11))
             elif widget_type == 'text':
-                widget = tk.Text(row, height=height, font=('Segoe UI', 11), wrap='word')
+                widget = tk.Text(row, height=height, font=font_at(11), wrap='word')
             else:
-                widget = tk.Entry(row, font=('Segoe UI', 11))
+                widget = tk.Entry(row, font=font_at(11))
             widget.pack(side='left', fill='x', expand=True)
             if tooltip: hint(row, tooltip)
             return widget
@@ -1497,7 +1498,7 @@ class LevelFlowMixin:
         def media_field(field, title, types):
             row = tk.Frame(dynamic, bg='white'); row.pack(fill='x', pady=4)
             tk.Label(row, text=title, bg='white', fg='#285D40', width=23, anchor='w').pack(side='left')
-            w = tk.Entry(row, font=('Segoe UI', 11)); w.pack(side='left', fill='x', expand=True)
+            w = tk.Entry(row, font=font_at(11)); w.pack(side='left', fill='x', expand=True)
             entries[field] = w
             tk.Button(row, text='📁 Import file nghe' if field=='audio' else '📁 Chọn ảnh', bg='#E2F0E2', fg='#285D40', bd=0,
                       command=lambda:media_picker(field, types)).pack(side='left', padx=7)
@@ -1535,11 +1536,11 @@ class LevelFlowMixin:
                 from matching_widget import parse_pairs, IMAGE_PREFIX
                 pairs = parse_pairs(opts)
                 tk.Label(dynamic, text='MATCHING · NỐI CHỮ / HÌNH / HỖN HỢP', bg='white', fg='#39865B',
-                         font=('Segoe UI', 11, 'bold')).pack(anchor='w', pady=(4, 5))
+                         font=font_at(11, 'bold')).pack(anchor='w', pady=(4, 5))
                 mode_row=tk.Frame(dynamic,bg='white');mode_row.pack(fill='x',pady=5)
                 tk.Label(mode_row,text='Kiểu nối',bg='white',fg='#285D40',width=23,anchor='w').pack(side='left')
                 modes=['Chữ ↔ Chữ','Hình ↔ Hình','Hình ↔ Chữ','Chữ ↔ Hình']
-                mode=ttk.Combobox(mode_row,values=modes,state='readonly',font=('Segoe UI',11))
+                mode=ttk.Combobox(mode_row,values=modes,state='readonly',font=font_at(11))
                 mode.pack(side='left',fill='x',expand=True)
                 saved_mode=data.get('matching_mode','')
                 if saved_mode not in modes and pairs:
@@ -1563,7 +1564,7 @@ class LevelFlowMixin:
                                        highlightthickness=1,highlightbackground='#DCE8DE')
                         group.pack(fill='x',pady=5)
                         tk.Label(group,text=f'ĐÁP ÁN CHUẨN {i+1}  ✓',bg='#F6FAF6',fg='#285D40',
-                                 font=('Segoe UI',10,'bold')).pack(anchor='w',pady=(0,4))
+                                 font=font_at(10, 'bold')).pack(anchor='w',pady=(0,4))
                         for side,initial,is_image in (('left',left_val,left_img),('right',right_val,right_img)):
                             field_row=tk.Frame(group,bg='#F6FAF6');field_row.pack(fill='x',pady=2)
                             tk.Label(field_row,text='Bên trái' if side=='left' else 'Bên phải',
@@ -1580,9 +1581,9 @@ class LevelFlowMixin:
                                                 put(widget,IMAGE_PREFIX+store_media(path))
                                         except OSError as exc:messagebox.showerror('Lỗi import ảnh',str(exc))
                                 tk.Button(field_row,text='🖼 Thêm hình',command=choose_image,
-                                          font=('Segoe UI',10,'bold'),bg='#E2F0E2',fg='#285D40',
+                                          font=font_at(10, 'bold'),bg='#E2F0E2',fg='#285D40',
                                           bd=0,padx=10,pady=6,cursor='hand2').pack(side='right',padx=(7,0))
-                            w=tk.Entry(field_row,font=('Segoe UI',10))
+                            w=tk.Entry(field_row,font=font_at(10))
                             w.pack(side='left',fill='x',expand=True,padx=3)
                             entries[f'{side}_{i}']=w
                             if initial:
@@ -1594,7 +1595,7 @@ class LevelFlowMixin:
                 hint(dynamic,'Chữ ↔ Chữ: 2 ô chữ. Hình ↔ Hình: 2 ảnh. Hình ↔ Chữ / Chữ ↔ Hình: kết hợp hai loại.')
             elif typ in ('choice', 'picture_choice', 'listening_choice'):
                 tk.Label(dynamic, text='CÁC PHƯƠNG ÁN TRẢ LỜI', bg='white', fg='#39865B',
-                         font=('Segoe UI', 11, 'bold')).pack(anchor='w', pady=(4, 5))
+                         font=font_at(11, 'bold')).pack(anchor='w', pady=(4, 5))
                 for i in range(4):
                     entries['option_'+str(i)] = line('Đáp án '+chr(65+i), parent=dynamic,
                         tooltip=sample_hints.get(typ, 'Nhập nội dung đáp án mẫu.'))
@@ -2036,7 +2037,7 @@ class LevelFlowMixin:
                  ('Nội dung câu hỏi', lambda o: o.get('prompt',''))],
                 edit, delete, start + 1)
             tk.Label(pager, text=f'Trang {start // page_size + 1}/{max(1, (total + page_size - 1) // page_size)}',
-                     bg='white', fg='#285D40', font=('Segoe UI', 10, 'bold')).pack(side='left', padx=9)
+                     bg='white', fg='#285D40', font=font_at(10, 'bold')).pack(side='left', padx=9)
             if start:
                 tk.Button(pager, text='← Trang trước', command=lambda: change_page(-1)).pack(side='left', padx=5)
             if start + page_size < total:
@@ -2084,7 +2085,7 @@ class LevelFlowMixin:
             chooser = tk.Frame(body, bg=body['bg'])
             chooser.pack(fill='x', pady=12)
             tk.Label(chooser, text='Tạo bài học mới (nhiều block)', bg=body['bg'],
-                     font=('Segoe UI', 13, 'bold')).pack(anchor='w', pady=(0, 8))
+                     font=font_at(13, 'bold')).pack(anchor='w', pady=(0, 8))
             selection = tk.Frame(chooser, bg=body['bg'])
             selection.pack(fill='x')
             theme_codes = [t[0] for t in self._themes()]
@@ -2147,7 +2148,7 @@ class LevelFlowMixin:
                     return
                 open_block_editor(self, theme, level, lesson, create_mode=True)
             tk.Button(chooser, text='+ Tạo bài học và thêm các block', command=create_lesson,
-                      bg='#34865C', fg='white', font=('Segoe UI', 11, 'bold'),
+                      bg='#34865C', fg='white', font=font_at(11, 'bold'),
                       bd=0, padx=15, pady=9).pack(anchor='w', pady=12)
             tk.Label(chooser, text='Chọn bài học có sẵn ở danh sách bên dưới để sửa toàn bộ block.',
                      bg=body['bg'], fg='#557263').pack(anchor='w')
@@ -2159,15 +2160,15 @@ class LevelFlowMixin:
                 row=tk.Frame(body,bg=body['bg']);row.pack(fill='x',pady=3)
                 tk.Label(row,text=name,width=19,anchor='w',bg=body['bg']).pack(side='left')
                 if name == 'theme':
-                    w=__import__('tkinter').ttk.Combobox(row,values=[t[0] for t in self._themes()],state='readonly',font=('Segoe UI',12));w.pack(side='left',fill='x',expand=True);w.set(self._themes()[0][0]);w._theme_selector=True
+                    w=__import__('tkinter').ttk.Combobox(row,values=[t[0] for t in self._themes()],state='readonly',font=font_at(12));w.pack(side='left',fill='x',expand=True);w.set(self._themes()[0][0]);w._theme_selector=True
                 elif name == 'lesson':
-                    w=__import__('tkinter').ttk.Combobox(row,values=list(range(1,self._lesson_count(self._themes()[0][0],1)+1)),state='readonly',font=('Segoe UI',12));w.pack(side='left',fill='x',expand=True);w.set('1')
+                    w=__import__('tkinter').ttk.Combobox(row,values=list(range(1,self._lesson_count(self._themes()[0][0],1)+1)),state='readonly',font=font_at(12));w.pack(side='left',fill='x',expand=True);w.set('1')
                 elif name == 'type' and kind == 'questions':
-                    w=__import__('tkinter').ttk.Combobox(row,values=list(QUESTION_TYPES),state='readonly',font=('Segoe UI',12));w.pack(side='left',fill='x',expand=True);w.set('choice')
+                    w=__import__('tkinter').ttk.Combobox(row,values=list(QUESTION_TYPES),state='readonly',font=font_at(12));w.pack(side='left',fill='x',expand=True);w.set('choice')
                 elif name in ('content','instructions','prompt'):
-                    w=tk.Text(row,height=4,font=('Segoe UI',12));w.pack(side='left',fill='x',expand=True)
+                    w=tk.Text(row,height=4,font=font_at(12));w.pack(side='left',fill='x',expand=True)
                 else:
-                    w=tk.Entry(row,font=('Segoe UI',12));w.pack(side='left',fill='x',expand=True)
+                    w=tk.Entry(row,font=font_at(12));w.pack(side='left',fill='x',expand=True)
                 inputs[name]=w
                 if name in ('audio','title_audio','content_audio'):
                     def choose_audio(entry=w):
@@ -2185,7 +2186,7 @@ class LevelFlowMixin:
                             if dest.read_bytes()!=audio_path.read_bytes():dest=target_dir/(audio_path.stem+'_'+hashlib.sha256(audio_path.read_bytes()).hexdigest()[:12]+audio_path.suffix.lower())
                         if not dest.exists():copy2(audio_path,dest)
                         entry.delete(0,'end');entry.insert(0,'media/'+dest.name)
-                    tk.Button(row,text='Chọn âm thanh...',command=choose_audio,font=('Segoe UI',10,'bold'),
+                    tk.Button(row,text='Chọn âm thanh...',command=choose_audio,font=font_at(10, 'bold'),
                               bg='#E2F0E2',fg='#285D40',bd=0,padx=12,pady=8).pack(side='left',padx=(8,0))
                 if name == 'image':
                     def choose_image(entry=w):
@@ -2208,7 +2209,7 @@ class LevelFlowMixin:
                         if not destination.exists():copy2(image_path,destination)
                         entry.delete(0,'end');entry.insert(0,'media/'+destination.name)
                         messagebox.showinfo('Đã chọn ảnh','Đã tự điền: media/'+destination.name+'\nBấm Lưu nội dung để hoàn tất.')
-                    tk.Button(row,text='Chọn ảnh...',command=choose_image,font=('Segoe UI',10,'bold'),bg='#E2F0E2',fg='#285D40',bd=0,padx=12,pady=8).pack(side='left',padx=(8,0))
+                    tk.Button(row,text='Chọn ảnh...',command=choose_image,font=font_at(10, 'bold'),bg='#E2F0E2',fg='#285D40',bd=0,padx=12,pady=8).pack(side='left',padx=(8,0))
             target={'index':None}
             def fill(idx):
                 item=self._levels(kind)[idx];target['index']=idx
