@@ -6,7 +6,7 @@ from pathlib import Path
 import stat
 from tempfile import NamedTemporaryFile
 
-from question_layout_store import layout_v2, validate_layout
+from question_layout_store import layout_v2, layout_v3, validate_layout
 
 
 def _spans(text):
@@ -56,15 +56,16 @@ def _spans(text):
     return sorted(read(0)[2])
 
 
-def migrate_bytes(original):
+def migrate_bytes(original, *, version=2):
     """Return migrated UTF-8 bytes and count, without touching a file."""
     text = original.decode('utf-8-sig')
     prefix = b'\xef\xbb\xbf' if original.startswith(b'\xef\xbb\xbf') else b''
     edits = []
     for start, end, layout in _spans(text):
         checked = validate_layout(layout)
-        if checked and checked.get('version') != 2:
-            encoded = json.dumps(layout_v2(checked), ensure_ascii=False, separators=(',', ':'))
+        if checked and checked.get('version', 1) < version:
+            convert = layout_v3 if version == 3 else layout_v2
+            encoded = json.dumps(convert(checked), ensure_ascii=False, separators=(',', ':'))
             edits.append((start, end, encoded))
     parts, cursor = [], 0
     for start, end, encoded in edits:
@@ -100,10 +101,10 @@ def _replace(path, expected, content):
             tmp_path.unlink(missing_ok=True)
 
 
-def migrate_file(path):
+def migrate_file(path, *, version=2):
     path = Path(path).resolve(strict=True)
     original = path.read_bytes()
-    updated, count = migrate_bytes(original)
+    updated, count = migrate_bytes(original, version=version)
     if not count:
         return 0
     backup = path.with_name(path.name + '.bak')
@@ -142,12 +143,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('path', type=Path)
     parser.add_argument('--restore', action='store_true')
+    parser.add_argument('--version', type=int, choices=(2, 3), default=2)
     args = parser.parse_args()
     if args.restore:
         restore_file(args.path)
         print('Đã phục hồi:', args.path)
     else:
-        print('Số bố cục đã di trú:', migrate_file(args.path))
+        print('Số bố cục đã di trú:', migrate_file(args.path, version=args.version))
 
 
 if __name__ == '__main__':

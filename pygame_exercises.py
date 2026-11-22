@@ -1,4 +1,5 @@
 from exercise_gfx import draw_question_progress, present_frame
+from extras_render import draw_extras
 from question_rich_text import draw as draw_rich, wrap as wrap_rich
 """Optional Pygame exercise renderer. Does not own scoring, data, or navigation."""
 import math
@@ -449,7 +450,7 @@ def _run(question):
     if kind in ('fill', 'listening_fill', 'error'):
         try:
             from question_layout_runtime import element as _text_element
-            field = 'input_area' if (question.get('layout') or {}).get('version') == 2 else 'answer_area'
+            field = 'input_area' if (question.get('layout') or {}).get('version') in (2, 3) else 'answer_area'
             legacy_text_area = _text_element(question, field)
         except (ImportError, AttributeError, TypeError, ValueError):
             pass
@@ -1065,6 +1066,9 @@ def _run(question):
                     confirm_rect = complete_rect(y+140)
                     draw_complete(screen, confirm_rect, fonts[2], confirm_ready, confirm_rect.collidepoint(mouse), pygame.mouse.get_pressed()[0])
                     cells.append((confirm_rect,'confirm_text'))
+            draw_extras(screen, question)
+            if (question.get('layout') or {}).get('extras') and not content_scroll:
+                draw_question_progress(screen, question)
             # Show a vertical slice of the tall content; horizontal position never moves.
             display_screen.blit(screen, (0, 0), (0, content_scroll, 960, 640))
             scrollbar_track = None

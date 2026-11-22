@@ -454,7 +454,7 @@ def _run(question):
                 pygame.draw.circle(s, (30, 146, 110, int(120 * (1 - age / 0.45))), (x, y), int(8 + age * 90), 3)
                 screen.blit(s, (0, 0)); alive.append((x, y, t0))
         ripples = alive
-        page.present()
+        page.present(question)
         page.complete(question, submit, f_bold, ready)
         screen = page.display
         if zoom_open:draw_zoom(screen,zoom_open)

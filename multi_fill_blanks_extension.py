@@ -254,7 +254,7 @@ def run(question):
                 scroll_bottom = content_end
             ready = all(v.strip() for v in values)
             screen.blit(small.render('Tab: đổi ô', True, (100, 115, 132)), (55, min(scroll_bottom - 36, y + 52)))
-            page.present()
+            page.present(question)
             # These controls are locked to the viewport, not to the content.
             mouse = pygame.mouse.get_pos()
             draw_complete(page.display, fixed_submit, small, ready,

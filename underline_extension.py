@@ -225,7 +225,7 @@ def run(question):
                     hit.append((pygame.Rect(x-2,y-3,rendered.get_width()+4,font.get_height()+9),i))
                 if kind==TYPES[0]:screen.blit(font.render(suffix,True,navy),(x+font.size(word_lines[-1])[0],y))
             button=pygame.Rect(704,button_y,200,46)
-            page.present()
+            page.present(question)
             page.complete(question, button, small, bool(chosen))
             present_frame(question)
             for event in page.events():

@@ -2,7 +2,7 @@
 
 This module does not change answer validation or event handling.
 """
-from question_layout_runtime import element
+from question_layout_store import pixel_elements, pixel_extras
 
 
 def content_bottom(question, minimum, margin=48):
@@ -11,11 +11,9 @@ def content_bottom(question, minimum, margin=48):
     layout = question.get('layout') or {}
     if not isinstance(layout, dict):
         return bottom
-    elements = layout.get('desktop', {}) if layout.get('version') == 2 else layout
-    for key in elements:
-        if key in ('complete_button', 'question_counter'):
-            continue
-        geometry = element(question, key)
-        if geometry and 'y' in geometry:
-            bottom = max(bottom, int(geometry['y']) + max(1, int(geometry.get('height', 0))) + margin)
+    geometry = list(pixel_elements(layout).values())
+    geometry.extend(extra['rect'] for extra in pixel_extras(layout))
+    for rect in geometry:
+        if 'y' in rect:
+            bottom = max(bottom, rect['y'] + max(1, rect.get('height', 0)) + margin)
     return bottom

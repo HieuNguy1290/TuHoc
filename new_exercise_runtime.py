@@ -1,5 +1,7 @@
 from question_prompt import display_prompt
 from exercise_gfx import draw_question_progress, present_frame
+from extras_render import draw_extras
+from question_layout_store import pixel_extras
 from question_rich_text import draw as draw_rich, wrap as wrap_rich
 """Pygame interaction and scoring for the five additional editor formats."""
 import re
@@ -360,16 +362,18 @@ def run(question):
                                     letter_top + letter_height + 40,
                                     (letter_picture_y or letter_group_top) + (picture.get_height() if picture else 0) + 30)
         if audio_doc: letter_content_bottom = max(letter_content_bottom, narration_waveform_area.bottom + 40)
+    extras_bottom = max((extra['rect']['y'] + extra['rect']['height']
+                         for extra in pixel_extras(question.get('layout'))), default=0)
     try:
         pygame.key.start_text_input()
         while True:
-            if letter_page:screen=letter_page.begin(letter_content_bottom)
+            if letter_page:screen=letter_page.begin(max(letter_content_bottom, extras_bottom))
             elif choice_page_surface:
                 lowest = max((g.get('y', 244+(i//3)*140) + g.get('height', 118)
                               for i,g in choice_positions.items()), default=640)
                 if audio_doc:
                     lowest = max(lowest, narration_waveform_area.bottom)
-                screen = choice_page_surface.begin(max(640, lowest+40))
+                screen = choice_page_surface.begin(max(640, lowest+40, extras_bottom))
             screen.fill(bg);aa_rect(screen,'white',(25,25,910,screen.get_height()-50),border_radius=18)
             # Shared counter badge replaces the former full-width navigation strip.
             if not choice_page_surface:
@@ -499,7 +503,7 @@ def run(question):
                     y+=55
                 content_bottom=max(y+scroll,
                     int(gap_image_area.get('y', gap_top)) + (sentence_picture.get_height() if sentence_picture else 0) + 18)
-                max_scroll=max(0,content_bottom-465)
+                max_scroll=max(0,content_bottom-465, extras_bottom-490)
                 scroll=min(scroll,max_scroll)
                 screen.set_clip(old_clip)
                 if pending_gap_zoom is not None:
@@ -537,6 +541,11 @@ def run(question):
                     button(nxt,'Tiếp ▶',enabled=choice_page<len(pages)-1)
                     hits.append((prev,('page',-1)));hits.append((nxt,('page',1)))
                     draw_label(f'Trang đáp án {choice_page+1}/{len(pages)}',295,554,small)
+            if not letter_page and not choice_page_surface and extras_bottom:
+                draw_extras(screen, question, offset=(0, -scroll))
+                draw_question_progress(screen, question)
+                draw_complete(screen, submit, font, can_submit, submit.collidepoint(_ptr),
+                              pygame.mouse.get_pressed()[0])
             if audio_doc and narration_waveform is not None:
                 # Document element: drawn on the scrolling surface, so it moves
                 # with the answers. Hover uses content coordinates.
@@ -546,7 +555,7 @@ def run(question):
                 narration_waveform_rects = narration_waveform.draw(
                     screen, narration_waveform_area, small, (_m[0], _m[1] + _sc))
             if letter_page:
-                letter_page.present()
+                letter_page.present(question)
                 # The completion control and progress counter belong to the
                 # viewport, not to the scrolling question content.
                 fixed_submit = complete_rect(553)
@@ -564,7 +573,7 @@ def run(question):
                               'Dừng nghe' if narration_playing else 'Nghe câu hỏi',
                               'white', narration_button.x+12, narration_button.y+5)
             elif choice_page_surface:
-                choice_page_surface.present()
+                choice_page_surface.present(question)
                 # Keep progress and completion controls fixed on the viewport.
                 aa_rect(choice_page_surface.display, 'white', (30, 29, 915, 62), border_radius=10)
                 draw_question_progress(choice_page_surface.display, question)

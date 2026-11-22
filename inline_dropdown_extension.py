@@ -259,7 +259,7 @@ def run(question):
                     label_surf = ft.render(o, True, navy)
                     surface.blit(label_surf, label_surf.get_rect(midleft=(rr.x + 14, rr.centery)))
                     menu.append((rr, j))
-            page.present()
+            page.present(question)
             page.complete(question, submit, small, can and opened is None)
             if zoom:
                 draw_zoom(screen, zoom)

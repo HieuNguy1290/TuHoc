@@ -11,7 +11,7 @@ SCREENS = {'desktop': DESKTOP, 'mobile': MOBILE}
 def to_pixels(values, screen):
     width, height = screen
     sizes = {field: width for field in HORIZONTAL} | {field: height for field in VERTICAL}
-    return {field: round(value * sizes[field]) if field in sizes else int(value)
+    return {field: round(value * sizes[field]) if field in sizes else value if field == 'image_fit' else int(value)
             for field, value in values.items()}
 
 

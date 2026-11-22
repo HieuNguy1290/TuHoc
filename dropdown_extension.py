@@ -92,7 +92,7 @@ def run(question):
     submit_y = 560
     # Optional per-question geometry. The field and its popup share one origin,
     # so pointer hit testing always follows the rendered answer control.
-    answer_layout = layout_element(question, 'dropdown_area') if (question.get('layout') or {}).get('version') == 2 else layout_element(question, 'answer_area')
+    answer_layout = layout_element(question, 'dropdown_area') if (question.get('layout') or {}).get('version') in (2, 3) else layout_element(question, 'answer_area')
     if answer_layout:
         field_x = max(30, min(900, int(answer_layout.get('x', 175))))
         field_y = max(60, int(answer_layout.get('y', field_y)))
@@ -138,7 +138,7 @@ def run(question):
                     while val and small.size(val)[0]>rect.width-20:val=val[:-2]+'…'
                     screen.blit(small.render(val,True,navy),(rect.x+10,rect.y+11))
                     menu.append((rect,j))
-            page.present()
+            page.present(question)
             page.complete(question, submit, small, selected is not None)
             present_frame(question)
             for event in page.events(scroll_enabled=not opened):

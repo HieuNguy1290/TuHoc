@@ -1,6 +1,7 @@
 from question_rich_text import draw as draw_rich, wrap as wrap_rich
 from exercise_buttons import draw_complete
 from exercise_gfx import draw_question_progress, present_frame
+from extras_render import draw_extras
 from exercise_gfx import open_exercise_window
 """Nhìn hình - hoàn thành câu: bấm từ trong ngân hàng để tự điền vào chỗ chấm.
 
@@ -548,6 +549,7 @@ def run(question, letter_mode=False):
                     hits.append((rect, ('choice', i)))
             can_submit = len(assigned) == len(exp) and bool(exp)
             submit = pygame.Rect(738, 570, 170, 38)
+            draw_extras(screen, question)
             if lesson_surface is not None:
                 screen = display_screen
                 screen.fill(bg)

@@ -59,7 +59,7 @@ def run(question):
     navy=(32,52,77); bg=(241,247,252)
     text_layout=element(question,'question_text')
     image_layout=element(question,'question_image')
-    if (question.get('layout') or {}).get('version') == 2:
+    if (question.get('layout') or {}).get('version') in (2, 3):
         input_layout = element(question, 'input_area')
     else:
         input_layout = element(question, 'answer_area')
@@ -124,7 +124,7 @@ def run(question):
             screen.blit(font.render(visible+('| ' if active else ''),True,navy),(field_x+13,field_y+max(4,(field_height-font.get_height())//2)))
             submit=pygame.Rect(705,submit_y,185,42)
             enabled=bool(answer.strip())
-            page.present()
+            page.present(question)
             page.complete(question, submit, small, enabled)
             if zoom_open and path:draw_zoom(page.display,path)
             present_frame(question)

@@ -24,7 +24,7 @@ def edit_layout(parent, question, initial=None, *, preview=None):
     """Open a modal editor. Return validated layout, or None if cancelled."""
     initial = validate_layout(initial or {})
     stored = initial
-    if stored.get('version') == 2:
+    if stored.get('version') in (2, 3):
         initial = {key: to_relative(rect, DESKTOP) for key, rect in stored['desktop'].items()}
     working = deepcopy(initial)
     saved_layout = deepcopy(initial)
@@ -258,6 +258,8 @@ def edit_layout(parent, question, initial=None, *, preview=None):
         if mobile_layout or 'mobile' in stored:
             result['mobile'] = {el: fit_pixels(to_pixels(rect, MOBILE), MOBILE)
                                 for el, rect in mobile_layout.items()}
+        if stored.get('version') == 3:
+            result.update(version=3, extras=stored['extras'])
         return validate_layout(result)
 
     def dirty():

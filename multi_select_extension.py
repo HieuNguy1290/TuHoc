@@ -201,7 +201,7 @@ def run(question):
                         screen.blit(item_font.render(line,True,(35,54,76)),(rect.x+44,text_y))
                 cells.append((rect,i))
             screen.blit(small.render('Chọn nhiều ô, bấm lại để bỏ chọn.',True,(93,111,128)),(54,submit_y+14))
-            page.present()
+            page.present(question)
             # Fixed controls are drawn onto the viewport, not the scrolling page.
             mouse=pygame.mouse.get_pos()
             draw_complete(page.display, fixed_submit, font, bool(selected),

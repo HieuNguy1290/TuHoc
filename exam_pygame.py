@@ -1,3 +1,5 @@
+from extras_render import draw_extras
+from question_layout_store import pixel_extras
 from question_prompt import display_prompt
 from pygame_session_guard import shutdown as _app_shutdown
 """Responsive Pygame exam with independently scrollable reading and answer panels."""
@@ -36,6 +38,11 @@ def wrap(font,text,width):
             line=word
         if line:result.append(line)
     return result or ['']
+
+
+def _decorations_bottom(question):
+    return max((box['rect']['y'] + box['rect']['height']
+                for box in pixel_extras(question.get('layout'))), default=0)
 
 
 class ExamUI:
@@ -464,6 +471,7 @@ class ExamUI:
         words=len(q.get('sequence',[]))
         prompt_height=len(wrap(self.bold,str(display_prompt(q)),645))*(self.bold.get_linesize()+5)+50
         estimated=max(self.read_area.height, prompt_height+max(count*62+80,pairs*46+115,((words+3)//4)*60+230,380 if kind=='picture_missing_letters' else 180))
+        estimated=max(estimated,_decorations_bottom(q))
         canvas=pygame.Surface((self.read_area.width,estimated),pygame.SRCALPHA)
         self._interactive_target=s
         s=canvas
@@ -482,6 +490,7 @@ class ExamUI:
                 label=f'{i+1}.  '+values[i]+(' |' if i==self.gap_focus else '')
                 self._text(s,label[:80],rect.x+12,rect.y+11,self.small,INK)
                 self.buttons.append((rect,lambda ix=i:setattr(self,'gap_focus',ix)))
+            draw_extras(s,q,(self.read_area.width,640))
             self._finish_interactive(s,original_buttons,estimated);return
         if kind in ('fill','error','picture_missing_letters','listening_fill'):
             if kind=='error':
@@ -491,6 +500,7 @@ class ExamUI:
             rect=pygame.Rect(x,y+40,635,62)
             pygame.draw.rect(s,WHITE,rect,border_radius=9);pygame.draw.rect(s,BLUE,rect,2,border_radius=9)
             self._text(s,value+' |',x+15,y+53,self.font,INK,width=600)
+            draw_extras(s,q,(self.read_area.width,640))
             self._finish_interactive(s,original_buttons,estimated);return
         if kind=='order':
             sequence=list(q.get('sequence',[]))
@@ -503,6 +513,7 @@ class ExamUI:
                 col=i%4;row=i//4
                 self._button(s,str(word),(x+col*160,y+row*60,150,50),lambda w=word:self._pick_order(q,w),small=True)
             self._button(s,'Làm lại',(x,y+155,160,43),lambda:self._reset_order(qid),small=True)
+            draw_extras(s,q,(self.read_area.width,640))
             self._finish_interactive(s,original_buttons,estimated);return
         if kind=='matching':
             pairs=q.get('pairs',[])
@@ -521,6 +532,7 @@ class ExamUI:
                 label=('✓ ' if linked else '')+word
                 self._button(s,label,(x+327,y+i*46,285,40),lambda w=word:self._select_match_right(qid,w),small=True)
             self._button(s,'Xóa các cặp',(x,y+len(pairs)*46+9,190,37),lambda:self._clear_match(qid),small=True)
+        draw_extras(s,q,(self.read_area.width,640))
         self._finish_interactive(s,original_buttons,estimated)
 
     def _finish_interactive(self,canvas,original_buttons,height):
@@ -738,7 +750,7 @@ class ExamUI:
                 lines=wrap(self.small,f'{chr(65+option_ix)}. {opt}',qw-22)
                 h=max(39,len(lines)*(self.small.get_linesize()+4)+14)
                 entries.append(('option',(qid,opt,lines),y,h));y+=h+7
-            y+=20
+            y=max(y,child_tops[qid]+_decorations_bottom(child))+20
         self._group_scroll_limit=max(0,y-self.group_answer_area.height)
         gs=max(0,min(self.group_scroll.get(gid,0),self._group_scroll_limit))
         if self._focus_child_id in child_tops:
@@ -782,6 +794,9 @@ class ExamUI:
                 clipped=screen_rect.clip(self.group_answer_area)
                 if clipped.width and clipped.height:
                     self.buttons.append((clipped,lambda val=opt,key=qid:self._choose_reading_option(key,val)))
+        for child in children:
+            draw_extras(answers_surface, child, (right_w,640),
+                        offset=(0, child_tops[child['id']]-gs))
         s.blit(answers_surface,(right_x,outer.y))
         # Lightweight scroll indicators; scrolling uses the mouse wheel over each pane.
         for area,offset,limit in ((self.group_passage_area,ps,self._passage_scroll_limit),(self.group_answer_area,gs,self._group_scroll_limit)):
@@ -826,7 +841,7 @@ class ExamUI:
                 lines=wrap(self.font,label,w-38)
                 card_h=max(50,len(lines)*line_h+22)
                 items.append(('option',(i,str(opt),lines),height,None));height+=card_h+9
-        height+=16
+        height=max(height+16,_decorations_bottom(q))
         self.scroll_limit=max(0,height-self.read_area.height)
         self.scroll=max(0,min(self.scroll,self.scroll_limit))
         surface=pygame.Surface((self.read_area.width,max(self.read_area.height,height)),pygame.SRCALPHA)
@@ -880,6 +895,7 @@ class ExamUI:
                     if line:surface.blit(font.render(line,True,color),(12,yy))
                     yy+=font.get_linesize()+5
         visible=pygame.Rect(0,int(self.scroll),self.read_area.width,self.read_area.height)
+        draw_extras(surface,q,(self.read_area.width,640))
         s.blit(surface,self.read_area.topleft,visible)
         if self.scroll_limit:
             track=pygame.Rect(self.read_area.right-5,self.read_area.y,4,self.read_area.height)

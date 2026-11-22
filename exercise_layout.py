@@ -87,7 +87,10 @@ class Page:
             self.surface = pygame.Surface((960, height))
         return self.surface
 
-    def present(self):
+    def present(self, question=None):
+        if question is not None:
+            from extras_render import draw_extras
+            draw_extras(self.surface, question)
         self.display.blit(self.surface, (0, 0), (0, self.scroll, 960, 640))
         if self.limit:
             track = pygame.Rect(941, 100, 7, 500)
