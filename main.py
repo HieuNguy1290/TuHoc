@@ -48,7 +48,7 @@ from upgrade_v2 import GameAppMixin
 from dictation_vi import DictationMixin
 from level_flow import LevelFlowMixin
 from wheel_scroll import install_wheel_scroll
-from drag_scroll import install_drag_scroll
+from drag_scroll import bind_menu_pan, install_drag_scroll
 from ui_motion import animate_position, add_hover
 from panel_animations import animate_magnetic_cascade, animate_reverse_cascade_left
 from icon_animations import micro_rotation
@@ -1527,27 +1527,15 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
             add_hover(item,TOKEN_COLORS['surface'],'#E8F3EB')
         # Menu has its own wheel/drag scrolling, independent of the lesson canvas.
         self._menu_scroll_canvas=canvas
-        self._menu_drag_start=None
         def menu_wheel(event):
             delta = -1 if getattr(event,'num',None)==4 else (1 if getattr(event,'num',None)==5 else (-1 if event.delta>0 else 1))
             canvas.yview_scroll(delta*3,'units')
             return 'break'
-        def menu_press(event):
-            self._menu_drag_start=(event.y_root,canvas.yview()[0])
-        def menu_drag(event):
-            if self._menu_drag_start is None:return
-            bbox=canvas.bbox('all')
-            if bbox:
-                total=max(1,bbox[3]-bbox[1])
-                canvas.yview_moveto(max(0,min(1,self._menu_drag_start[1]+(self._menu_drag_start[0]-event.y_root)/total)))
-        def menu_release(event):self._menu_drag_start=None
-        for widget in (canvas,inner,*inner.winfo_children()):
+        drawer_widgets = (canvas, inner, *inner.winfo_children())
+        for widget in drawer_widgets:
             for seq in ('<MouseWheel>','<Button-4>','<Button-5>'):
                 widget.bind(seq,menu_wheel)
-            # Buttons retain click navigation; dragging begins after a small gesture.
-            widget.bind('<ButtonPress-1>',menu_press,add='+')
-            widget.bind('<B1-Motion>',menu_drag,add='+')
-            widget.bind('<ButtonRelease-1>',menu_release,add='+')
+        bind_menu_pan(canvas, drawer_widgets)
         # Let Tk finish mapping the drawer off-screen before starting the slide.
         # Without this idle boundary, the first visible frame may jump ahead.
         drawer.place_configure(x=-315)

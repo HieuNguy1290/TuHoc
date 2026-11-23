@@ -673,7 +673,8 @@ def _run(question):
 
     # Scroll the entire question AND its answer area vertically. Never scroll horizontally.
     content_scroll = 0
-    scrollbar_drag_offset = None  # Pointer offset inside the viewport scrollbar thumb.
+    from pygame_scroll import ScrollThumb
+    scrollbar = ScrollThumb()
     def wrapped_lines(value, font, max_width):
         lines = []
         for paragraph in str(value).split('\n'):
@@ -1147,17 +1148,10 @@ def _run(question):
             # Show a vertical slice of the tall content; horizontal position never moves.
             displayed_scroll = content_scroll
             display_screen.blit(screen, (0, 0), (0, displayed_scroll, 960, 640))
-            scrollbar_track = None
-            scrollbar_thumb = None
-            if max_content_scroll:
-                scrollbar_track = pygame.Rect(938, 110, 7, 455)
-                aa_rect(display_screen, (220,229,236), scrollbar_track, border_radius=3)
-                thumb_h = min(scrollbar_track.height, max(35, int(scrollbar_track.height * 640 / virtual_height)))
-                thumb_y = scrollbar_track.y + int((scrollbar_track.height-thumb_h)*content_scroll/max_content_scroll)
-                scrollbar_thumb = pygame.Rect(scrollbar_track.x, thumb_y, 7, thumb_h)
-                aa_rect(display_screen, (80,135,170), scrollbar_thumb, border_radius=3)
-            else:
-                scrollbar_drag_offset = None
+            scrollbar.configure(pygame.Rect(938, 110, 7, 455), 640, displayed_scroll, max_content_scroll, minimum=35)
+            if scrollbar.track:
+                aa_rect(display_screen, (220,229,236), scrollbar.track, border_radius=3)
+                aa_rect(display_screen, (80,135,170), scrollbar.thumb, border_radius=3)
             # The question counter belongs to the viewport, not the scrolled
             # question surface. A small opaque header prevents text bleed-through.
             if content_scroll:
@@ -1342,12 +1336,10 @@ def _run(question):
                         typed += ev.text
                 if ev.type==pygame.MOUSEBUTTONUP and ev.button==1:
                     waveform_drag=None
-                    scrollbar_drag_offset=None
-                if ev.type==pygame.MOUSEMOTION and scrollbar_drag_offset is not None and scrollbar_track is not None and scrollbar_thumb is not None:
-                    # Scrollbar is viewport-fixed: never apply content_scroll to its pointer.
-                    available = max(1, scrollbar_track.height-scrollbar_thumb.height)
-                    new_top = max(scrollbar_track.top, min(scrollbar_track.top+available, ev.pos[1]-scrollbar_drag_offset))
-                    content_scroll = round((new_top-scrollbar_track.top)*max_content_scroll/available)
+                consumed, offset = scrollbar.event(ev)
+                if consumed:
+                    if offset is not None:
+                        content_scroll = offset
                     continue
                 if ev.type==pygame.MOUSEMOTION and waveform_drag=='mini' and waveform is not None and mini_rects:
                     mw=mini_rects[0]
@@ -1371,19 +1363,6 @@ def _run(question):
                 if ev.type==pygame.MOUSEBUTTONDOWN and ev.button in (4,5):
                     content_scroll = max(0, min(max_content_scroll, content_scroll + (-65 if ev.button==4 else 65)))
                     continue
-                if ev.type==pygame.MOUSEBUTTONDOWN and ev.button==1 and scrollbar_track is not None and scrollbar_thumb is not None:
-                    # Give the narrow scrollbar a larger pointer target. Clicking
-                    # the track jumps to that position; dragging the thumb is smooth.
-                    scrollbar_hit = scrollbar_track.inflate(16, 0)
-                    if scrollbar_hit.collidepoint(ev.pos):
-                        if scrollbar_thumb.inflate(16, 0).collidepoint(ev.pos):
-                            scrollbar_drag_offset = ev.pos[1]-scrollbar_thumb.top
-                        else:
-                            scrollbar_drag_offset = scrollbar_thumb.height//2
-                            available = max(1, scrollbar_track.height-scrollbar_thumb.height)
-                            new_top = max(scrollbar_track.top, min(scrollbar_track.top+available, ev.pos[1]-scrollbar_drag_offset))
-                            content_scroll = round((new_top-scrollbar_track.top)*max_content_scroll/available)
-                        continue
                 if ev.type==pygame.MOUSEBUTTONDOWN and ev.button==1 and waveform is not None and mini_rects and mini_fade>0.05:
                     mw,mp=mini_rects
                     if mp.inflate(8,8).collidepoint(ev.pos):
@@ -1524,7 +1503,8 @@ def _run(question):
                     regions['answer_area'] = enclosing(rect for rect, index in cells if type(index) is int)
                     if kind == 'order':
                         regions['answer_preview'] = preview_rect
-            present_frame(question, regions, scroll=displayed_scroll, limit=max_content_scroll)
+                regions['_scrollbar'] = scrollbar.track
+            present_frame(question, regions, scroll=displayed_scroll, limit=max_content_scroll, fixed=('_scrollbar',))
             # Show the actual question before loading/decoding audio.
             if waveform_pending:
                 waveform_pending = False

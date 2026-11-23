@@ -216,6 +216,8 @@ def run(question):
             except (pygame.error, OSError, ValueError):
                 pass
         choices=list(exp)+list(question.get('distractors',[]));random.shuffle(choices)
+        from pygame_scroll import ScrollThumb
+        gap_scrollbar = ScrollThumb()
         assigned={};selected_slot=0;scroll=0;max_scroll=0;choice_page=0
         # Layout overrides apply only to the three gap-based question types.
         # Keep the choice bank, answer correctness and legacy geometry unchanged.
@@ -523,13 +525,10 @@ def run(question):
                     icon_rect = draw_zoom_icon(screen, image_rect)
                     if gap_viewport.colliderect(icon_rect) and picture_path:
                         zoom_regions.append((icon_rect, picture_path))
-                # Small scroll indicator beside the passage; it is not a hit target.
-                if max_scroll:
-                    track = pygame.Rect(908, 213, 5, 279)
-                    aa_rect(screen, (220, 229, 237), track, border_radius=2)
-                    thumb_h = max(22, round(track.height * 285 / (285 + max_scroll)))
-                    thumb_y = track.y + round((track.height-thumb_h) * scroll / max_scroll)
-                    aa_rect(screen, (104, 145, 183), (track.x, thumb_y, track.width, thumb_h), border_radius=2)
+                gap_scrollbar.configure(pygame.Rect(908, 213, 5, 279), gap_viewport.height, scroll, max_scroll, minimum=22)
+                if gap_scrollbar.track:
+                    aa_rect(screen, (220, 229, 237), gap_scrollbar.track, border_radius=2)
+                    aa_rect(screen, (104, 145, 183), gap_scrollbar.thumb, border_radius=2)
                 bank_left = min(810, max(0, bank.get('x', 65)))
                 bank_right = min(918, bank_left + max(65, bank.get('width', 825)))
                 cy = bank.get('y', 505) - scroll if 'y' in bank else 505
@@ -650,6 +649,12 @@ def run(question):
                     elif event.type == pygame.QUIT:
                         zoom_path = None
                     continue
+                if gap_mode:
+                    consumed, offset = gap_scrollbar.event(event)
+                    if consumed:
+                        if offset is not None:
+                            scroll = offset
+                        continue
                 if event.type==pygame.QUIT:
                     from pygame_exit_dialog import confirm
                     if confirm(letter_page.display if letter_page else screen, clock, 'Thoát bài tập?', 'Bạn muốn rời bài tập này?'):return None
@@ -783,7 +788,11 @@ def run(question):
                 gap_mode = kind in ('sentence_gaps', 'passage_gaps', 'conversation_gaps')
                 media = narration_waveform_area if narration_waveform is not None or narration_waveform_pending else narration_button
                 regions = {'question_text': text_rect(prompt_block), 'audio_player': media}
-                fixed = {'audio_player'} if not audio_doc else set()
+                fixed = {'_scrollbar'}
+                if not audio_doc:
+                    fixed.add('audio_player')
+                regions['_scrollbar'] = current_page.scrollbar.track if current_page else (
+                    gap_scrollbar.track if gap_mode else None)
                 if kind == 'image_multi_choice':
                     regions['question_image'] = (question_picture_frame or target) if question_picture is not None else None
                 elif kind == 'picture_missing_letters':

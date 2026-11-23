@@ -9,6 +9,7 @@ import time
 import os
 import sys
 import pygame
+from pygame_scroll import ScrollThumb
 from tkinter import Tk, filedialog
 from exam_bank import ExamBank, SUBJECTS
 from safe_storage import commit_json
@@ -25,6 +26,8 @@ class BankManager:
         self.bank=ExamBank(root);self.page=1;self.tab='bank';self.level=1;self.grade='1';self.subject='tieng_anh';self.lesson='';self.filter_type='all';self.filter_diff='all';self.search='';self.message='';self.active=None;self.actions=[];self.fields=[];self.scroll=0;self.edit_type='choice';self.edit_id='';self.form={};self.match_mode=0;self.reading_child=0;self.reading_form={};self.reading_questions=[];self.size=(1100,720);self.running=True;self.multiline_open=False;self.multiline_key='';self.multiline_scroll=0;self.match_pairs=[];self.match_focus=None;self.dropdown=None;self.dropdown_scroll=0;self.desktop=(1280,800);self.edit_scroll=0;self.maximized=False;self.config_draft=None;self.config_error="";self.focus_rect=None;self.mouse_pos=(-999,-999);self._hover_offset=0
         self.sort_by='';self.remove_request=None;self.removed=None
         self.edit_layout=None
+        self._scrollbar = ScrollThumb()
+        self._scrollbar_tab = None
     def font(self,size,bold=False):
         # Prefer bundled Windows Unicode fonts; pygame's default font lacks Vietnamese glyphs.
         paths=[r'C:\Windows\Fonts\segoeuib.ttf' if bold else r'C:\Windows\Fonts\segoeui.ttf',
@@ -68,6 +71,17 @@ class BankManager:
         try:
             while self.running and not _app_shutdown.is_set():
                 for e in pygame.event.get():
+                    if self.tab == self._scrollbar_tab and not (self.remove_request or self.multiline_open or self.dropdown):
+                        consumed, offset = self._scrollbar.event(e)
+                        if consumed:
+                            if offset is not None:
+                                if self.tab == 'bank':
+                                    self.scroll = offset
+                                else:
+                                    self.edit_scroll = offset
+                            continue
+                    else:
+                        self._scrollbar.grab = None
                     if e.type==pygame.QUIT:self.running=False
                     elif e.type in (pygame.VIDEORESIZE, getattr(pygame,"WINDOWSIZECHANGED",-999)):
                         self.size=(max(760,self.screen.get_width()),max(570,self.screen.get_height())) if e.type!=pygame.VIDEORESIZE else (max(760,e.w),max(570,e.h))
@@ -353,12 +367,16 @@ class BankManager:
         self.btn('Lưu câu hỏi' if self.edit_type!='reading_group' else 'Lưu bài đọc',pygame.Rect(w-203,h-52,175,40),self.save,disabled=self.edit_type not in EDITABLE and self.edit_type!='reading_group')
         self.btn('Quay lại',pygame.Rect(w-348,h-52,132,40),lambda:setattr(self,'tab','bank'))
         self.text('Cuộn chuột để xem toàn bộ biểu mẫu',30,h-39,self.sm,MUTED,max(100,w-400))
-        if maximum>0:
-            track=pygame.Rect(w-9,viewport_top,5,area.h)
-            self.rect(track,LINE)
-            thumb_h=max(30,int(area.h*area.h/(virtual_h-viewport_top)))
-            thumb_y=viewport_top+int((area.h-thumb_h)*self.edit_scroll/maximum)
-            self.rect(pygame.Rect(w-9,thumb_y,5,thumb_h),BLUE)
+        self.draw_scrollbar(pygame.Rect(w-9,viewport_top,5,area.h), area.h, self.edit_scroll, maximum, 30)
+
+    def draw_scrollbar(self, track, height, offset, limit, minimum):
+        if self._scrollbar_tab != self.tab:
+            self._scrollbar.grab = None
+        self._scrollbar_tab = self.tab
+        self._scrollbar.configure(track, height, offset, limit, minimum=minimum)
+        if self._scrollbar.track:
+            self.rect(self._scrollbar.track, LINE)
+            self.rect(self._scrollbar.thumb, BLUE)
 
     def scope(self):
         rows=self.bank.questions();groups=self.bank.reading_groups()
@@ -635,12 +653,8 @@ class BankManager:
             self.btn('Xóa',pygame.Rect(w-81,y+5,42,28),lambda r=q:self.request_remove(r))
         self.screen.set_clip(old_clip)
         self.actions=self.actions[:action_start]+[(r.clip(viewport),cb) for r,cb in self.actions[action_start:] if r.colliderect(viewport)]
-        if max_scroll:
-            track=pygame.Rect(frame.right-9,viewport.y,5,viewport.h)
-            self.rect(track,LINE)
-            thumb_h=max(24,int(viewport.h*viewport.h/content_h))
-            thumb_y=viewport.y+int((viewport.h-thumb_h)*self.scroll/max_scroll)
-            self.rect(pygame.Rect(track.x,thumb_y,track.w,thumb_h),BLUE)
+        self.draw_scrollbar(pygame.Rect(frame.right-9,viewport.y,5,viewport.h),
+                            viewport.h, self.scroll, max_scroll, 24)
         if not visible_rows and total==0:
             self.text('Không có câu hỏi phù hợp với bộ lọc hiện tại.',46,viewport.y+18,self.sm,MUTED,max(100,w-100))
         # Footer never overlaps the table or its final row.

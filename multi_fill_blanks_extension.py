@@ -1,6 +1,6 @@
 from question_rich_text import draw as draw_rich, wrap as wrap_rich
 from exercise_buttons import draw_complete
-from exercise_gfx import draw_question_progress, present_frame
+from exercise_gfx import draw_question_progress
 from exercise_gfx import open_exercise_window
 """Independent inline text fields for a single multi-blank exercise."""
 import re
@@ -269,7 +269,7 @@ def run(question):
                            'audio_player': audio_rect if has_audio else None,
                            'answer_area': (answer_left, answer_top, answer_right-answer_left, y-answer_top+line_height)}
                 regions.update(option_rects(boxes, 'slot'))
-            present_frame(question, regions, scroll=page.scroll, limit=page.limit)
+            page.frame(question, regions)
             if wf_pending:      # giải mã âm thanh SAU khung hình đầu tiên, tránh màn hình đen
                 wf_pending = False
                 try:

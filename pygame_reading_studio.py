@@ -95,11 +95,18 @@ def _run(item, data_dir, image_file):
         if current and current['points']:
             strokes.append(current);redo.clear();persist()
         current=None
+    from pygame_scroll import ScrollThumb
+    scrollbar = ScrollThumb()
     buttons=[]
     running=True
     while running and not _app_shutdown.is_set():
         w,h=screen.get_size();left,top,viewh=metrics();limit_scroll()
         for event in pygame.event.get():
+            consumed, offset = scrollbar.event(event)
+            if consumed:
+                if offset is not None:
+                    scroll = offset
+                continue
             if event.type==pygame.QUIT:running=False
             elif event.type==pygame.VIDEORESIZE:
                 save_stroke();page=make_page();limit_scroll()
@@ -158,10 +165,10 @@ def _run(item, data_dir, image_file):
         ratio=scroll/max(1,page.get_height()-viewh)
         progress=f'{int(ratio*100)}%  |  {len(strokes)} net ve  |  Cuon chuot de doc  |  D: bat/tat but  |  ESC: dong'
         screen.blit(small.render(progress,True,navy),(22,h-39))
-        if page.get_height()>viewh:
-            track=pygame.Rect(left+page.get_width()+8,top,9,viewh)
-            pygame.draw.rect(screen,(211,224,231),track,border_radius=4)
-            thumb_h=max(28,int(viewh*viewh/page.get_height()))
-            pygame.draw.rect(screen,(67,135,178),(track.x,track.y+int((viewh-thumb_h)*ratio),9,thumb_h),border_radius=4)
+        scrollbar.configure(pygame.Rect(left+page.get_width()+8,top,9,viewh),
+                            viewh, scroll, page.get_height()-viewh, minimum=28)
+        if scrollbar.track:
+            pygame.draw.rect(screen,(211,224,231),scrollbar.track,border_radius=4)
+            pygame.draw.rect(screen,(67,135,178),scrollbar.thumb,border_radius=4)
         pygame.display.flip();clock.tick(45)
     save_stroke()

@@ -1,4 +1,3 @@
-from exercise_gfx import present_frame
 from exercise_gfx import open_exercise_window
 """Chọn đáp án từ danh sách thả xuống ngay trong câu (một hoặc nhiều chỗ).
 
@@ -288,7 +287,7 @@ def run(question):
                            'dropdown_area': (left, sentence_top, right-left, sentence_h),
                            'answer_menu': mr if opened is not None and opened in fields else None}
                 regions.update(option_rects(((rect, i) for i, rect in fields.items()), 'slot'))
-            present_frame(question, regions, scroll=page.scroll, limit=page.limit)
+            page.frame(question, regions)
             for event in page.events(scroll_enabled=(opened is None and zoom is None)):
                 if zoom:
                     if event.type in (pygame.MOUSEBUTTONDOWN, pygame.QUIT) or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):

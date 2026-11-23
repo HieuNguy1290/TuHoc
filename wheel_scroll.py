@@ -2,6 +2,8 @@
 import tkinter as tk
 from tkinter import ttk
 
+from drag_scroll import belongs_to_canvas, canvas_extent
+
 
 def install_wheel_scroll(root):
     if getattr(root, '_wheel_scroll_installed', False): return
@@ -15,21 +17,23 @@ def install_wheel_scroll(root):
             except (tk.TclError, RuntimeError): pass
         state['job'] = None
 
+    root._cancel_wheel_scroll = cancel
+
     def tick():
         canvas = state['canvas']
         try:
             if canvas is None or canvas is not root.active_scroll_canvas or not canvas.winfo_exists():
                 cancel(); return
-            bbox = canvas.bbox('all')
-            if not bbox: cancel(); return
-            available = max(0., bbox[3]-bbox[1]-canvas.winfo_height())
+            content = canvas_extent(canvas)
+            first, last = canvas.yview()
+            available = max(0., content*(1-last+first))
             if not available: cancel(); return
-            current = canvas.yview()[0] * max(1.,bbox[3]-bbox[1])
+            current = first * content
             target = min(available,max(0.,state['target']))
             delta = target-current
             if abs(delta) < .9:
-                canvas.yview_moveto(target/max(1.,bbox[3]-bbox[1]));cancel();return
-            canvas.yview_moveto((current+delta*.28)/max(1.,bbox[3]-bbox[1]))
+                canvas.yview_moveto(target/max(1.,content));cancel();return
+            canvas.yview_moveto((current+delta*.28)/max(1.,content))
             state['job'] = root.after(16,tick)
         except (tk.TclError,RuntimeError,AttributeError):cancel()
 
@@ -72,18 +76,20 @@ def install_wheel_scroll(root):
         except (tk.TclError, AttributeError):
             pass
         canvas = root.active_scroll_canvas
-        if canvas is None:return None
+        if canvas is None or not belongs_to_canvas(event.widget, canvas):
+            return None
         try:
             if not canvas.winfo_exists():
                 cancel(); state['canvas'] = None; return None
-            bbox = canvas.bbox('all')
-            if not bbox or bbox[3]-bbox[1] <= canvas.winfo_height():
+            content = canvas_extent(canvas)
+            first, last = canvas.yview()
+            if not content or last-first >= 1:
                 cancel(); state['canvas'] = None
                 return None
             direction = -1 if getattr(event,'num',None)==4 else (1 if getattr(event,'num',None)==5 else (-1 if event.delta>0 else 1))
             magnitude = 1 if getattr(event,'num',None) in (4,5) else max(.35,abs(event.delta)/120)
-            content = max(1.,bbox[3]-bbox[1]); available = max(0.,content-canvas.winfo_height())
-            if state['canvas'] is not canvas:
+            available = max(0.,content*(1-last+first))
+            if state['job'] is None or state['canvas'] is not canvas:
                 cancel();state['canvas']=canvas;state['target']=canvas.yview()[0]*content
             state['target']=min(available,max(0.,state['target']+direction*magnitude*78))
             if state['job'] is None:tick()

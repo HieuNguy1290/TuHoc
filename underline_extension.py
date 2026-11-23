@@ -1,4 +1,3 @@
-from exercise_gfx import present_frame
 from exercise_gfx import open_exercise_window
 """Two additive underline exercise types: image choice and sentence word selection."""
 import re
@@ -251,7 +250,7 @@ def run(question):
                            'question_image': (image_rect or picture.get_rect(midtop=(480, group_top))) if picture else None,
                            'answer_area': enclosing(word_regions.values())}
                 regions.update(option_rects((rect, i) for i, rect in word_regions.items()))
-            present_frame(question, regions, scroll=page.scroll, limit=page.limit)
+            page.frame(question, regions)
             for event in page.events():
                 if event.type==pygame.QUIT:return None
                 if event.type==pygame.KEYDOWN and event.key==pygame.K_ESCAPE:return None

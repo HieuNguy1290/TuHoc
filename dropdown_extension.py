@@ -1,4 +1,3 @@
-from exercise_gfx import present_frame
 from exercise_gfx import open_exercise_window
 """Dropdown answer: Tk authoring widget and Pygame exercise window."""
 from pathlib import Path
@@ -162,7 +161,7 @@ def run(question):
                            'question_image': (image_rect or picture.get_rect(midtop=(480, group_top))) if picture else None,
                            'answer_menu': menu_rect if opened else None}
                 regions.update(option_rects(menu))
-            present_frame(question, regions, scroll=page.scroll, limit=page.limit)
+            page.frame(question, regions)
             for event in page.events(scroll_enabled=not opened):
                 if event.type==pygame.QUIT:return None
                 if event.type==pygame.KEYDOWN:

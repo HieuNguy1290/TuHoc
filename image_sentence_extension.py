@@ -501,6 +501,8 @@ def run(question, letter_mode=False):
     content_height = max(H, int(layout_content_bottom(question, natural_bottom)))
     scroll_max = max(0, content_height - H)
     scroll_y = 0
+    from pygame_scroll import ScrollThumb
+    scrollbar = ScrollThumb()
     viewport = pygame.Rect(25, 26, 910, 538)
     display_screen = screen
     lesson_surface = pygame.Surface((960, content_height)).convert() if scroll_max else None
@@ -567,12 +569,10 @@ def run(question, letter_mode=False):
                 screen = display_screen
                 screen.fill(bg)
                 screen.blit(lesson_surface, (0, 0), area=pygame.Rect(0, scroll_y, 960, 640))
-                if scroll_max:
-                    track = pygame.Rect(940, 36, 7, 518)
-                    pygame.draw.rect(screen, (216, 226, 235), track, border_radius=4)
-                    thumb_h = max(32, round(track.height * H / content_height))
-                    thumb_y = track.y + round((track.height - thumb_h) * scroll_y / scroll_max)
-                    pygame.draw.rect(screen, (112, 141, 166), (track.x, thumb_y, track.w, thumb_h), border_radius=4)
+                scrollbar.configure(pygame.Rect(940, 36, 7, 518), H, scroll_y, scroll_max, minimum=32)
+                if scrollbar.track:
+                    pygame.draw.rect(screen, (216, 226, 235), scrollbar.track, border_radius=4)
+                    pygame.draw.rect(screen, (112, 141, 166), scrollbar.thumb, border_radius=4)
             draw_complete(screen,submit,small,can_submit,submit.collidepoint(pygame.mouse.get_pos()),pygame.mouse.get_pressed()[0])
             if zoom:
                 draw_zoom(screen, zoom)
@@ -585,6 +585,11 @@ def run(question, letter_mode=False):
                 if zoom:
                     if event.type in (pygame.MOUSEBUTTONDOWN, pygame.QUIT) or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                         zoom = None
+                    continue
+                consumed, offset = scrollbar.event(event)
+                if consumed:
+                    if offset is not None:
+                        scroll_y = offset
                     continue
                 if event.type == pygame.MOUSEWHEEL and scroll_max:
                     scroll_y = max(0, min(scroll_max, scroll_y - event.y * 48))
@@ -659,7 +664,8 @@ def run(question, letter_mode=False):
                            'answer_area': (left, sentence_top, right-left, sentence_h)}
                 regions.update(option_rects((rect, index) for rect, (kind, index) in hits if kind == 'choice'))
                 regions.update(option_rects(((rect, index) for rect, (kind, index) in hits if kind == 'slot'), 'slot'))
-            present_frame(question, regions, scroll=displayed_scroll, limit=scroll_max)
+                regions['_scrollbar'] = scrollbar.track
+            present_frame(question, regions, scroll=displayed_scroll, limit=scroll_max, fixed=('_scrollbar',))
             if wf_pending:      # giải mã âm thanh SAU khung hình đầu tiên, tránh màn hình đen
                 wf_pending = False
                 try:

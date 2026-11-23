@@ -2,6 +2,7 @@
 from exercise_gfx import draw_rect as aa_rect, draw_question_progress
 from exercise_buttons import draw_complete
 import pygame
+from pygame_scroll import ScrollThumb
 
 
 def wrap(text, font, width):
@@ -78,6 +79,7 @@ class Page:
         self.scroll = 0
         self.limit = 0
         self.surface = None
+        self.scrollbar = ScrollThumb()
 
     def begin(self, bottom, *, padding=20):
         height = max(640, int(bottom + padding))
@@ -92,12 +94,16 @@ class Page:
             from extras_render import draw_extras
             draw_extras(self.surface, question)
         self.display.blit(self.surface, (0, 0), (0, self.scroll, 960, 640))
-        if self.limit:
-            track = pygame.Rect(941, 100, 7, 500)
-            aa_rect(self.display, (220, 229, 236), track, border_radius=3)
-            h = max(32, int(track.height * 640 / self.surface.get_height()))
-            y = track.y + int((track.height-h) * self.scroll / self.limit)
-            aa_rect(self.display, (80, 135, 170), (track.x, y, 7, h), border_radius=3)
+        self.scrollbar.configure(pygame.Rect(941, 100, 7, 500), 640, self.scroll, self.limit, minimum=32)
+        if self.scrollbar.track:
+            aa_rect(self.display, (220, 229, 236), self.scrollbar.track, border_radius=3)
+            aa_rect(self.display, (80, 135, 170), self.scrollbar.thumb, border_radius=3)
+
+    def frame(self, question, regions):
+        from exercise_gfx import present_frame
+        if regions is not None:
+            regions['_scrollbar'] = self.scrollbar.track
+        present_frame(question, regions, scroll=self.scroll, limit=self.limit, fixed=('_scrollbar',))
 
     def complete(self, question, rect, font, ready):
         mouse = pygame.mouse.get_pos()
@@ -110,6 +116,13 @@ class Page:
         # and a click are delivered in the same batch.
         visible_scroll = self.scroll
         for event in pygame.event.get():
+            if not scroll_enabled:
+                self.scrollbar.grab = None
+            consumed, offset = self.scrollbar.event(event) if scroll_enabled else (False, None)
+            if consumed:
+                if offset is not None:
+                    self.scroll = offset
+                continue
             if scroll_enabled and event.type == pygame.MOUSEWHEEL:
                 self.scroll = max(0, min(self.limit, self.scroll-event.y*65))
                 continue

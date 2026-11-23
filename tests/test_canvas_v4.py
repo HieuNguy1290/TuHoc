@@ -65,7 +65,7 @@ class LayoutV4Tests(unittest.TestCase):
                                                                {**draft, 'type': kind}, layout).draw()
                     self.assertEqual(surface.get_size(), READ_VIEWPORT)
                     if kind == 'reading_group':
-                        self.assertEqual(set(regions), {'answer_passage', 'answer_panel'})
+                        self.assertEqual({key for key in regions if not key.startswith('_')}, {'answer_passage', 'answer_panel'})
                     else:
                         self.assertEqual(regions['question_text'][0], (9, 25, 361, 70))
                         self.assertGreater(len(regions), 1)

@@ -187,10 +187,11 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     ttk.Label(sidebar, text='Thuộc tính phần tử', font=('Segoe UI', 12, 'bold')).pack(anchor='w', pady=(5, 12))
     selection = tk.StringVar(value='Chọn thành phần')
     ttk.Label(sidebar, textvariable=selection, wraplength=185).pack(anchor='w', pady=4)
+    ribbon = ttk.Frame(win, padding=(12, 0, 12, 6))
+    ribbon.pack(fill='x', before=main)
+    ttk.Label(ribbon, text='Định dạng chữ').pack(side='left', padx=(0, 8))
     font_var = tk.IntVar(value=24)
-    ttk.Label(sidebar, text='Cỡ chữ thành phần được chọn').pack(anchor='w', pady=(18, 4))
-    font_spin = ttk.Spinbox(sidebar, from_=8, to=96, textvariable=font_var, width=8)
-    font_spin.pack(anchor='w')
+    font_spin = ttk.Spinbox(ribbon, from_=8, to=96, textvariable=font_var, width=5)
     font_spin.state(['disabled'])
     ttk.Label(sidebar, text='Số câu và nút Hoàn thành được khóa.', wraplength=180, foreground='#64748b').pack(anchor='w', pady=22)
     fields = ttk.Frame(sidebar)
@@ -218,19 +219,22 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     italic_var = tk.BooleanVar()
     underline_var = tk.BooleanVar()
     family_var = tk.StringVar()
-    family_select = ttk.Combobox(text_tools, values=FONT_FAMILIES, textvariable=family_var,
-                                 state='readonly', width=19)
-    family_select.pack(anchor='w', pady=(0, 4))
-    family_select.bind('<<ComboboxSelected>>', lambda _e: change_text_style(font_family=family_var.get()))
-    style_row = ttk.Frame(text_tools)
-    style_row.pack(anchor='w')
-    ttk.Checkbutton(text_tools, text='Gạch chân', variable=underline_var,
-                    command=lambda: change_text_style(underline=underline_var.get())).pack(anchor='w')
+    from studio_text_format import FAMILY_DEFAULT, FLAGS
+    family_select = ttk.Combobox(ribbon, values=(FAMILY_DEFAULT, *FONT_FAMILIES[1:]),
+                                 textvariable=family_var, state='readonly', width=17)
+    family_select.pack(side='left')
+    family_select.bind('<<ComboboxSelected>>', lambda _e: change_text_style(
+        font_family='' if family_var.get() == FAMILY_DEFAULT else family_var.get()))
+    font_spin.pack(side='left', padx=5)
+    style_buttons = []
+    variables = {'bold': bold_var, 'italic': italic_var, 'underline': underline_var}
+    for field, symbol, label in FLAGS:
+        button = ttk.Checkbutton(ribbon, text=f'{symbol} · {label}', variable=variables[field],
+                                 style='Toolbutton', command=lambda name=field: change_text_style(
+                                     **{name: variables[name].get()}))
+        button.pack(side='left', padx=2)
+        style_buttons.append(button)
     align_var = tk.StringVar(value='left')
-    ttk.Checkbutton(style_row, text='Đậm', variable=bold_var,
-                    command=lambda: change_text_style(bold=bold_var.get())).pack(side='left')
-    ttk.Checkbutton(style_row, text='Nghiêng', variable=italic_var,
-                    command=lambda: change_text_style(italic=italic_var.get())).pack(side='left')
     align_select = ttk.Combobox(text_tools, values=('left', 'center', 'right'),
                                 textvariable=align_var, state='readonly', width=7)
     align_select.pack(anchor='w')
@@ -242,7 +246,7 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     spacing_spin.pack(side='left')
     spacing_spin.bind('<Return>', lambda _e: spacing_change())
     spacing_spin.bind('<FocusOut>', lambda _e: spacing_change())
-    ranges_button = ttk.Button(text_tools, text='Định dạng đoạn chữ…', command=lambda: edit_text_ranges())
+    ranges_button = ttk.Button(ribbon, text='Định dạng đoạn chữ…', command=lambda: edit_text_ranges())
     colors = ttk.Frame(sidebar)
     ttk.Button(colors, text='Màu chữ', command=lambda: choose_color('color')).pack(side='left')
     ttk.Button(colors, text='Nền', command=lambda: choose_color('bg')).pack(side='left')
@@ -260,6 +264,10 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     last_motion = None
     registered_motion = False
     preview_image = None
+    scrollbar_drag = False
+    drag_feedback = {}
+    drag_sprite = None
+    drag_photo = None
     live_renderer = None
     scene_boxes = {}
     scene_scroll = 0
@@ -419,16 +427,18 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         align_select.pack_forget()
         ranges_button.pack_forget()
         spacing_row.pack_forget()
-        font_spin.state(['!disabled'] if text_element(el) else ['disabled'])
+        state = ['!disabled'] if text_element(el) and not practice else ['disabled']
+        for widget in (font_spin, family_select, *style_buttons):
+            widget.state(state)
         if text_element(el):
             style = extras[el] if el in extras else current(el)
             bold_var.set(style.get('bold', False))
             italic_var.set(style.get('italic', False))
             underline_var.set(style.get('underline', False))
-            family_var.set(style.get('font_family', ''))
+            family_var.set(style.get('font_family') or FAMILY_DEFAULT)
             text_tools.pack(anchor='w')
             if 'runs' in properties(el):
-                ranges_button.pack(anchor='w', pady=3)
+                ranges_button.pack(side='left', padx=8)
             if 'align' in properties(el):
                 align_var.set(style.get('align', 'left'))
                 align_select.pack(anchor='w')
@@ -553,7 +563,7 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
             status.set('Không mở được mô phỏng Pygame.')
 
     def poll_live():
-        nonlocal poll_job, scene_boxes, scene_scroll, scene_limit, scene_layout, menu_revision
+        nonlocal poll_job, scene_boxes, scene_scroll, scene_limit, scene_layout, menu_revision, drag_sprite
         nonlocal scene_error, practice_done
         poll_job = None
         if live_renderer is None:
@@ -574,6 +584,9 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
             if latest is not None:
                 _, size, pixels, scene_boxes, scene_scroll, scene_limit = latest
                 scene_layout = sent_layout
+                if not drag[0] and requested and scene_layout == requested[0]:
+                    drag_feedback.clear()
+                    drag_sprite = None
                 show_frame(size, pixels)
                 if not drag[0]:
                     show_pixels()
@@ -645,11 +658,11 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         redraw()
 
     def live_input(kind, event):
-        if not practice or practice_done or preview_image is None:
+        if preview_image is None or not scrollbar_drag and (not practice or practice_done):
             return
         point = (round(canvas.canvasx(event.x)/zoom[0]-page_origin_x),
                  round(canvas.canvasy(event.y)/zoom[0]-page_origin_y))
-        if 0 <= point[0] < preview_image.width and 0 <= point[1] < preview_image.height:
+        if scrollbar_drag or (0 <= point[0] < preview_image.width and 0 <= point[1] < preview_image.height):
             send_live('input', (kind, point))
         return 'break'
 
@@ -836,8 +849,10 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
 
     def edit_text(event):
         nonlocal edit_widget
-        key, _ = hit(canvas.canvasx(event.x), canvas.canvasy(event.y))
-        if key not in extras or key in locked or edit_widget is not None:
+        key, mode = hit(canvas.canvasx(event.x), canvas.canvasy(event.y))
+        if practice or mode != 'move' or key not in extras or key in locked:
+            return down(event)
+        if edit_widget is not None:
             return 'break'
         release()
         x1,y1,x2,y2 = boxes[key]
@@ -994,6 +1009,8 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
             block_order = tuple(el for el in elements if el not in hidden)
         for el in block_order:
             draw_block(el,live)
+        if live and drag_feedback:
+            paint_drag_feedback()
         queue_live_frame()
         if not live:
             canvas.create_text(ox+w-18*scale,oy+22*scale,text='Câu: --/--  (khóa)',
@@ -1054,11 +1071,17 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         return rects[0][1]-rects[1][1] if rects else 0
 
     def down(event):
-        nonlocal registered_motion, marquee, drag_scene_offset
+        nonlocal registered_motion, marquee, drag_scene_offset, scrollbar_drag, drag_sprite
         canvas.focus_set()
         if practice:
             return live_input('click', event)
         x,y=canvas.canvasx(event.x),canvas.canvasy(event.y)
+        if live_renderer and working is desktop_layout:
+            px,py = x/zoom[0]-page_origin_x, y/zoom[0]-page_origin_y
+            for key, (_, (bx,by,bw,bh)) in scene_boxes.items():
+                if key.startswith('_scrollbar') and bx-6 <= px < bx+bw+6 and by <= py < by+bh:
+                    scrollbar_drag = True
+                    return live_input('click', event)
         el, mode = hit(x,y)
         if event.state&1 and el:
             if el in selected_keys:
@@ -1079,6 +1102,12 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         registered_motion = False
         group_start.clear()
         if el not in locked:
+            drag_feedback.clear()
+            drag_sprite = None
+            if mode != 'move' and live_renderer and preview_image and working is desktop_layout and el in scene_boxes:
+                px, py, width, height = scene_boxes[el][1]
+                if width > 0 and height > 0:
+                    drag_sprite = preview_image.crop((px,py,px+width,py+height))
             drag_scene_offset = draw_offset(el)
             drag[0]=(el,mode,x,y,deepcopy(current(el)))
             if mode=='move':
@@ -1093,7 +1122,12 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
             move(last_motion)
 
     def release(event=None):
-        nonlocal scroll_job, last_motion, drag_visual, marquee
+        nonlocal scroll_job, last_motion, drag_visual, marquee, scrollbar_drag
+        if scrollbar_drag:
+            if event is not None:
+                live_input('release', event)
+            scrollbar_drag = False
+            return 'break'
         if practice and event is not None:
             return live_input('release', event)
         if drag_visual is not None:
@@ -1123,7 +1157,7 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
 
     def move(event):
         nonlocal scroll_job, last_motion, registered_motion
-        if practice:
+        if practice or scrollbar_drag:
             return live_input('motion', event)
         last_motion = event
         if marquee is not None:
@@ -1193,6 +1227,8 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         if auto and scroll_job is None:
             scroll_job = canvas.after(60,repeat_motion)
         if live_renderer is not None:
+            if working is desktop_layout and preview_image and registered_motion:
+                drag_feedback.update(values)
             queue_live_frame()
         schedule_drag(el,mode)
 
@@ -1201,12 +1237,48 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         if drag_visual is None:
             drag_visual = canvas.after(16,lambda:update_drag(el,mode))
 
+    def paint_drag_feedback():
+        nonlocal drag_photo
+        canvas.delete('drag_feedback')
+        drag_photo = None
+        if preview_image is None:
+            return
+        awaiting_frame = requested is None or scene_layout != requested[0]
+        scale = zoom[0]
+        ox, oy = page_origin_x*scale, page_origin_y*scale
+        for key, value in drag_feedback.items():
+            x1 = ox+value['x']*preview_image.width*scale
+            y1 = oy+(value['y']*page_h-draw_offset(key))*scale
+            x2 = x1+value['width']*preview_image.width*scale
+            y2 = y1+value['height']*page_h*scale
+            if awaiting_frame and key == active[0] and drag_sprite and x2 > x1 and y2 > y1:
+                from PIL import Image, ImageTk
+
+                left, top = max(ox,x1), max(oy,y1)
+                right = min(ox+preview_image.width*scale,x2)
+                bottom = min(oy+preview_image.height*scale,y2)
+                if right > left and bottom > top:
+                    w,h = drag_sprite.size
+                    crop = ((left-x1)*w/(x2-x1),(top-y1)*h/(y2-y1),
+                            (right-x1)*w/(x2-x1),(bottom-y1)*h/(y2-y1))
+                    patch = drag_sprite.transform(
+                        (max(1,round(right-left)),max(1,round(bottom-top))), Image.Transform.EXTENT,
+                        crop, resample=Image.Resampling.BILINEAR)
+                    drag_photo = ImageTk.PhotoImage(patch, master=canvas)
+                    canvas.create_image(left,top,image=drag_photo,anchor='nw',tags='drag_feedback')
+            canvas.create_rectangle(x1,y1,x2,y2,outline='#2563eb',width=2,tags='drag_feedback')
+            if key == active[0] and len(drag_feedback) == 1:
+                for rx,ry in handles.values():
+                    px,py=x1+rx*(x2-x1),y1+ry*(y2-y1)
+                    canvas.create_rectangle(px-4,py-4,px+4,py+4,fill='#2563eb',outline='white',tags='drag_feedback')
+
     def update_drag(el,mode):
         nonlocal drag_visual
         drag_visual = None
         if el not in block_items:
             return
         if live_renderer is not None and working is desktop_layout and preview_image is not None:
+            paint_drag_feedback()
             show_pixels()
             return
         if mode == 'move':
@@ -1496,6 +1568,12 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     win.bind('<Configure>', lambda event: fullscreen_btn.configure(
         text='Thu nhỏ cửa sổ' if is_maximized() else 'Phóng to cửa sổ') if event.widget is win else None, add='+')
     ttk.Label(toolbar, text='Thước: px | Ctrl+cuộn: zoom | Shift+cuộn: ngang').pack(side='right', padx=10)
+    from drag_scroll import CanvasPan
+
+    canvas_pan = CanvasPan()
+    canvas.bind('<ButtonPress-2>', lambda event: canvas_pan.start(canvas, event.y_root))
+    canvas.bind('<B2-Motion>', lambda event: (canvas_pan.move(event.y_root), draw_rulers())[0])
+    canvas.bind('<ButtonRelease-2>', lambda _event: canvas_pan.finish())
     canvas.bind('<ButtonPress-1>', down)
     canvas.bind('<B1-Motion>', move)
     canvas.bind('<ButtonRelease-1>', release)

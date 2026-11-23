@@ -1,5 +1,5 @@
 from exercise_buttons import draw_complete
-from exercise_gfx import draw_question_progress, present_frame
+from exercise_gfx import draw_question_progress
 from exercise_gfx import open_exercise_window
 """Isolated authoring, validation and Pygame display for three multi-answer exercises."""
 from pathlib import Path
@@ -231,7 +231,7 @@ def run(question):
                            'answer_passage': text_rect(passage_box) if kind == 'text_multi_select' else None,
                            'question_image': rendered_image}
                 regions.update(option_rects(cells))
-            present_frame(question, regions, scroll=page.scroll, limit=page.limit)
+            page.frame(question, regions)
             for event in page.events():
                 if event.type==pygame.QUIT:return None
                 if event.type==pygame.KEYDOWN:

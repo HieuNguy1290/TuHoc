@@ -11,6 +11,7 @@ import copy
 import os
 import time
 import pygame
+from pygame_scroll import ScrollThumb
 from exam_bank import ExamBank, SUBJECTS
 from exam_grading import is_correct
 
@@ -69,6 +70,8 @@ class ExamUI:
         self.studio_bounds = None
         self.studio_child_id = None
         self.studio_child_top = 0
+        self.scrollbars = {}
+        self.scrollbar_mode = self.mode
         self.scroll=0;self.dropdown=None;self.buttons=[];self.mouse=(-1,-1)
         self.resolution=(1280,720);self.window=None;self.error=None
         self.flagged=set();self.nav_page=0;self.nav_filter='all';self.nav_page_size=40;self.nav_area=pygame.Rect(791,202,254,404);self.read_scroll={};self.scroll_limit=0;self.read_area=pygame.Rect(0,0,0,0)
@@ -88,6 +91,14 @@ class ExamUI:
             clock=pygame.time.Clock()
             while self.running and not _app_shutdown.is_set():
                 for ev in pygame.event.get():
+                    if ev.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
+                        scale, (ox, oy) = self._transform()
+                        pos = ((ev.pos[0]-ox)/scale, (ev.pos[1]-oy)/scale)
+                        if self.scroll_gesture(ev, pos):
+                            continue
+                    elif ev.type == pygame.WINDOWFOCUSLOST:
+                        for bar in self.scrollbars.values():
+                            bar.grab = None
                     if ev.type==pygame.QUIT:self.running=False
                     elif ev.type==pygame.VIDEORESIZE:self._set_mode((max(800,ev.w),max(600,ev.h)))
                     elif ev.type==pygame.KEYDOWN:
@@ -481,6 +492,43 @@ class ExamUI:
             if clipped.width and clipped.height:self.buttons.append((clipped,lambda p=path:self._play_audio(p)))
         if self._audio_error:self._text(s,self._audio_error,x,y+53,self.small,(176,57,57),width=620)
 
+    def draw_scrollbar(self, surface, key, track, height, offset, limit, minimum=24):
+        if self.scrollbar_mode != self.mode:
+            self.scrollbar_mode = self.mode
+            self.scrollbars.clear()
+        if key not in self.scrollbars:
+            self.scrollbars[key] = ScrollThumb()
+        bar = self.scrollbars[key]
+        bar.configure(track, height, offset, limit, minimum=minimum)
+        if bar.track:
+            pygame.draw.rect(surface, BORDER, bar.track, border_radius=3)
+            pygame.draw.rect(surface, BLUE, bar.thumb, border_radius=3)
+
+    def scroll_gesture(self, event, pos):
+        if self.mode != self.scrollbar_mode or self.dropdown or self.review_detail is not None:
+            for bar in self.scrollbars.values():
+                bar.grab = None
+            self.scrollbar_mode = self.mode
+            return False
+        group = self._current_reading_group()
+        keys = ('passage', 'questions') if group else ('body',) if self.mode == 'exam' else (
+            ('review',) if self.mode == 'result' else ())
+        for key in keys:
+            bar = self.scrollbars.get(key)
+            if bar is None:
+                continue
+            consumed, offset = bar.event(event, pos)
+            if consumed:
+                if offset is not None:
+                    if key == 'review':
+                        self.review_scroll = offset
+                    elif key == 'body':
+                        self.scroll = self.read_scroll[self.index] = offset
+                    else:
+                        self._scroll_reading_pane(key, offset, absolute=True)
+                return True
+        return False
+
     def _studio_region(self, key, value):
         if self.studio_bounds is not None and value is not None:
             self.studio_bounds[key] = pygame.Rect(value)
@@ -634,12 +682,9 @@ class ExamUI:
             target=pygame.Rect(rect).move(self.read_area.x,self.read_area.y-int(self.scroll))
             target=target.clip(self.read_area)
             if target.width>0 and target.height>0:self.buttons.append((target,action))
-        if self.scroll_limit:
-            track=pygame.Rect(self.read_area.right-5,self.read_area.y,4,self.read_area.height)
-            pygame.draw.rect(self._interactive_target,(225,232,242),track,border_radius=3)
-            thumb_h=max(25,int(track.height*self.read_area.height/height))
-            thumb_y=track.y+int((track.height-thumb_h)*self.scroll/self.scroll_limit)
-            pygame.draw.rect(self._interactive_target,BLUE,(track.x,thumb_y,4,thumb_h),border_radius=3)
+        track = pygame.Rect(self.read_area.right-5,self.read_area.y,4,self.read_area.height)
+        self.draw_scrollbar(self._interactive_target, 'body', track, self.read_area.height,
+                            self.scroll, self.scroll_limit, 25)
 
     def _gap_text(self,q,text):
         count=len(q.get('gap_answers',[]))
@@ -936,12 +981,11 @@ class ExamUI:
             draw_extras(answers_surface,child,(right_w,640),
                         offset=(0,child_tops[child['id']]-gs),mobile=False)
         s.blit(answers_surface,self.group_answer_area.topleft)
-        # Lightweight scroll indicators; scrolling uses the mouse wheel over each pane.
-        for area,offset,limit in ((self.group_passage_area,ps,self._passage_scroll_limit),(self.group_answer_area,gs,self._group_scroll_limit)):
-            if limit:
-                track=area.height-12;thumb=max(20,int(track*area.height/(area.height+limit)))
-                thumb_y=area.y+6+int((track-thumb)*offset/limit)
-                pygame.draw.rect(s,(174,191,213),(area.right-5,thumb_y,3,thumb),border_radius=2)
+        for key, area, offset, limit in (
+                ('passage', self.group_passage_area, ps, self._passage_scroll_limit),
+                ('questions', self.group_answer_area, gs, self._group_scroll_limit)):
+            self.draw_scrollbar(s, key, pygame.Rect(area.right-5, area.y+6, 4, area.height-12),
+                                area.height, offset, limit, 20)
 
     def _draw_reading(self,s,q):
         """Render all text to an offscreen surface; clip and scroll without overlap."""
@@ -1108,12 +1152,8 @@ class ExamUI:
         visible=pygame.Rect(0,int(self.scroll),self.read_area.width,self.read_area.height)
         draw_extras(surface,q,(self.read_area.width,640))
         s.blit(surface,self.read_area.topleft,visible)
-        if self.scroll_limit:
-            track=pygame.Rect(self.read_area.right-5,self.read_area.y,4,self.read_area.height)
-            pygame.draw.rect(s,(225,232,242),track,border_radius=3)
-            thumb_h=max(25,int(track.height*self.read_area.height/height))
-            thumb_y=track.y+int((track.height-thumb_h)*self.scroll/self.scroll_limit)
-            pygame.draw.rect(s,BLUE,(track.x,thumb_y,4,thumb_h),border_radius=3)
+        track = pygame.Rect(self.read_area.right-5,self.read_area.y,4,self.read_area.height)
+        self.draw_scrollbar(s, 'body', track, self.read_area.height, self.scroll, self.scroll_limit, 25)
 
     def _draw_confirm(self,s):
         self._text(s,'Xác nhận nộp bài',80,108,self.big)
@@ -1195,12 +1235,8 @@ class ExamUI:
         for rect,i in targets:
             visible=rect.clip(area)
             if visible.width and visible.height:self.buttons.append((visible,lambda ix=i:self._show_review(ix)))
-        if self.review_scroll_limit:
-            track=pygame.Rect(area.right-7,area.y,5,area.height)
-            pygame.draw.rect(s,BORDER,track,border_radius=3)
-            thumb=max(28,int(track.height*area.height/total))
-            top=track.y+int((track.height-thumb)*self.review_scroll/self.review_scroll_limit)
-            pygame.draw.rect(s,BLUE,(track.x,top,track.width,thumb),border_radius=3)
+        track = pygame.Rect(area.right-7,area.y,5,area.height)
+        self.draw_scrollbar(s, 'review', track, area.height, self.review_scroll, self.review_scroll_limit, 28)
         self._text(s,'Nhấp vào câu để xem đáp án đã nộp và đáp án đúng.',65,574,self.small,MUTED)
         self._button(s,'Kiểm tra khác',(65,620,305,55),self._another_exam,True,small=True)
         self._button(s,'Thoát',(790,620,237,55),lambda:setattr(self,'running',False),small=True)
@@ -1250,7 +1286,7 @@ class ExamLayoutScene:
         group = q.get('_preview_group')
         child_index = q.get('_preview_child_index')
         self.group = q['type'] == 'reading_group' or group is not None
-        ui.mode = 'exam'
+        ui.mode = ui.scrollbar_mode = 'exam'
         if self.group:
             source = group if group is not None else q
             group_layout = source.get('layout')
@@ -1290,6 +1326,12 @@ class ExamLayoutScene:
                 ui._studio_region(extra['id'], (box['x'], box['y'], box['width'], box['height']))
         regions = {key: (tuple(rect), tuple(rect.move(0, -scroll)))
                    for key, rect in ui.studio_bounds.items()}
+        for key, bar in ui.scrollbars.items():
+            if bar.track and (ui.studio_child_id is None or key == 'questions'):
+                rect = bar.track
+                if ui.studio_child_id is not None:
+                    rect = rect.move(-ui.group_answer_area.x, -ui.group_answer_area.y)
+                regions[f'_scrollbar_{key}'] = (tuple(rect), tuple(rect))
         return screen, regions, scroll, limit
 
     def event(self, event):
@@ -1299,12 +1341,14 @@ class ExamLayoutScene:
         gap = q['type'] in ('sentence_gaps', 'conversation_gaps', 'passage_gaps')
         text = q['type'] in ('fill', 'error', 'picture_missing_letters', 'listening_fill')
         group = ui._current_reading_group()
-        if event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN):
+        if event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
             x, y = event.pos
             if ui.studio_child_id is not None:
                 x += ui.group_answer_area.x
                 y += ui.group_answer_area.y
             ui.mouse = (x, y)
+            if ui.scroll_gesture(event, ui.mouse):
+                return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             ui._click(ui.mouse)
         elif event.type == pygame.MOUSEWHEEL:

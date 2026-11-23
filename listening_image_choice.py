@@ -1,4 +1,4 @@
-from exercise_gfx import draw_question_progress, present_frame
+from exercise_gfx import draw_question_progress
 """Dang bai 'Nghe va chon dap an bang hinh' (type: listening_image_choice).
 
 Cau hoi:
@@ -476,7 +476,7 @@ def _run(question):
             regions = {'question_text': text_rect(prompt_block), 'audio_player': audio_rect,
                        'question_image': (image_frame or qr) if question_picture is not None else None}
             regions.update(option_rects((r, i) for i, r in enumerate(cards)))
-        present_frame(question, regions, scroll=page.scroll, limit=page.limit)
+        page.frame(question, regions)
         if wf_pending:      # giai ma am thanh SAU khung hinh dau tien, tranh man hinh den
             wf_pending = False
             try:

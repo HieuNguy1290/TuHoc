@@ -123,7 +123,7 @@ class StudioTests(unittest.TestCase):
             choices = widgets(win, tk.Listbox)[0]
             choices.selection_set(choices.get(0, 'end').index('question_text'))
             choices.event_generate('<<ListboxSelect>>')
-            next(b for b in widgets(win, ttk.Checkbutton) if b.cget('text') == 'Đậm').invoke()
+            next(b for b in widgets(win, ttk.Checkbutton) if b.cget('text') == 'B · Đậm').invoke()
             button(win, 'Định dạng đoạn chữ…').invoke()
             dialog = next(child for child in win.winfo_children() if isinstance(child, tk.Toplevel))
             text = widgets(dialog, tk.Text)[0]
@@ -207,6 +207,20 @@ class StudioTests(unittest.TestCase):
                     win.update()
                     time.sleep(.02)
                 self.assertAlmostEqual(bounds()[0]-before[0], 30, delta=2)
+                old = bounds()
+                deadline = time.monotonic()+4
+                x = round(old[0]-canvas.canvasx(0))
+                y = round((old[1]+old[3])/2-canvas.canvasy(0))
+                canvas.event_generate('<ButtonPress-1>', x=x, y=y)
+                canvas.event_generate('<B1-Motion>', x=x+27, y=y, state=0x108)
+                while not canvas.find_withtag('drag_feedback'):
+                    self.assertLess(time.monotonic(), deadline, 'Resize feedback missing while holding the mouse')
+                    win.update()
+                    time.sleep(.01)
+                outline = next(item for item in canvas.find_withtag('drag_feedback') if canvas.type(item) == 'rectangle')
+                new = canvas.coords(outline)
+                self.assertAlmostEqual((old[2]-old[0]) - (new[2]-new[0]), 27, delta=2)
+                canvas.event_generate('<ButtonRelease-1>', x=x+27, y=y)
                 next(b for b in widgets(win, ttk.Button) if b.cget('text') == 'Lưu bố cục').invoke()
             except BaseException as exc:
                 errors.append(exc)
@@ -217,6 +231,7 @@ class StudioTests(unittest.TestCase):
         if errors:
             raise errors[0]
         self.assertGreater(saved['desktop']['option_1']['x'], 66)
+        self.assertLess(saved['desktop']['option_1']['width'], 828)
 
     def test_drag_at_zoom_with_scrolled_origin(self):
         question = {'type': 'fill', 'prompt': 'Câu hỏi'}

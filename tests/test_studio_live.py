@@ -73,6 +73,28 @@ def test_choice_geometry_and_practice_click_use_the_same_box(monkeypatch):
         preview.close()
 
 
+def test_page_thumb_can_be_dragged_outside_track(tmp_path, monkeypatch):
+    monkeypatch.setenv('SDL_AUDIODRIVER', 'dummy')
+    case = next(case for case in cases(tmp_path) if case.kind == 'image_write_answer')
+    layout = {'version': 4, 'desktop': {'input_area': {'x': 60, 'y': 900, 'width': 600, 'height': 50}}}
+    preview = LivePreview(case.question)
+    try:
+        preview.send('layout', (1, layout, True, None))
+        _, _, _, regions, _, limit = next_frame(preview, 1)
+        x, y, width, height = regions['_scrollbar'][1]
+        preview.send('input', ('click', (x+width//2, y+6)))
+        next_frame(preview, 1)
+        preview.send('input', ('motion', (x-180, y+height+60)))
+        _, _, _, _, scroll, _ = next_frame(preview, 1)
+        assert scroll == limit
+        preview.send('input', ('release', (x-180, y+height+60)))
+        next_frame(preview, 1)
+        preview.send('input', ('motion', (x-180, y)))
+        assert next_frame(preview, 1)[4] == limit
+    finally:
+        preview.close()
+
+
 def test_exam_groups_and_children_use_their_own_viewports(tmp_path, monkeypatch):
     monkeypatch.setenv('SDL_AUDIODRIVER', 'dummy')
     context = dict(_layout_context='exam', _preview_root=str(tmp_path))

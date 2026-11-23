@@ -1,5 +1,4 @@
 from question_rich_text import draw as draw_rich, wrap as wrap_rich
-from exercise_gfx import present_frame
 from exercise_gfx import open_exercise_window
 """Standalone image-to-written-answer editor and Pygame exercise."""
 import re
@@ -140,7 +139,7 @@ def run(question):
                 from studio_live_preview import text_rect
                 regions = {'question_text': text_rect(prompt) if text_layout else (prompt_x, prompt_y, 850, len(lines)*32),
                            'question_image': (authored_frame or image_rect) if picture else None, 'input_area': field}
-            present_frame(question, regions, scroll=page.scroll, limit=page.limit)
+            page.frame(question, regions)
             for event in page.events():
                 if zoom_open:
                     if event.type in (pygame.MOUSEBUTTONDOWN,pygame.QUIT) or (event.type==pygame.KEYDOWN and event.key==pygame.K_ESCAPE):zoom_open=False

@@ -32,7 +32,7 @@ def _post_input(pygame, action):
         value = {'click': pygame.MOUSEBUTTONDOWN, 'release': pygame.MOUSEBUTTONUP,
                  'motion': pygame.MOUSEMOTION}[kind]
         pos = tuple(data)
-        attrs = {'pos': pos, 'button': 1} if kind != 'motion' else {'pos': pos, 'rel': (0, 0), 'buttons': (0, 0, 0)}
+        attrs = {'pos': pos, 'button': 1} if kind != 'motion' else {'pos': pos, 'rel': (0, 0), 'buttons': tuple(pygame.mouse.get_pressed())}
     elif kind == 'wheel':
         value, attrs = pygame.MOUSEWHEEL, {'x': 0, 'y': data}
     elif kind == 'text':
