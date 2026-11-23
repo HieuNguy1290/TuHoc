@@ -42,7 +42,7 @@ class Phase3Regression(unittest.TestCase):
         self.assertNotIn("_index', 1)) - 1", runtime_source)
 
         import pygame
-        from exercise_gfx import draw_question_progress
+        from tuhoc.exercises.exercise_gfx import draw_question_progress
 
         pygame.font.init()
         try:

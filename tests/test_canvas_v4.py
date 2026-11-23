@@ -7,10 +7,10 @@ import pygame
 
 from tuhoc.exams.exam_bank import ALLOWED_TYPES
 from tuhoc.exams.exam_pygame import ExamLayoutScene, READ_VIEWPORT
-from layout_registry import controls_for
-from layout_render import MOBILE
-from layout_typography import TextBlock, _font
-from question_layout_store import layout_v3, pixel_elements, pixel_extras, validate_layout
+from tuhoc.studio.layout_registry import controls_for
+from tuhoc.studio.layout_render import MOBILE
+from tuhoc.studio.layout_typography import TextBlock, _font
+from tuhoc.studio.question_layout_store import layout_v3, pixel_elements, pixel_extras, validate_layout
 
 
 class LayoutV4Tests(unittest.TestCase):

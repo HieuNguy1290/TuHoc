@@ -3,8 +3,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from layout_edit_geometry import arrange, bounds, constrain, snap_axis
-from layout_templates import apply_lesson_layout, read_template, save_template
+from tuhoc.studio.layout_edit_geometry import arrange, bounds, constrain, snap_axis
+from tuhoc.studio.layout_templates import apply_lesson_layout, read_template, save_template
 
 
 class StudioShortcuts(unittest.TestCase):

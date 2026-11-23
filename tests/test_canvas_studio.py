@@ -2,10 +2,10 @@ import tkinter as tk
 from tkinter import ttk
 import unittest
 
-from new_exercise_editors import build
-from question_layout_editor import edit_layout
-from question_layout_runtime import element
-from token_picker import TokenPicker
+from tuhoc.studio.new_exercise_editors import build
+from tuhoc.studio.question_layout_editor import edit_layout
+from tuhoc.studio.question_layout_runtime import element
+from tuhoc.studio.token_picker import TokenPicker
 
 
 def pixel_fields(root):
@@ -105,7 +105,7 @@ class StudioTests(unittest.TestCase):
         self.assertEqual(self.interact(question, result, reopen), result)
 
     def test_direct_formatting_keeps_unselected_properties(self):
-        from studio_text_format import format_segments
+        from tuhoc.studio.studio_text_format import format_segments
 
         self.assertEqual(format_segments([dict(start=0, end=4, bold=True)], 2, 6, {'italic': True}), [
             dict(start=0, end=2, bold=True),
@@ -172,7 +172,7 @@ class StudioTests(unittest.TestCase):
 
     def test_live_canvas_moves_actual_answer_from_its_drawn_position(self):
         import time
-        from question_layout_editor import edit_layout
+        from tuhoc.studio.question_layout_editor import edit_layout
 
         question = {'type': 'choice', 'prompt': 'Choose the odd one out:',
                     'options': ['Dog', 'Kite', 'Cat', 'Bird']}

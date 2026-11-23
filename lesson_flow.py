@@ -141,7 +141,7 @@ class LessonFlowMixin:
         for q,answer,correct in rows:
             self.db.record(sid,{'id':q['id'],'type':q.get('type','fill'),'version':'1.3'},correct,(time.monotonic()-self.quiz_start)/len(rows),answer)
         self.db.save_lesson_progress(sid,topic['id'],good,len(rows),completed)
-        from pygame_review_panel import show_review
+        from tuhoc.exercises.pygame_review_panel import show_review
         body=self.layout('Kết quả bài tập')
         payload=dict(stars=0,correct=good,total=len(rows),percent=good/max(1,len(rows)),duration=f'{int(time.monotonic()-self.quiz_start)} giây',message='Có câu chờ giáo viên đánh giá.' if not completed else 'Đã lưu tiến độ học tập.',unlock='',rows=[dict(question=q,answer=answer,correct=c) for q,answer,c in rows])
         show_review(body,payload,lambda action:self.lesson_detail(topic) if action=='back' else self.quiz_question(0))

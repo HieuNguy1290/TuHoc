@@ -511,7 +511,7 @@ class GameAppMixin:
 
     def _finish_wrong_review(self):
         'Record attempts/mastery, but do not award stars or unlock levels.'
-        from pygame_review_panel import show_review
+        from tuhoc.exercises.pygame_review_panel import show_review
         total=len(self.s_questions)
         correct=sum(bool(ok) for _q,_answer,ok in self.s_answers)
         if not getattr(self,'_quiz_saved',False):
@@ -664,17 +664,17 @@ class GameAppMixin:
             self.practice_next();return
         self.practice_index+=1;self.practice_next()
     def _quiz_normalize(self,value):
-        from review_normalize import normalize
+        from tuhoc.exercises.review_normalize import normalize
         return normalize(value)
 
     def _quiz_pairs(self,q):
-        from matching_widget import parse_pairs
+        from tuhoc.exercises.matching_widget import parse_pairs
         opts=q.get('options',[])
         if isinstance(opts,str):opts=[x.strip() for x in opts.split('|') if x.strip()]
         return parse_pairs(opts)
 
     def _quiz_correct(self,q,answer):
-        from new_exercise_runtime import NEW_TYPES, correct
+        from tuhoc.exercises.new_exercise_runtime import NEW_TYPES, correct
         if q.get('type') in NEW_TYPES:return correct(q,answer)
         if q.get('type')=='matching':
             pairs=self._quiz_pairs(q)
@@ -703,7 +703,7 @@ class GameAppMixin:
         return self._quiz_normalize(answer) in {self._quiz_normalize(x) for x in accepted}
 
     def _quiz_answer_text(self,q,answer):
-        from new_exercise_runtime import NEW_TYPES, answer_text
+        from tuhoc.exercises.new_exercise_runtime import NEW_TYPES, answer_text
         if q.get('type') in NEW_TYPES:return answer_text(q,answer)
         if q.get('type')!='matching':return str(answer)
         pairs=self._quiz_pairs(q)
@@ -752,7 +752,7 @@ class GameAppMixin:
         self._quiz_pending_index = None
         self._quiz_launch_retries = 0
         try:
-            from pygame_exercises import close as pg_close
+            from tuhoc.exercises.pygame_exercises import close as pg_close
             pg_close(self)
         except (ImportError, RuntimeError, AttributeError):
             pass
@@ -781,7 +781,7 @@ class GameAppMixin:
         # Pygame is the primary quiz UI. Do not render the old Tkinter exercise
         # underneath it; only fall back when Pygame is unavailable/unsupported.
         try:
-            from pygame_exercises import available as pg_available, launch as pg_launch, SUPPORTED as pg_supported
+            from tuhoc.exercises.pygame_exercises import available as pg_available, launch as pg_launch, SUPPORTED as pg_supported
             if pg_available() and kind in pg_supported:
                 pg_q=dict(q, _index=index+1, _total=len(items))
                 image_ref=q.get('image') or ('' if kind_is_picture(q) else self.curriculum.image(q.get('answer',''),self.s_theme,self.s_level))
@@ -883,7 +883,7 @@ class GameAppMixin:
                 self.session_quiz(index)
             self.button(status,'Thử lại Pygame',try_pygame_again).pack(side='right',padx=(8,0))
         c=self._card(body)
-        from question_prompt import display_prompt
+        from tuhoc.exercises.question_prompt import display_prompt
         prompt_label=tk.Label(c,text=str(display_prompt(q)),bg='white',fg=INK,font=('Segoe UI',int(self._display_settings.get('text_size',18)),'bold'),wraplength=760,justify='left')
         prompt_label.pack(anchor='w',pady=10)
         # Fit long prompts to the actual card width (including small screens/DPI).
@@ -896,7 +896,7 @@ class GameAppMixin:
         if isinstance(opts,str):opts=[x.strip() for x in opts.split('|') if x.strip()]
         board=None;entry=None;choice=tk.StringVar(master=c,value='')
         if kind in ('image_multi_choice','picture_missing_letters','sentence_gaps','conversation_gaps','passage_gaps'):
-            from new_exercise_runtime import gaps, expected
+            from tuhoc.exercises.new_exercise_runtime import gaps, expected
             import re
             if kind == 'image_multi_choice':
                 options = q.get('image_options') or [{'image': v} for v in q.get('options', [])]
@@ -942,7 +942,7 @@ class GameAppMixin:
             tk.Label(c, text='Các ô màu xanh hiển thị đáp án đúng tại vị trí cần điền.',
                      bg='white', fg='#147B46', wraplength=720).pack(anchor='w', pady=5)
         elif kind=='matching':
-            from matching_widget import MatchingBoard
+            from tuhoc.exercises.matching_widget import MatchingBoard
             pairs=self._quiz_pairs(q)
             if not pairs:
                 tk.Label(c,text='Câu nối cặp chưa có đáp án chuẩn. Vui lòng chỉnh trong Quản lý câu hỏi.',bg='white',fg='#BA3F54',wraplength=700).pack(pady=8)
@@ -1042,7 +1042,7 @@ class GameAppMixin:
 
     def session_finish(self):
         try:
-            from pygame_exercises import close as _pg_close
+            from tuhoc.exercises.pygame_exercises import close as _pg_close
             _pg_close(self)
         except ImportError:
             pass
@@ -1095,7 +1095,7 @@ class GameAppMixin:
         insights=summarize(self.s_answers)
         payload=dict(stars=stars,correct=correct,total=total,insights=insights,percent=correct/max(total,1),duration=self._format_elapsed(duration),message=msg,unlock='Mở khóa level tiếp theo!' if stars else 'Cần ít nhất 75% để mở khóa level sau.',rows=[dict(question=review_question(q),answer=a if q.get('type')=='matching' else self._quiz_answer_text(q,a),correct=ok) for q,a,ok in self.s_answers])
         body=self.layout('🎉 Kết quả Level')
-        from pygame_review_panel import show_review
+        from tuhoc.exercises.pygame_review_panel import show_review
         def action(name):
             if name=='retry':
                 self._retry_current_lesson_questions()

@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 from PIL import Image
 
-from layout_images import fitted_image
-from question_layout_editor import edit_layout, resize_rect
+from tuhoc.studio.layout_images import fitted_image
+from tuhoc.studio.question_layout_editor import edit_layout, resize_rect
 
 
 def widgets(root, kind):

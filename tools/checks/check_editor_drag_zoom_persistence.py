@@ -39,7 +39,7 @@ def editor_contract():
 
 def roundtrip():
     sys.path.insert(0, str(ROOT))
-    from question_layout_store import get_layout, set_layout
+    from tuhoc.studio.question_layout_store import get_layout, set_layout
     question = {'prompt': 'Example', 'options': ['A', 'B'], 'correct': 1}
     before = deepcopy(question)
     layout = {'question_text': {'x': .2, 'y': .18, 'width': .6, 'height': .12, 'font_size': 30},
@@ -68,7 +68,7 @@ def zoom_invariance():
 
 def reject_locked():
     sys.path.insert(0, str(ROOT))
-    from question_layout_store import validate_layout
+    from tuhoc.studio.question_layout_store import validate_layout
     for key in ('complete_button', 'question_counter'):
         try:
             validate_layout({key: {'x': .1}})

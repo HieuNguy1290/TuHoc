@@ -19,7 +19,7 @@ READING_KEYS=['theme','level','lesson','title','content','image']
 QUESTION_TYPES=('choice','picture_choice','true_false','fill','error','order','matching','listening_choice','listening_fill','image_multi_choice','listening_image_choice','picture_missing_letters','sentence_gaps','conversation_gaps','passage_gaps','image_multi_select','text_multi_select','audio_multi_select','image_write_answer','image_underline_choice','sentence_underline_words','dropdown_fill_blank','multi_fill_blanks','image_sentence_fill','image_letter_pick','inline_dropdown_fill')
 QUESTION_LABELS={'choice':'Đọc câu hỏi – chọn đáp án','picture_choice':'Nhìn hình – chọn đáp án','true_false':'Đúng / Sai','fill':'Điền đáp án','error':'Tìm lỗi','order':'Sắp xếp','matching':'Nối chữ / hình / hỗn hợp','listening_choice':'Nghe – chọn đáp án','listening_fill':'Nghe – điền đáp án'}
 
-from new_exercise_editors import NEW_TYPES, LABELS as NEW_LABELS
+from tuhoc.studio.new_exercise_editors import NEW_TYPES, LABELS as NEW_LABELS
 QUESTION_LABELS.update(NEW_LABELS)
 
 def library_file(data_dir,name):return Path(data_dir)/'content_library'/('level_'+name+'.json')
@@ -1349,7 +1349,7 @@ class LevelFlowMixin:
     def question_editor(self):
         """Type-aware editor; persists the existing QUESTION_KEYS JSON schema."""
         from tkinter import ttk
-        from studio_list import copy_question, find_rows, remove_at
+        from tuhoc.studio.studio_list import copy_question, find_rows, remove_at
         from ui_components import Toast
         from safe_storage import commit_json
 
@@ -1549,12 +1549,12 @@ class LevelFlowMixin:
             opts = data.get('options') or []
             if isinstance(opts, str): opts = [x.strip() for x in opts.split('|') if x.strip()]
             if typ in NEW_TYPES:
-                from new_exercise_editors import build
+                from tuhoc.studio.new_exercise_editors import build
                 entries['_collect_new'] = build(dynamic, typ, data, store_media, self.media_file)
                 if typ == 'dropdown_fill_blank':
                     entries['_collect_new'].prompt_getter = lambda: get(controls['prompt'])
             elif typ == 'matching':
-                from matching_widget import parse_pairs, IMAGE_PREFIX
+                from tuhoc.exercises.matching_widget import parse_pairs, IMAGE_PREFIX
                 pairs = parse_pairs(opts)
                 tk.Label(dynamic, text='MATCHING · NỐI CHỮ / HÌNH / HỖN HỢP', bg='white', fg='#39865B',
                          font=font_at(11, 'bold')).pack(anchor='w', pady=(4, 5))
@@ -1696,7 +1696,7 @@ class LevelFlowMixin:
                 obj['lesson'] = question_location['lesson'].get(get(controls['lesson']))
                 obj['type'] = typ
                 # Stage 1: preserve a per-question layout without changing rendering.
-                from question_layout_store import get_layout, set_layout
+                from tuhoc.studio.question_layout_store import get_layout, set_layout
                 obj = set_layout(obj, pending_layout['value'])
                 obj['lesson'] = int(obj['lesson'] or 1)
                 if obj['theme'] not in {t[0] for t in self._themes()}: raise ValueError('Chủ đề không hợp lệ.')
@@ -1713,7 +1713,7 @@ class LevelFlowMixin:
                         if bool(left)!=bool(right):raise ValueError(f'Cặp {i+1}: cần điền cả hai bên.')
                         if left and right:
                             mode=get(entries['matching_mode'])
-                            from matching_widget import IMAGE_PREFIX
+                            from tuhoc.exercises.matching_widget import IMAGE_PREFIX
                             if mode.startswith('Hình') and not left.startswith(IMAGE_PREFIX):raise ValueError(f'Cặp {i+1}: thiếu ảnh bên trái.')
                             if mode.endswith('Hình') and not right.startswith(IMAGE_PREFIX):raise ValueError(f'Cặp {i+1}: thiếu ảnh bên phải.')
                             if any(x in left or x in right for x in (' = ',' -> ')):
@@ -1864,14 +1864,14 @@ class LevelFlowMixin:
             question['audio'] = get(entries['audio']) if 'audio' in entries else question.get('audio', '')
             # Preview the current staged visual layout, including unsaved edits.
             # This is a copy only: preview must never persist or mutate a question.
-            from question_layout_store import get_layout
+            from tuhoc.studio.question_layout_store import get_layout
             question['layout'] = get_layout({'layout': pending_layout['value'] if layout_override is None else layout_override})
             return question
 
         def preview(layout_override=None, owner=None, on_frame=None):
             try:
                 question = preview_question(layout_override)
-                import pygame_exercises
+                import tuhoc.exercises.pygame_exercises as pygame_exercises
 
                 if not pygame_exercises.launch(owner or self, question, lambda _answer: None,
                                                allow_feedback=False, on_frame=on_frame):
@@ -1881,7 +1881,7 @@ class LevelFlowMixin:
                 messagebox.showwarning('Xem trước', str(exc), parent=self)
 
         def edit_visual_layout():
-            from question_layout_editor import edit_layout
+            from tuhoc.studio.question_layout_editor import edit_layout
             typ = kind_var.get()
             question = {'type': typ, 'prompt': get(controls['prompt']), 'id': get(controls['id']),
                         'theme': get(controls['theme']), 'level': get(controls['level']),
@@ -1912,7 +1912,7 @@ class LevelFlowMixin:
                 templates = self.data_dir / 'canvas_templates.json'
                 can_paste = 'image' in entries and (
                     sys.platform in ('win32','darwin') or which('xclip') or which('wl-paste'))
-                from pygame_exercises import prepare_preview_question
+                from tuhoc.exercises.pygame_exercises import prepare_preview_question
                 live_question = None
                 try:
                     live_question = prepare_preview_question(self, preview_question())
@@ -1932,7 +1932,7 @@ class LevelFlowMixin:
                 messagebox.showwarning('Chỉnh bố cục', str(exc), parent=self)
 
         def apply_type_template():
-            from layout_templates import apply_lesson_layout, read_template
+            from tuhoc.studio.layout_templates import apply_lesson_layout, read_template
             from safe_storage import commit_json
             typ=kind_var.get()
             theme=get(controls['theme'])
@@ -2051,7 +2051,7 @@ class LevelFlowMixin:
 
             selected['index'] = None if clone else i
             selected['id'] = None if clone else item.get('id')
-            from question_layout_store import get_layout
+            from tuhoc.studio.question_layout_store import get_layout
             pending_layout['value'] = get_layout(item)
             for key in ('theme','id','prompt'): put(controls[key], item.get(key,''))
             refresh_question_location(level_id=int(item.get('level') or 1), lesson_id=int(item.get('lesson') or 1))
@@ -2163,7 +2163,7 @@ class LevelFlowMixin:
         fields={'lessons':LESSON_KEYS,'questions':QUESTION_KEYS,'vocab':VOCAB_KEYS,'blocks':BLOCK_KEYS,'reading':READING_KEYS}[kind]
         if kind == 'lessons':
             from tkinter import ttk
-            from multi_block_editor import open_block_editor
+            from tuhoc.studio.multi_block_editor import open_block_editor
             chooser = tk.Frame(body, bg=body['bg'])
             chooser.pack(fill='x', pady=12)
             tk.Label(chooser, text='Tạo bài học mới (nhiều block)', bg=body['bg'],
@@ -2296,7 +2296,7 @@ class LevelFlowMixin:
             def fill(idx):
                 item=self._levels(kind)[idx];target['index']=idx
                 if kind == 'lessons':
-                    from multi_block_editor import open_block_editor
+                    from tuhoc.studio.multi_block_editor import open_block_editor
                     return open_block_editor(self, item['theme'], item['level'], item.get('lesson') or 1)
                 for k,w in inputs.items():
                     val=item.get(k,'');val='|'.join(map(str,val)) if isinstance(val,list) else str(val)
@@ -2338,7 +2338,7 @@ class LevelFlowMixin:
                 if not 0 <= idx < len(rows):
                     return
                 item = rows[idx]
-                from multi_block_editor import open_block_editor
+                from tuhoc.studio.multi_block_editor import open_block_editor
                 return open_block_editor(self, item['theme'], item['level'], item.get('lesson') or 1)
             all_rows = list(enumerate(self._levels(kind)))
             filters = tk.Frame(body, bg=body['bg'])

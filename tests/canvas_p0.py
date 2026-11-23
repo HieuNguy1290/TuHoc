@@ -249,7 +249,7 @@ class Replay:
 
 
 def play(original, item, answer, png, scrolled, font_path):
-    from pygame_exercises import _cached_font
+    from tuhoc.exercises.pygame_exercises import _cached_font
 
     before = deepcopy(item)
     replay = Replay(item["type"], answer, png, scrolled)
@@ -260,8 +260,8 @@ def play(original, item, answer, png, scrolled, font_path):
         with patch("pygame.display.flip", side_effect=lambda: replay.present(flip)), \
                 patch("pygame.event.get", replay.poll), patch("pygame.mouse.get_pos", return_value=(45, 320)), \
                 patch("pygame.time.get_ticks", return_value=0), \
-                patch("listening_image_choice.time", SimpleNamespace(monotonic=lambda: replay.frames / 30)), \
-                patch("pygame_exercises._cached_font", side_effect=lambda path, size, bold: _cached_font(font_path, size, bold)):
+                patch("tuhoc.exercises.listening_image_choice.time", SimpleNamespace(monotonic=lambda: replay.frames / 30)), \
+                patch("tuhoc.exercises.pygame_exercises._cached_font", side_effect=lambda path, size, bold: _cached_font(font_path, size, bold)):
             result = original(item)
     finally:
         random.setstate(original_state)
@@ -281,7 +281,7 @@ def play(original, item, answer, png, scrolled, font_path):
 
 
 def verify_submission(db, fixture_dir, mode, rows):
-    from pygame_review_panel import show_review
+    from tuhoc.exercises.pygame_review_panel import show_review
     from upgrade_v2 import Curriculum, GameAppMixin, LearningService
 
     class Quiz(GameAppMixin):
@@ -305,8 +305,8 @@ def verify_submission(db, fixture_dir, mode, rows):
     quiz.s_theme, quiz.s_level = "family", 1
     quiz.s_started = time.monotonic()
 
-    with patch("pygame_exercises.launch", return_value=True) as launch, \
-            patch("pygame_review_panel.show_review", autospec=show_review) as review:
+    with patch("tuhoc.exercises.pygame_exercises.launch", return_value=True) as launch, \
+            patch("tuhoc.exercises.pygame_review_panel.show_review", autospec=show_review) as review:
         quiz.session_quiz(0)
         for index, (q, runtime_answer, expected_correct, expected_text) in enumerate(rows):
             assert launch.call_count == index + 1
@@ -382,7 +382,7 @@ def persisted(answer, kind):
 
 def run(output, font_path, only, layout_format):
     import main
-    import pygame_exercises
+    import tuhoc.exercises.pygame_exercises as pygame_exercises
     from level_flow import QUESTION_TYPES
     from upgrade_v2 import GameAppMixin
 
@@ -413,7 +413,7 @@ def run(output, font_path, only, layout_format):
             for mode in ("default", "scroll"):
                 q = deepcopy(case.question)
                 if mode == "scroll":
-                    from question_layout_store import layout_v2, layout_v3, set_layout
+                    from tuhoc.studio.question_layout_store import layout_v2, layout_v3, set_layout
                     layout = legacy_layout(case)
                     if layout_format == "migrated":
                         layout = layout_v2(layout)

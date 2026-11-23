@@ -1,6 +1,6 @@
-from pygame_session_guard import shutdown as _app_shutdown
+from tuhoc.exercises.pygame_session_guard import shutdown as _app_shutdown
 """Fullscreen annotation companion for the existing Tkinter lesson layout."""
-from pygame_session_guard import launch as launch_guarded
+from tuhoc.exercises.pygame_session_guard import launch as launch_guarded
 
 
 def available():
@@ -22,8 +22,8 @@ def _run(title, lesson, blocks, data_dir, settings):
     import pygame
     import math
     from pathlib import Path
-    from pygame_media_support import resolve_media, load_image
-    from pygame_window_utils import vietnamese_font
+    from tuhoc.exercises.pygame_media_support import resolve_media, load_image
+    from tuhoc.exercises.pygame_window_utils import vietnamese_font
     pygame.init()
     pygame.key.start_text_input()
     info = pygame.display.Info()

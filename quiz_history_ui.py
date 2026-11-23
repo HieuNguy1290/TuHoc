@@ -2,7 +2,7 @@
 from strings_vi import t
 from ui_components import EmptyState
 from ui_tokens import COLORS as TOKEN_COLORS, font_at
-from question_prompt import display_prompt
+from tuhoc.exercises.question_prompt import display_prompt
 import datetime
 import csv
 import io

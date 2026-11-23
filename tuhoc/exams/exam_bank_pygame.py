@@ -1,5 +1,5 @@
 from tuhoc.paths import PROJECT_ROOT
-from pygame_session_guard import shutdown as _app_shutdown
+from tuhoc.exercises.pygame_session_guard import shutdown as _app_shutdown
 """Pygame bank UI, pagination, level statistics and safe question editing.
 No user data is overwritten unless the Save action validates successfully.
 """
@@ -10,11 +10,11 @@ import time
 import os
 import sys
 import pygame
-from pygame_scroll import ScrollThumb
+from tuhoc.exercises.pygame_scroll import ScrollThumb
 from tkinter import Tk, filedialog
 from tuhoc.exams.exam_bank import ExamBank, SUBJECTS
 from safe_storage import commit_json
-from studio_list import find_rows, remove_at
+from tuhoc.studio.studio_list import find_rows, remove_at
 
 # Presentation order only: existing IDs and Vietnamese labels are unchanged.
 TYPES=[('choice','Đọc câu hỏi – chọn đáp án'),('true_false','Đúng / Sai'),('picture_choice','Nhìn hình – chọn đáp án'),('image_multi_choice','Trắc nghiệm đáp án bằng hình'),('listening_choice','Nghe – chọn đáp án'),('fill','Điền đáp án'),('picture_missing_letters','Nhìn hình – điền chữ thiếu'),('listening_fill','Nghe – điền đáp án'),('sentence_gaps','Ghép từ vào câu'),('conversation_gaps','Hoàn thành hội thoại'),('passage_gaps','Hoàn thành đoạn văn'),('error','Tìm lỗi'),('order','Sắp xếp'),('matching','Nối chữ / hình / hỗn hợp'),('reading_group','Bài đọc dài + nhiều câu hỏi')]
@@ -813,7 +813,7 @@ class BankManager:
             if root is not None:root.destroy()
 
     def edit_visual_layout(self, *, child=False):
-        from question_layout_editor import edit_layout
+        from tuhoc.studio.question_layout_editor import edit_layout
         from tkinter import TclError
 
         target = self.reading_questions[self.reading_child] if child else None

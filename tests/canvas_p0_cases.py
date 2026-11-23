@@ -107,7 +107,7 @@ def legacy_layout(case):
 
 def authored_layout(case):
     """Use v2 element overrides that each renderer consumes while answering."""
-    from question_layout_store import layout_v2
+    from tuhoc.studio.question_layout_store import layout_v2
 
     layout = layout_v2(legacy_layout(case))
     desktop = layout['desktop']

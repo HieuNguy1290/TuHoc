@@ -4,11 +4,11 @@ from tools.checks.paths import ROOT, source_file
 import unittest
 
 from tools.checks.audit_layout_coverage import coverage_matrix
-from layout_registry import REGISTRY, controls_for
-from layout_render import DESKTOP, MOBILE
-from layout_templates import template_for
-from pygame_exercises import SUPPORTED
-from question_layout_store import GEOMETRY, layout_v3, pixel_elements, validate_layout
+from tuhoc.studio.layout_registry import REGISTRY, controls_for
+from tuhoc.studio.layout_render import DESKTOP, MOBILE
+from tuhoc.studio.layout_templates import template_for
+from tuhoc.exercises.pygame_exercises import SUPPORTED
+from tuhoc.studio.question_layout_store import GEOMETRY, layout_v3, pixel_elements, validate_layout
 
 
 class LayoutMatrix(unittest.TestCase):

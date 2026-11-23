@@ -4,7 +4,7 @@ import random
 import time
 
 from canvas_p0_cases import cases
-from studio_live_preview import LivePreview
+from tuhoc.studio.studio_live_preview import LivePreview
 
 
 def next_message(preview, revision, message):

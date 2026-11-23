@@ -74,7 +74,7 @@ def main():
     target = source_file('image_sentence_extension.py')
     if wrapper.exists() and target.exists():
         src = wrapper.read_text(encoding='utf-8-sig')
-        report['checks']['letter_pick_delegation'] = {'status':'pass' if 'from image_sentence_extension import run' in src else 'review',
+        report['checks']['letter_pick_delegation'] = {'status':'pass' if 'from tuhoc.exercises.image_sentence_extension import run' in src else 'review',
             'target_exists':True}
     else:
         report['checks']['letter_pick_delegation'] = {'status':'blocked','target_exists':target.exists()}

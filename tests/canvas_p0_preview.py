@@ -19,7 +19,7 @@ def descendants(widget):
 
 
 def verify(directory, feedback_enabled):
-    import pygame_exercises
+    import tuhoc.exercises.pygame_exercises as pygame_exercises
     import unified_subjects
     from level_flow import library_file, save_rows
     from main import App
@@ -89,10 +89,10 @@ def verify(directory, feedback_enabled):
         prompt = next(w for w in descendants(app) if isinstance(w, tk.Text))
         prompt.delete("1.0", "end")
         prompt.insert("1.0", "Bản nháp P0")
-        with patch("question_layout_editor.edit_layout", return_value=staged):
+        with patch("tuhoc.studio.question_layout_editor.edit_layout", return_value=staged):
             button("↔ Chỉnh bố cục").invoke()
-        with patch("pygame_exercises.launch", side_effect=capture_launch), \
-                patch("pygame_exercises._run", side_effect=replay), \
+        with patch("tuhoc.exercises.pygame_exercises.launch", side_effect=capture_launch), \
+                patch("tuhoc.exercises.pygame_exercises._run", side_effect=replay), \
                 patch.object(app, "_quiz_correct", wraps=app._quiz_correct) as grade:
             button("👁 Xem trước").invoke()
             end = time.monotonic() + 8

@@ -260,7 +260,7 @@ def audit_integration(report):
     return report['integration_audit']
 
 def coverage_matrix(root):
-    from layout_registry import REGISTRY
+    from tuhoc.studio.layout_registry import REGISTRY
     types = Counter()
 
     def count(value):

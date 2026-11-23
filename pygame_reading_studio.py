@@ -1,9 +1,9 @@
-from pygame_session_guard import shutdown as _app_shutdown
+from tuhoc.exercises.pygame_session_guard import shutdown as _app_shutdown
 """Optional Pygame reading studio; additive to the existing Tk teaching toolbar."""
 import hashlib
 import json
 import threading
-from pygame_session_guard import launch as launch_guarded
+from tuhoc.exercises.pygame_session_guard import launch as launch_guarded
 from pathlib import Path
 
 
@@ -25,7 +25,7 @@ def launch(item, data_dir, image_file=None, speak=None):
 
 def _run(item, data_dir, image_file):
     import pygame
-    from pygame_window_utils import open_maximized, vietnamese_font
+    from tuhoc.exercises.pygame_window_utils import open_maximized, vietnamese_font
     from PIL import Image
     pygame.init()
     pygame.font.init()
@@ -95,7 +95,7 @@ def _run(item, data_dir, image_file):
         if current and current['points']:
             strokes.append(current);redo.clear();persist()
         current=None
-    from pygame_scroll import ScrollThumb
+    from tuhoc.exercises.pygame_scroll import ScrollThumb
     scrollbar = ScrollThumb()
     buttons=[]
     running=True

@@ -6,7 +6,7 @@ from pathlib import Path
 import stat
 from tempfile import NamedTemporaryFile
 
-from question_layout_store import layout_v2, layout_v3, validate_layout
+from tuhoc.studio.question_layout_store import layout_v2, layout_v3, validate_layout
 
 
 def _spans(text):

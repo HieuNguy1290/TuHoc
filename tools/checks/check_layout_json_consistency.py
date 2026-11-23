@@ -38,8 +38,8 @@ def main():
     if all((source_file(x)).is_file() for x in REQUIRED[:2]):
         sys.path.insert(0, str(ROOT))
         try:
-            from question_layout_store import get_layout, set_layout, reset_layout, validate_layout
-            from question_layout_runtime import element
+            from tuhoc.studio.question_layout_store import get_layout, set_layout, reset_layout, validate_layout
+            from tuhoc.studio.question_layout_runtime import element
         except Exception as exc:
             results.append({'name':'module imports','status':'fail','error':repr(exc)})
         else:
@@ -118,7 +118,7 @@ def numeric_contract(validate_layout):
 
 
 def extent_contract(element):
-    from layout_scroll_extent import content_bottom
+    from tuhoc.studio.layout_scroll_extent import content_bottom
     question = sample()
     bottom = content_bottom(question, 640)
     expected = element(question,'option_0')['y'] + element(question,'option_0')['height']

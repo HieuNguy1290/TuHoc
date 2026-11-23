@@ -72,7 +72,7 @@ GREEN, DARK, PALE, YELLOW, BG = '#39865B', '#285D40', '#E2F0E2', '#F9E9AC', TOKE
 
 
 def normalize(text):
-    from review_normalize import normalize as shared_normalize
+    from tuhoc.exercises.review_normalize import normalize as shared_normalize
     return shared_normalize(text)
 
 
@@ -563,7 +563,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         # Ask the SDL exercise worker to exit its active question immediately.
         # Do not call pygame.quit() from Tk: SDL display belongs to the worker.
         try:
-            import pygame_exercises
+            import tuhoc.exercises.pygame_exercises as pygame_exercises
             pygame_exercises.close(self)
         except Exception:
             import logging
@@ -586,7 +586,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
                     logging.getLogger(__name__).exception(
                         'Audio shutdown failed for %s', player_name)
         # Wait without nested Tk update() calls or blocking the UI thread.
-        import pygame_session_guard as guard
+        import tuhoc.exercises.pygame_session_guard as guard
         guard.request_shutdown()
         deadline = time.monotonic() + 2.0
         def finish_when_idle():
@@ -2627,7 +2627,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         if getattr(self, '_exam_thread', None) and self._exam_thread.is_alive():
             dialogs.showinfo('Kiểm tra', 'Cửa sổ kiểm tra đang mở.')
             return
-        import pygame_session_guard as guard
+        import tuhoc.exercises.pygame_session_guard as guard
         if not guard.launch(run_exam, (self.data_dir, self.student['id'] if self.student else None), 'TuHocExamSDL'):
             dialogs.showinfo('Kiểm tra', 'Một cửa sổ bài tập hoặc kiểm tra đang mở.')
 
@@ -2672,14 +2672,14 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         return self.topic_page()
 
     def do_exercise(self,ex):
-        from exercise_focus_ui import exercise
+        from tuhoc.exercises.exercise_focus_ui import exercise
         self._focus_exercise=exercise(self,ex)
 
     def save_vocab(self,w):
         self.db.save_word(self.student['id'],self.learning.wordkey(w['word']),w.get('meaning',''));dialogs.showinfo('Sổ từ','Đã lưu từ vào Flashcard.')
 
     def result(self,ex,correct,seconds):
-        from exercise_focus_ui import result
+        from tuhoc.exercises.exercise_focus_ui import result
         self._focus_exercise=result(self,ex,correct,seconds)
 
     def _language_words(self,due=False):

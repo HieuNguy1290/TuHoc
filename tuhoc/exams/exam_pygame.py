@@ -1,17 +1,17 @@
 """Responsive Pygame exam with independently scrollable reading and answer panels."""
-from extras_render import draw_extras
-from layout_images import pygame_image
-from layout_typography import TextBlock, resolve_font
-from question_layout_store import pixel_elements, pixel_extras
-from question_prompt import display_prompt
-from pygame_session_guard import shutdown as _app_shutdown
+from tuhoc.studio.extras_render import draw_extras
+from tuhoc.studio.layout_images import pygame_image
+from tuhoc.studio.layout_typography import TextBlock, resolve_font
+from tuhoc.studio.question_layout_store import pixel_elements, pixel_extras
+from tuhoc.exercises.question_prompt import display_prompt
+from tuhoc.exercises.pygame_session_guard import shutdown as _app_shutdown
 import random
 import datetime
 import copy
 import os
 import time
 import pygame
-from pygame_scroll import ScrollThumb
+from tuhoc.exercises.pygame_scroll import ScrollThumb
 from tuhoc.exams.exam_bank import ExamBank, SUBJECTS
 from tuhoc.exams.exam_grading import is_correct
 
@@ -535,7 +535,7 @@ class ExamUI:
 
     def _studio_group(self, key, prefixes):
         if self.studio_bounds is not None:
-            from studio_live_preview import enclosing
+            from tuhoc.studio.studio_live_preview import enclosing
             self._studio_region(key, enclosing(rect for name, rect in self.studio_bounds.items()
                                                if name.startswith(prefixes)))
 

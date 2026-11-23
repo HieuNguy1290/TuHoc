@@ -1,6 +1,6 @@
 'Read-only incorrect-answer review using existing attempts and curriculum.'
 from strings_vi import t
-from question_prompt import display_prompt
+from tuhoc.exercises.question_prompt import display_prompt
 from ui_components import EmptyState
 import tkinter as tk
 from tkinter import ttk

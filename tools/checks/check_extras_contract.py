@@ -6,11 +6,11 @@ import unittest
 
 import pygame
 
-from extras_render import draw_extras
+from tuhoc.studio.extras_render import draw_extras
 from layout_migrate import migrate_file, restore_file
-from layout_render import DESKTOP, MOBILE
-from layout_scroll_extent import content_bottom
-from question_layout_store import get_layout, layout_v2, layout_v3, pixel_elements, pixel_extras, set_layout
+from tuhoc.studio.layout_render import DESKTOP, MOBILE
+from tuhoc.studio.layout_scroll_extent import content_bottom
+from tuhoc.studio.question_layout_store import get_layout, layout_v2, layout_v3, pixel_elements, pixel_extras, set_layout
 
 
 BOX = dict(id='note', kind='text', text='Tiếng Việt', desktop=dict(x=96, y=640, width=192, height=80),

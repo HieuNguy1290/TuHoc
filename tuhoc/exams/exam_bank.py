@@ -247,7 +247,7 @@ class ExamBank:
         # Work on a deep copy: editor drafts must not be mutated on save or failure.
         group=copy.deepcopy(group)
         if 'layout' in group:
-            from question_layout_store import validate_layout
+            from tuhoc.studio.question_layout_store import validate_layout
             group['layout'] = validate_layout(group['layout'])
         for field in ('subject','grade','lesson','title','passage'):
             if not str(group.get(field,'')).strip():raise ValueError('Bài đọc thiếu '+field)

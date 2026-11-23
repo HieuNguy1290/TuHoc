@@ -32,9 +32,9 @@ def check_sources():
 
 
 def check_geometry():
-    from question_layout_store import validate_layout, set_layout
-    from question_layout_runtime import element
-    from layout_scroll_extent import content_bottom
+    from tuhoc.studio.question_layout_store import validate_layout, set_layout
+    from tuhoc.studio.question_layout_runtime import element
+    from tuhoc.studio.layout_scroll_extent import content_bottom
     q = {'prompt': 'demo', 'answer': 'yes'}
     assert content_bottom(q, 640) == 640
     assert element(q, 'question_text') is None
