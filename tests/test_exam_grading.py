@@ -3,7 +3,7 @@ import unicodedata
 
 import pytest
 
-from exam_grading import is_correct
+from tuhoc.exams.exam_grading import is_correct
 
 
 @pytest.mark.parametrize(("question", "answer", "ordered", "expected"), [

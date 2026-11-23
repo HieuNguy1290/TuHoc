@@ -6,10 +6,10 @@ import sqlite3
 
 import pytest
 
-from exam_bank import ExamBank, SUBJECTS, validate_question
+from tuhoc.exams.exam_bank import ExamBank, SUBJECTS, validate_question
 from exam_content.grade2 import LESSON, build_questions, install
-from exam_grading import is_correct
-from exam_history_bridge import exam_records
+from tuhoc.exams.exam_grading import is_correct
+from tuhoc.exams.exam_history_bridge import exam_records
 
 
 @pytest.mark.parametrize("subject", ["toan", "tieng_viet"])
@@ -92,7 +92,7 @@ def test_math_results_are_filtered_under_math(tmp_path):
 def test_editor_imports_pack_and_saves_passage_again(tmp_path):
     pytest.importorskip("tkinter")
     pytest.importorskip("pygame")
-    from exam_bank_pygame import BankManager
+    from tuhoc.exams.exam_bank_pygame import BankManager
 
     ui = BankManager(tmp_path)
     ui.install_grade2()

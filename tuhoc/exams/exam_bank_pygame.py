@@ -1,3 +1,4 @@
+from tuhoc.paths import PROJECT_ROOT
 from pygame_session_guard import shutdown as _app_shutdown
 """Pygame bank UI, pagination, level statistics and safe question editing.
 No user data is overwritten unless the Save action validates successfully.
@@ -11,7 +12,7 @@ import sys
 import pygame
 from pygame_scroll import ScrollThumb
 from tkinter import Tk, filedialog
-from exam_bank import ExamBank, SUBJECTS
+from tuhoc.exams.exam_bank import ExamBank, SUBJECTS
 from safe_storage import commit_json
 from studio_list import find_rows, remove_at
 
@@ -836,7 +837,7 @@ class BankManager:
         initial = target.get('layout') if child else self.edit_layout
 
         def preview(layout, _parent, show_frame):
-            from exam_pygame import layout_preview
+            from tuhoc.exams.exam_pygame import layout_preview
             show_frame(*layout_preview(self.bank.folder.parent, question, layout))
         root = None
         try:
@@ -1055,5 +1056,5 @@ def clamp_width(value):
     return max(65,value)
 
 if __name__ == '__main__':
-    root=sys.argv[1] if len(sys.argv)>1 else os.path.dirname(os.path.abspath(__file__))
+    root=sys.argv[1] if len(sys.argv)>1 else str(PROJECT_ROOT)
     BankManager(root).run()

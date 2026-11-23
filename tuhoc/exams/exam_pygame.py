@@ -12,8 +12,8 @@ import os
 import time
 import pygame
 from pygame_scroll import ScrollThumb
-from exam_bank import ExamBank, SUBJECTS
-from exam_grading import is_correct
+from tuhoc.exams.exam_bank import ExamBank, SUBJECTS
+from tuhoc.exams.exam_grading import is_correct
 
 VIRTUAL=(1100,720)
 READ_VIEWPORT = (694, 331)

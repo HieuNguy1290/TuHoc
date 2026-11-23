@@ -332,9 +332,9 @@ def verify_submission(db, fixture_dir, mode, rows):
 
 
 def verify_exam(directory, db):
-    from exam_grading import is_correct
-    from exam_history_bridge import exam_detail, exam_records
-    from exam_pygame import ExamUI
+    from tuhoc.exams.exam_grading import is_correct
+    from tuhoc.exams.exam_history_bridge import exam_detail, exam_records
+    from tuhoc.exams.exam_pygame import ExamUI
 
     examples = (
         ({"type": "choice", "answer": "cat"}, "  CAT ", "dog", None),

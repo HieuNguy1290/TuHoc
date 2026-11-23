@@ -5,8 +5,8 @@ from tempfile import TemporaryDirectory
 
 import pygame
 
-from exam_bank import ALLOWED_TYPES
-from exam_pygame import ExamLayoutScene, READ_VIEWPORT
+from tuhoc.exams.exam_bank import ALLOWED_TYPES
+from tuhoc.exams.exam_pygame import ExamLayoutScene, READ_VIEWPORT
 from layout_registry import controls_for
 from layout_render import MOBILE
 from layout_typography import TextBlock, _font

@@ -5,7 +5,7 @@ import random
 
 import pytest
 
-from exam_bank import ExamBank, validate_question
+from tuhoc.exams.exam_bank import ExamBank, validate_question
 
 
 def choice(number=1, difficulty=1, **overrides):

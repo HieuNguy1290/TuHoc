@@ -1,7 +1,7 @@
 """Optional demo installer: original Grade 1 Family English questions (not THPT exam questions)."""
 import argparse
 from pathlib import Path
-from exam_bank import ExamBank,validate_question
+from tuhoc.exams.exam_bank import ExamBank,validate_question
 
 # Each item: (prompt, correct answer, three plausible distractors).
 M1=[

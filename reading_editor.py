@@ -1,7 +1,7 @@
 """Reading group editor tab; persists independently of standalone questions."""
 import tkinter as tk
 from tkinter import ttk, messagebox
-from exam_bank import SUBJECTS
+from tuhoc.exams.exam_bank import SUBJECTS
 
 
 def add_reading_tab(notebook, bank, parent):

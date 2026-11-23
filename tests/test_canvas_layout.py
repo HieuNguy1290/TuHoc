@@ -81,7 +81,7 @@ class LayoutTests(unittest.TestCase):
             self.assertEqual(list(path.parent.glob('*.tmp')), [])
 
     def test_blank_prompt_is_only_valid_for_missing_letters(self):
-        from exam_bank import validate_question
+        from tuhoc.exams.exam_bank import validate_question
         from question_prompt import display_prompt
         from upgrade_v2 import Curriculum
         from level_flow import save_rows

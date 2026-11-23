@@ -72,7 +72,7 @@ def install(bank):
 
 
 def main():
-    from exam_bank import ExamBank
+    from tuhoc.exams.exam_bank import ExamBank
 
     parser = argparse.ArgumentParser(description="Nạp 200 câu Toán và Tiếng Việt lớp 2.")
     parser.add_argument("--root", required=True, type=Path, help="Thư mục hồ sơ TuHocBeta.")

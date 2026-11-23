@@ -152,7 +152,7 @@ def _render_worker(pipe, question):
                 settling = 3 if question.get('audio') else 0
                 pygame.event.clear()
                 if question.get('_layout_context') == 'exam':
-                    from exam_pygame import ExamLayoutScene
+                    from tuhoc.exams.exam_pygame import ExamLayoutScene
                     exam = ExamLayoutScene(question['_preview_root'], question, layout)
                     clock = pygame.time.Clock()
                     while True:

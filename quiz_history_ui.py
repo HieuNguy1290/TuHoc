@@ -9,8 +9,8 @@ import io
 import json
 import os
 from pathlib import Path
-from exam_history_bridge import exam_records, exam_detail
-from exam_bank import SUBJECTS as EXAM_SUBJECTS
+from tuhoc.exams.exam_history_bridge import exam_records, exam_detail
+from tuhoc.exams.exam_bank import SUBJECTS as EXAM_SUBJECTS
 import tkinter as tk
 from tkinter import ttk
 

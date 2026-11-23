@@ -10,7 +10,7 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-from exam_bank import ExamBank, validate_question
+from tuhoc.exams.exam_bank import ExamBank, validate_question
 
 LESSON = 'Family & Friends - THPT 2025'
 PREFIX = 'ff12l10_2025_'
@@ -139,7 +139,7 @@ def install(root, apply=False):
             backup = path.with_name(f'{path.stem}.backup_{stamp}{path.suffix}')
             shutil.copy2(path, backup)
             print('Sao lưu:', backup)
-    from exam_bank import _atomic
+    from tuhoc.exams.exam_bank import _atomic
     _atomic(existing_questions, raw_questions + add_q)
     _atomic(existing_groups, raw_groups + add_g)
     print('Đã cài mẫu. Không thay đổi exam_config.json hoặc dữ liệu học sinh.')

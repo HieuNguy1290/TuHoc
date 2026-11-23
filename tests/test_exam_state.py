@@ -7,7 +7,7 @@ import pytest
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 pygame = pytest.importorskip("pygame")
 
-from exam_pygame import ExamUI, VIRTUAL
+from tuhoc.exams.exam_pygame import ExamUI, VIRTUAL
 
 
 @pytest.fixture

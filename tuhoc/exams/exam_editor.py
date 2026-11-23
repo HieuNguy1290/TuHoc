@@ -2,6 +2,7 @@
 
 Safe to call repeatedly from Tk callbacks. No subprocess waits on Tk's UI thread.
 """
+from tuhoc.paths import PROJECT_ROOT
 import ctypes
 import tempfile
 import traceback
@@ -124,8 +125,8 @@ def _launch(root):
     if not script.is_file():
         raise FileNotFoundError('Missing NHCH module: {}'.format(script))
     flags = getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0) if os.name == 'nt' else 0
-    command = [sys.executable, str(script), str(Path(root).resolve())]
-    _diag('launch_attempt', command=command, cwd=str(script.parent), flags=flags)
+    command = [sys.executable, '-m', 'tuhoc.exams.exam_bank_pygame', str(Path(root).resolve())]
+    _diag('launch_attempt', command=command, cwd=str(PROJECT_ROOT), flags=flags)
     try:
         child_stream = _child_log_stream()
     except OSError as exc:
@@ -133,7 +134,7 @@ def _launch(root):
         child_stream = None
     try:
         _process = subprocess.Popen(
-            command, cwd=str(script.parent), creationflags=flags,
+            command, cwd=str(PROJECT_ROOT), creationflags=flags,
             stdout=child_stream if child_stream is not None else subprocess.DEVNULL,
             stderr=subprocess.STDOUT if child_stream is not None else subprocess.DEVNULL,
         )

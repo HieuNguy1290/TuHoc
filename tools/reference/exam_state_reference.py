@@ -8,7 +8,7 @@ pg = MagicMock()
 for name in ('pygame', 'pygame.mixer', 'pygame.font', 'pygame.display', 'pygame.key', 'pygame.time'):
     sys.modules[name] = pg
 
-import exam_pygame as ep
+import tuhoc.exams.exam_pygame as ep
 
 ui = ep.ExamUI.__new__(ep.ExamUI)
 questions = [

@@ -10,7 +10,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from exam_bank import ExamBank, _atomic
+from tuhoc.exams.exam_bank import ExamBank, _atomic
 
 
 def migrate(root, apply=False):

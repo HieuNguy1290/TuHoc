@@ -4,7 +4,7 @@ import random
 
 import pytest
 
-from exam_bank import ExamBank, SUBJECTS
+from tuhoc.exams.exam_bank import ExamBank, SUBJECTS
 
 
 @pytest.mark.parametrize(('subject', 'grade', 'lesson'), [
@@ -28,7 +28,7 @@ def test_samples_fill_every_default_level_and_size(tmp_path, subject, grade, les
 
 def test_subject_switch_and_submit_saves_correct_course(tmp_path, monkeypatch):
     import pygame
-    from exam_pygame import ExamUI, VIRTUAL
+    from tuhoc.exams.exam_pygame import ExamUI, VIRTUAL
 
     monkeypatch.setattr(pygame.key, 'start_text_input', lambda: None)
     monkeypatch.setattr(pygame.key, 'stop_text_input', lambda: None)

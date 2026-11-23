@@ -2623,7 +2623,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
 
     def exam_page(self):
         import threading
-        from exam_pygame import run_exam
+        from tuhoc.exams.exam_pygame import run_exam
         if getattr(self, '_exam_thread', None) and self._exam_thread.is_alive():
             dialogs.showinfo('Kiểm tra', 'Cửa sổ kiểm tra đang mở.')
             return
@@ -2653,7 +2653,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
         log("BUTTON_CALLBACK_ENTER")
 
         try:
-            from exam_editor import open_editor
+            from tuhoc.exams.exam_editor import open_editor
 
             log("IMPORT_SUCCESS")
 
@@ -2842,7 +2842,7 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
     def statistics(self):
         body=self.layout('Thống kê học tập')
         stats=self.db.stats(self.student['id'])
-        from exam_history_bridge import exam_records
+        from tuhoc.exams.exam_history_bridge import exam_records
         exam_rows=exam_records(self.db.conn, self.student['id']) if hasattr(self.db, 'conn') else []
         if not stats and not exam_rows:
             self.label(body,'Chưa có kết quả học tập. Em hãy thử làm bài nhé!').pack(anchor='w')

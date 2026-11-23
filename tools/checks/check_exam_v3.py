@@ -6,7 +6,7 @@ import unittest
 from PIL import Image
 import pygame
 
-from exam_pygame import ExamUI, VIRTUAL
+from tuhoc.exams.exam_pygame import ExamUI, VIRTUAL
 
 
 class ExamV3(unittest.TestCase):

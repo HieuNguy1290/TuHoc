@@ -4,9 +4,9 @@ import os as _os
 import sys, json, random, tempfile, unicodedata, collections, time
 from pathlib import Path
 sys.path.insert(0,_os.environ.get('TUHOC_ROOT','.'))
-from exam_grading import is_correct
-import exam_bank as eb
-from exam_bank import ExamBank, validate_question
+from tuhoc.exams.exam_grading import is_correct
+import tuhoc.exams.exam_bank as eb
+from tuhoc.exams.exam_bank import ExamBank, validate_question
 
 ok=fail=0
 def check(name,cond,note=''):
