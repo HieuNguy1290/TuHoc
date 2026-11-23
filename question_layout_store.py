@@ -20,7 +20,8 @@ GEOMETRY = frozenset(('x', 'y', 'width', 'height'))
 TEXT_FLAGS = frozenset(('bold', 'italic', 'underline'))
 TEXT = frozenset(('font_size', 'font_family')) | TEXT_FLAGS
 FONT_FAMILIES = ('', 'DejaVu Sans', 'DejaVu Serif', 'Liberation Sans', 'Liberation Serif',
-                 'Arial', 'Segoe UI', 'Noto Sans', 'Noto Serif')
+                 'Arial', 'Segoe UI', 'Noto Sans', 'Noto Serif',
+                 'Be Vietnam Pro', 'Calibri', 'Tahoma', 'Times New Roman', 'Roboto')
 ELEMENT_PREFIXES = ('answer_', 'option_', 'slot_', 'word_')
 
 
