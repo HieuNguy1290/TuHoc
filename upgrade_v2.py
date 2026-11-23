@@ -800,7 +800,8 @@ class GameAppMixin:
                     self._quiz_pending_index=None
                     if getattr(self,'_quiz_saved',False) or len(self.s_answers)!=expected_index:
                         return
-                    if question_kind in __import__('new_exercise_runtime').NEW_TYPES:
+                    from tuhoc.exercises.new_exercise_runtime import NEW_TYPES
+                    if question_kind in NEW_TYPES:
                         answer=value
                     elif question_kind=='matching':
                         if not isinstance(value,dict): return
