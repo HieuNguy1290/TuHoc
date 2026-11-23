@@ -9,7 +9,8 @@ import json
 from pathlib import Path
 import sys
 
-ROOT = Path(__file__).resolve().parent
+from tools.checks.paths import ROOT, source_file
+
 REPORT = ROOT / 'editor_drag_zoom_03c36.json'
 
 
@@ -22,7 +23,7 @@ def check(name, fn, out):
 
 
 def editor_contract():
-    path = ROOT / 'question_layout_editor.py'
+    path = source_file('question_layout_editor.py')
     tree = ast.parse(path.read_text(encoding='utf-8-sig'))
     functions = {n.name: n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
     required = ('edit_layout', 'redraw', 'down', 'move', 'save', 'change_zoom')

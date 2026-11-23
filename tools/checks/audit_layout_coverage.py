@@ -12,7 +12,8 @@ import json
 from pathlib import Path
 import re
 
-ROOT = Path(__file__).resolve().parent
+from tools.checks.paths import ROOT, source_file
+
 MODULES = {
     'new_exercise_runtime.py': ['image_multi_choice', 'picture_missing_letters', 'sentence_gaps', 'passage_gaps', 'conversation_gaps'],
     'image_write_extension.py': ['image_write_answer'],
@@ -62,7 +63,7 @@ def inspect_with_delegate(path):
     result = inspect(path)
     delegate_name = runtime_delegate(path)
     if delegate_name:
-        delegate = ROOT / delegate_name
+        delegate = source_file(delegate_name)
         if delegate.is_file() and delegate.resolve() != path.resolve():
             target = inspect(delegate)
             result['delegated_runtime'] = delegate_name
@@ -80,7 +81,7 @@ def inspect_with_delegate(path):
 
 def _literal_assignment(filename, variable):
     """Read a literal tuple/set assignment without importing application modules."""
-    path = ROOT / filename
+    path = source_file(filename)
     if not path.is_file():
         return None
     try:
@@ -100,7 +101,7 @@ def _literal_assignment(filename, variable):
 def inventory(report):
     """Cross-check declared new types against legacy SUPPORTED set; do not guess the target 26."""
     new_types = _literal_assignment('new_exercise_editors.py', 'NEW_TYPES')
-    legacy_path = ROOT / 'pygame_exercises.py'
+    legacy_path = source_file('pygame_exercises.py')
     legacy_types = ['choice', 'picture_choice', 'true_false', 'listening_choice',
                     'order', 'fill', 'listening_fill', 'error', 'matching']
     if not legacy_path.is_file():
@@ -129,7 +130,7 @@ def inventory(report):
 
 def audit_legacy_runtime(report):
     """Inspect legacy shared runner conservatively; never equate signals with working UI."""
-    path = ROOT / 'pygame_exercises.py'
+    path = source_file('pygame_exercises.py')
     names = ('choice', 'picture_choice', 'true_false', 'listening_choice',
              'listening_fill', 'fill', 'matching', 'order', 'error')
     result = {'module': path.name, 'types': {}, 'warnings': [],
@@ -195,7 +196,7 @@ def audit_integration(report):
     checks = {}
     sources = {}
     for filename in required:
-        path = ROOT / filename
+        path = source_file(filename)
         entry = {'present': path.is_file(), 'syntax': None, 'signals': {}}
         if path.is_file():
             try:
@@ -240,7 +241,7 @@ def audit_integration(report):
         module_entry = report.get('modules', {}).get(mapping, {}) if kind not in legacy_types else checks.get(mapping, {})
         by_type[kind] = {
             'runtime_module': mapping,
-            'module_present': bool((ROOT / mapping).is_file()) if mapping else False,
+            'module_present': bool((source_file(mapping)).is_file()) if mapping else False,
             'syntax_ok': module_entry.get('syntax') == 'ok',
             'static_layout_signal': bool(module_entry.get('layout_lookup')) if kind not in legacy_types else 'shared runner; not independently proven',
             'ui_verified': False,
@@ -283,7 +284,7 @@ def coverage_matrix(root):
                     count(json.loads(bundle.read(name).decode('utf-8-sig')))
     result = {}
     for kind, spec in sorted(REGISTRY.items()):
-        source = (root / (spec.runtime + '.py')).read_text(encoding='utf-8')
+        source = source_file(spec.runtime + '.py', root).read_text(encoding='utf-8')
         result[kind] = {'runtime':spec.runtime,'editable':spec.editable,
                         'runtime_reads_layout':spec.runtime_reads_layout and 'question_layout_runtime' in source,
                         'bundled_questions':types[kind]}
@@ -310,7 +311,7 @@ def main():
     args = parser.parse_args()
     report = {'root': str(ROOT), 'modules': {}, 'question_types': {}, 'warnings': []}
     for filename, kinds in MODULES.items():
-        path = ROOT / filename
+        path = source_file(filename)
         if not path.exists():
             report['modules'][filename] = {'status': 'missing'}
             report['warnings'].append(f'Missing module: {filename}')

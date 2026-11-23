@@ -10,7 +10,8 @@ import math
 from pathlib import Path
 import sys
 
-ROOT = Path(__file__).resolve().parent
+from tools.checks.paths import ROOT, source_file
+
 REPORT = ROOT / 'layout_json_consistency_03c35.json'
 REQUIRED = ('question_layout_store.py', 'question_layout_runtime.py',
             'question_layout_editor.py', 'layout_scroll_extent.py')
@@ -28,13 +29,13 @@ def main():
     results = []
     for filename in REQUIRED:
         def parse(name=filename):
-            path = ROOT / name
+            path = source_file(name)
             ast.parse(path.read_text(encoding='utf-8-sig'), filename=name)
             return 'syntax ok'
         check('module: ' + filename, parse, results)
 
     # Import only the two lightweight, non-GUI geometry modules.
-    if all((ROOT / x).is_file() for x in REQUIRED[:2]):
+    if all((source_file(x)).is_file() for x in REQUIRED[:2]):
         sys.path.insert(0, str(ROOT))
         try:
             from question_layout_store import get_layout, set_layout, reset_layout, validate_layout

@@ -1,6 +1,7 @@
 """Validate every literal UI translation key and interpolation input."""
 import ast
 from pathlib import Path
+from tools.checks.paths import ROOT, source_file
 from string import Formatter
 from tempfile import TemporaryDirectory
 import unittest
@@ -11,10 +12,10 @@ from ui_errors import record_error
 
 class UIStrings(unittest.TestCase):
     def test_keys_and_format_fields(self):
-        root=Path(__file__).resolve().parent
+        root=ROOT
         seen=set()
         for name in ('main','ui_shell','home_ui','level_flow','wrong_answers_ui','quiz_history_ui','upgrade_v2'):
-            nodes=ast.walk(ast.parse((root/(name+'.py')).read_text(encoding='utf-8')))
+            nodes=ast.walk(ast.parse(source_file(name+'.py', root).read_text(encoding='utf-8')))
             for node in nodes:
                 if not (isinstance(node,ast.Call) and isinstance(node.func,ast.Name)
                         and node.func.id=='t' and node.args):

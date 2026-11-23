@@ -10,7 +10,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+from tools.checks.paths import ROOT, source_file
+
 SOURCE = ROOT / 'full_runtime_03c39.json'
 OUTPUT = ROOT / 'integration_failures_03c40.json'
 
@@ -33,7 +34,7 @@ def classify(name, entry):
         return {'classification': 'passed', 'reason': 'Check returned exit code 0'}
     if status == 'timeout':
         return {'classification': 'needs_investigation', 'reason': 'Check timed out'}
-    missing = [p for p in REQUIREMENTS.get(name, ()) if not (ROOT / p).is_file()]
+    missing = [p for p in REQUIREMENTS.get(name, ()) if not (source_file(p)).is_file()]
     if missing:
         return {'classification': 'blocked_missing_prerequisites', 'missing_files': missing,
                 'reason': 'Cannot interpret functional failure until these dependencies are available'}
@@ -58,7 +59,7 @@ def main():
     inventory = {}
     for section in ('runtime_modules', 'core_modules'):
         for name, record in prior.get(section, {}).items():
-            present_here = (ROOT / name).is_file()
+            present_here = (Path(__file__).parent / name).is_file()
             inventory[name] = {
                 'reported_present_03c39': bool(record.get('present')),
                 'present_in_current_folder': present_here,

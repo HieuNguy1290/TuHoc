@@ -10,7 +10,8 @@ import time
 import types
 import unittest
 
-ROOT = pathlib.Path(__file__).resolve().parent
+from tools.checks.paths import ROOT, source_file
+
 sys.path.insert(0, str(ROOT))
 
 class Phase4Regression(unittest.TestCase):
@@ -102,15 +103,15 @@ class Phase4Regression(unittest.TestCase):
         self.assertEqual(len(answers), 3)
 
     def test_07_source_integration_contracts(self):
-        source = (ROOT/'upgrade_v2.py').read_text(encoding='utf-8')
+        source = (source_file('upgrade_v2.py')).read_text(encoding='utf-8')
         ast.parse(source)
         for token in ('_save_quiz_draft', 'start_wrong_review', 'session_finish',
                       'learning_analytics_page', 'wrong_answers_page', 'quiz_history_page',
                       '_quiz_generation', 'on_cancel=on_cancel', 'result_insights'):
             self.assertIn(token, source, token)
         for filename in ('pygame_exercises.py', 'new_exercise_runtime.py'):
-            if (ROOT/filename).exists():
-                ast.parse((ROOT/filename).read_text(encoding='utf-8'))
+            if (source_file(filename)).exists():
+                ast.parse((source_file(filename)).read_text(encoding='utf-8'))
 
 if __name__ == '__main__':
     print('Phase 4 regression suite — in-memory database, no GUI, no changes to user data')

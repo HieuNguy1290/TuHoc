@@ -4,6 +4,7 @@ Run from the application directory: python check_layout_scroll.py
 Does not start Pygame, edit questions, or change application files.
 """
 from pathlib import Path
+from tools.checks.paths import ROOT, source_file
 import ast
 import importlib
 
@@ -19,7 +20,7 @@ def check_sources():
     ]
     errors = []
     for name in files:
-        path = Path(__file__).resolve().parent / name
+        path = source_file(name)
         if not path.is_file():
             errors.append(f'MISSING {name}')
             continue

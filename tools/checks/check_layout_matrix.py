@@ -1,8 +1,9 @@
 """Check registry completeness and screen projections independently of exercise input."""
 from pathlib import Path
+from tools.checks.paths import ROOT, source_file
 import unittest
 
-from audit_layout_coverage import coverage_matrix
+from tools.checks.audit_layout_coverage import coverage_matrix
 from layout_registry import REGISTRY, controls_for
 from layout_render import DESKTOP, MOBILE
 from layout_templates import template_for
@@ -13,7 +14,7 @@ from question_layout_store import GEOMETRY, layout_v3, pixel_elements, validate_
 class LayoutMatrix(unittest.TestCase):
     def test_registry_matches_dispatch_and_templates(self):
         self.assertEqual(set(REGISTRY), SUPPORTED)
-        matrix = coverage_matrix(Path(__file__).resolve().parent)
+        matrix = coverage_matrix(ROOT)
         for kind in SUPPORTED:
             self.assertTrue(matrix[kind]['runtime_reads_layout'], kind)
             preset = template_for(kind)

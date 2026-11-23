@@ -9,7 +9,8 @@ import json
 from pathlib import Path
 import sys
 
-ROOT = Path(__file__).resolve().parent
+from tools.checks.paths import ROOT, source_file
+
 REQUIRED = ('question_layout_store.py','question_layout_runtime.py','question_layout_editor.py',
             'layout_scroll_extent.py','level_flow.py','new_exercise_runtime.py',
             'pygame_exercises.py','new_exercise_editors.py')
@@ -19,7 +20,7 @@ EXTENSIONS = ('image_letter_pick_extension.py','image_sentence_extension.py',
 
 
 def test_store():
-    path = ROOT / 'question_layout_store.py'
+    path = source_file('question_layout_store.py')
     if not path.exists():
         return {'status':'blocked','reason':'missing question_layout_store.py'}
     spec = importlib.util.spec_from_file_location('_layout_store_test', path)
@@ -52,7 +53,7 @@ def main():
               'limitations':['No Pygame UI event loop, images, sound or Windows GUI tested',
                              'Source and store contracts do not establish correct hitboxes or grading']}
     for name in REQUIRED + EXTENSIONS:
-        path = ROOT / name
+        path = source_file(name)
         if not path.is_file():
             report['checks'][name] = {'status':'missing'}
             report['warnings'].append('Missing module: '+name)
@@ -69,8 +70,8 @@ def main():
     except Exception as exc:
         report['checks']['layout_store_contract'] = {'status':'fail','error':repr(exc)}
         report['warnings'].append('Layout store contract failed: '+repr(exc))
-    wrapper = ROOT / 'image_letter_pick_extension.py'
-    target = ROOT / 'image_sentence_extension.py'
+    wrapper = source_file('image_letter_pick_extension.py')
+    target = source_file('image_sentence_extension.py')
     if wrapper.exists() and target.exists():
         src = wrapper.read_text(encoding='utf-8-sig')
         report['checks']['letter_pick_delegation'] = {'status':'pass' if 'from image_sentence_extension import run' in src else 'review',

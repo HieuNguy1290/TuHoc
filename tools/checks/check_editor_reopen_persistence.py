@@ -10,12 +10,13 @@ import json
 from pathlib import Path
 import sys
 
-ROOT = Path(__file__).resolve().parent
+from tools.checks.paths import ROOT, source_file
+
 sys.path.insert(0, str(ROOT))
 
 
 def verify_editor_source():
-    path = ROOT / 'question_layout_editor.py'
+    path = source_file('question_layout_editor.py')
     source = path.read_text(encoding='utf-8-sig')
     tree = ast.parse(source)
     edits = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == 'edit_layout']

@@ -42,8 +42,8 @@ Khi bắt đầu, đọc hướng dẫn này và `docs/STATE.md` nếu tệp bà
 | Học liệu kiểm tra lớp 2 | `exam_content/__init__.py`, `exam_content/grade2.py` (tạo câu theo mã ổn định và nạp vào hồ sơ), `exam_content/grade2_math.py` (câu Toán), `exam_content/grade2_vietnamese.py` (câu Tiếng Việt), `docs/exam-grade2.md` (hướng dẫn và ma trận độ khó). |
 | Kết quả và ôn tập | `quiz_history_ui.py`, `wrong_answers_ui.py`, `learning_analytics_ui.py`, `ui_results_dashboard.py`, `pygame_review_panel.py`, `pygame_results.py`, `new_exercise_review.py`, `result_insights.py`, `review_normalize.py`. |
 | Âm thanh, ghi âm và trò chơi | `learning_audio.py`, `waveform_player.py`, `animated_media.py`, `recording_tools.py`, `recorder_app.py`, `floating_recorder.py`, `dictation_vi.py`, `minigames.py`, `modern_games.py`. |
-| Script dữ liệu và chẩn đoán | `make_demo.py`, `install_family_grade12_level10.py`, `them_cau_hoi_ve2.py` có thể ghi dữ liệu. `audit_layout_coverage.py` xuất báo cáo bố cục. `freeze_diagnostics.py` là tệp rỗng ở mốc rà soát. Kiểm tra cả import động và điểm gọi trước khi dời script. |
-| Bộ kiểm tra ở gốc | `check_coordinate_contracts.py`, `check_editor_drag_zoom_persistence.py`, `check_editor_reopen_persistence.py`, `check_exam_v3.py`, `check_extras_contract.py`, `check_integration_contracts.py`, `check_integration_failures_03c40.py`, `check_layout_json_consistency.py`, `check_layout_matrix.py`, `check_layout_scroll.py`, `check_legacy_runtime_regression.py`, `check_studio_shortcuts.py`, `check_studio_ui.py`, `check_studio_v3.py`, `check_ui_components.py`, `check_ui_contrast.py`, `check_ui_keys.py`, `check_ui_strings.py`, `check_ui_tokens.py`, `VERIFY_PATCH03.py`, `VERIFY_PATCH11.py`, `VERIFY_PATCH12.py`, `VERIFY_PHASE4_PATCH07.py`, `run_reading_tests.py`. |
+| Script dữ liệu và chẩn đoán | `make_demo.py`, `install_family_grade12_level10.py`, `them_cau_hoi_ve2.py` có thể ghi dữ liệu. `tools/checks/audit_layout_coverage.py` xuất báo cáo bố cục. `freeze_diagnostics.py` là tệp rỗng ở mốc rà soát. Kiểm tra cả import động và điểm gọi trước khi dời script. |
+| Bộ kiểm tra ở gốc | `tools/checks/check_coordinate_contracts.py`, `tools/checks/check_editor_drag_zoom_persistence.py`, `tools/checks/check_editor_reopen_persistence.py`, `tools/checks/check_exam_v3.py`, `tools/checks/check_extras_contract.py`, `tools/checks/check_integration_contracts.py`, `tools/checks/check_integration_failures_03c40.py`, `tools/checks/check_layout_json_consistency.py`, `tools/checks/check_layout_matrix.py`, `tools/checks/check_layout_scroll.py`, `tools/checks/check_legacy_runtime_regression.py`, `tools/checks/check_studio_shortcuts.py`, `tools/checks/check_studio_ui.py`, `tools/checks/check_studio_v3.py`, `tools/checks/check_ui_components.py`, `tools/checks/check_ui_contrast.py`, `tools/checks/check_ui_keys.py`, `tools/checks/check_ui_strings.py`, `tools/checks/check_ui_tokens.py`, `tools/checks/VERIFY_PATCH03.py`, `tools/checks/VERIFY_PATCH11.py`, `tools/checks/VERIFY_PATCH12.py`, `tools/checks/VERIFY_PHASE4_PATCH07.py`, `tools/checks/run_reading_tests.py`. |
 | Bộ kiểm thử trong `tests/` | `tests/conftest.py` chọn checkout qua `TUHOC_ROOT`. `tests/test_canvas_layout.py` và `tests/test_canvas_studio.py` kiểm tra Canvas. `tests/canvas_p0.py` phát lại thao tác, `tests/canvas_p0_cases.py` cung cấp fixture, `tests/canvas_p0_preview.py` kiểm tra xem trước. `tests/test_exam_bank.py`, `tests/test_exam_grading.py`, `tests/test_exam_state.py` và `tests/test_exam_grade2.py` là pytest cho Exam Mode. |
 | Công cụ phát triển | `tools/audit_ui_tokens.py` kiểm kê token, `tools/analyze_nav_log.py` tổng hợp log, `tools/measure_ui_pages.py` đo dựng màn hình trên checkout và hồ sơ thử riêng. `tools/reference/exam_logic_reference.py` và `tools/reference/exam_state_reference.py` là kịch bản rà soát lưu để tham chiếu. Dùng pytest trong `tests/` để xác minh Exam Mode. |
 | Hướng dẫn và lịch sử | `AGENTS.md`, `HUONG_DAN.txt`, `docs/canvas-p0.md`, `docs/canvas-p6.md`, `docs/canvas-matrix.md`, `docs/canvas-auto-log.md`, `docs/canvas-auto-report.md`, `docs/ui-auto-log.md`, `docs/ui-auto-report.md`, `agents/skills/tuhoc-canvas/SKILL.md`, `agents/skills/tuhoc-canvas/references/build-plan.md`. |
@@ -203,13 +203,13 @@ Trong workspace cloud đã chuẩn bị, có thể dùng `/workspace/.tuhoc/venv
 | Chấm thi, chọn đề | `exam_grading.py`, `exam_bank.py` | `tests/test_exam_grading.py` hoặc `tests/test_exam_bank.py` bằng pytest |
 | Trạng thái phiên thi | `exam_pygame.py` | `tests/test_exam_state.py` bằng pytest |
 | Bộ câu hỏi lớp 2 | `exam_content/grade2*.py`, `docs/exam-grade2.md` | `tests/test_exam_grade2.py` bằng pytest |
-| Kéo/căn/chia trong Studio | `layout_edit_geometry.py` | `check_editor_drag_zoom_persistence.py`, `check_studio_shortcuts.py` |
-| Schema/geometry layout | `question_layout_store.py`, `question_layout_runtime.py` | `check_layout_json_consistency.py`, `check_coordinate_contracts.py` |
-| Cuộn trong Studio | `layout_scroll_extent.py` | `check_layout_scroll.py` |
-| Chuỗi giao diện | `strings_vi.py` | `check_ui_strings.py` |
-| Token, màu, tương phản | `ui_tokens.py`, `theme_config.py` | `check_ui_tokens.py`, `check_ui_contrast.py` |
-| Phím tắt UI | `ui_keys.py` | `check_ui_keys.py` |
-| Renderer một dạng bài | Xác định module từ dispatch trong `pygame_exercises.py`, rồi đọc module tương ứng | `check_legacy_runtime_regression.py` và phát lại riêng dạng đó bằng `tests/canvas_p0.py` |
+| Kéo/căn/chia trong Studio | `layout_edit_geometry.py` | `tools/checks/check_editor_drag_zoom_persistence.py`, `tools/checks/check_studio_shortcuts.py` |
+| Schema/geometry layout | `question_layout_store.py`, `question_layout_runtime.py` | `tools/checks/check_layout_json_consistency.py`, `tools/checks/check_coordinate_contracts.py` |
+| Cuộn trong Studio | `layout_scroll_extent.py` | `tools/checks/check_layout_scroll.py` |
+| Chuỗi giao diện | `strings_vi.py` | `tools/checks/check_ui_strings.py` |
+| Token, màu, tương phản | `ui_tokens.py`, `theme_config.py` | `tools/checks/check_ui_tokens.py`, `tools/checks/check_ui_contrast.py` |
+| Phím tắt UI | `ui_keys.py` | `tools/checks/check_ui_keys.py` |
+| Renderer một dạng bài | Xác định module từ dispatch trong `pygame_exercises.py`, rồi đọc module tương ứng | `tools/checks/check_legacy_runtime_regression.py` và phát lại riêng dạng đó bằng `tests/canvas_p0.py` |
 | Lưu JSON, sao lưu | `safe_storage.py` | pytest hoặc check liên quan miền đó |
 
 Nếu tác vụ không khớp dòng nào, dùng `rg` để tìm đúng tệp rồi mới đọc.
@@ -258,7 +258,7 @@ Mốc 22/11/2026 có **64 ca pytest đạt và 9 ca `xfail`** trong Exam Mode. T
 | `tests/test_exam_bank.py` | `test_invalid_question` với `sequence=["a", "a "]` | Từ trùng trong bài sắp xếp lọt qua xác thực khi có khoảng trắng thừa. |
 
 - Bộ lớp 2 đã dựng đủ 200 câu, tạo được 1.000 tổ hợp môn, Level và số lượng câu, và nộp thử đề ở cả hai môn trên Linux/Xvfb.
-- Checkout thiếu `full_runtime_03c39.json` cho `check_integration_failures_03c40.py` và `test_reading_pipeline.py` cho `run_reading_tests.py`. Bỏ qua hai script này và giữ nguyên mã.
+- Checkout thiếu `full_runtime_03c39.json` cho `tools/checks/check_integration_failures_03c40.py` và `test_reading_pipeline.py` cho `tools/checks/run_reading_tests.py`. Bỏ qua hai script này và giữ nguyên mã.
 - Trên Linux, ghi **chưa kiểm** đối với các mục cần Windows như DPI 100/125/150%, IME Telex/VNI, thiết bị âm thanh, clipboard và luồng phát hành `.exe`.
 
 ### Môi trường

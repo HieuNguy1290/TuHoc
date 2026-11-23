@@ -8,11 +8,10 @@ import sys
 import unittest
 from unittest.mock import Mock, patch
 
-ROOT = pathlib.Path(__file__).resolve().parent
-
+from tools.checks.paths import ROOT, source_file
 
 def load_runtime():
-    spec = importlib.util.spec_from_file_location('new_exercise_runtime', ROOT / 'new_exercise_runtime.py')
+    spec = importlib.util.spec_from_file_location('new_exercise_runtime', source_file('new_exercise_runtime.py'))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -22,11 +21,11 @@ class Phase3Regression(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.runtime = load_runtime()
-        cls.quiz_source = (ROOT / 'upgrade_v2.py').read_text(encoding='utf-8-sig')
-        cls.exercise_source = (ROOT / 'pygame_exercises.py').read_text(encoding='utf-8-sig')
+        cls.quiz_source = (source_file('upgrade_v2.py')).read_text(encoding='utf-8-sig')
+        cls.exercise_source = (source_file('pygame_exercises.py')).read_text(encoding='utf-8-sig')
 
     def test_all_sources_parse(self):
-        for path in ROOT.glob('*.py'):
+        for path in (*ROOT.glob('*.py'), *(ROOT / 'tuhoc').rglob('*.py')):
             with self.subTest(path=path.name):
                 ast.parse(path.read_text(encoding='utf-8-sig'), filename=path.name)
 
@@ -38,7 +37,7 @@ class Phase3Regression(unittest.TestCase):
         index_keywords = [kw.value for call in calls for kw in call.keywords if kw.arg == '_index']
         self.assertTrue(index_keywords, 'Quiz must pass _index to Pygame')
         self.assertTrue(any(isinstance(v, ast.BinOp) and isinstance(v.op, ast.Add) and isinstance(v.right, ast.Constant) and v.right.value == 1 for v in index_keywords), 'Quiz must pass 1-based _index')
-        runtime_source = (ROOT / 'new_exercise_runtime.py').read_text(encoding='utf-8-sig')
+        runtime_source = (source_file('new_exercise_runtime.py')).read_text(encoding='utf-8-sig')
         self.assertIn('draw_question_progress(', runtime_source)
         self.assertNotIn("_index', 1)) - 1", runtime_source)
 
@@ -92,7 +91,7 @@ class Phase3Regression(unittest.TestCase):
         self.assertEqual(self.runtime.expected(q), ['c'])
 
     def test_lifecycle_guard_present(self):
-        guard = (ROOT / 'pygame_session_guard.py').read_text(encoding='utf-8-sig')
+        guard = (source_file('pygame_session_guard.py')).read_text(encoding='utf-8-sig')
         self.assertIn('threading.Lock()', guard)
         self.assertIn('blocking=False', guard)
         self.assertIn('release_sdl_session()', self.exercise_source)

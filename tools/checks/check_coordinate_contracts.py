@@ -8,7 +8,8 @@ import ast
 import json
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+from tools.checks.paths import ROOT, source_file
+
 REPORT = ROOT / 'coordinate_contracts_03c34.json'
 
 
@@ -52,7 +53,7 @@ def run():
     check('header_blocks_answer', not in_content_rect((120, 50), (100, 370, 180, 80), 320))
     check('footer_blocks_answer', not in_content_rect((120, 590), (100, 890, 180, 80), 320))
 
-    legacy = ROOT / 'pygame_exercises.py'
+    legacy = source_file('pygame_exercises.py')
     if legacy.exists():
         source = legacy.read_text(encoding='utf-8-sig')
         try:
@@ -69,7 +70,7 @@ def run():
         check('legacy_source_available', False, 'Place this checker beside pygame_exercises.py')
 
     for name in ('question_layout_runtime.py', 'question_layout_store.py', 'layout_scroll_extent.py'):
-        path = ROOT / name
+        path = source_file(name)
         if not path.exists():
             check('module_available_' + name, False, 'Missing: ' + name)
             continue
