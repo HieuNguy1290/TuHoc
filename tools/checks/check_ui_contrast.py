@@ -1,6 +1,6 @@
 """Print and check WCAG AA contrast for explicit text/foreground token pairs."""
 import unittest
-from ui_tokens import COLORS, contrast_ratio
+from tuhoc.ui.ui_tokens import COLORS, contrast_ratio
 
 
 class UIContrast(unittest.TestCase):

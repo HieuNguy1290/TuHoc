@@ -3,8 +3,8 @@ import tkinter as tk
 import unittest
 from unittest.mock import patch
 
-import ui_dialogs
-from ui_components import Badge, ConfirmDialog, Dialog, EmptyState, LoadingState, RoundedButton, Toast, Tooltip
+import tuhoc.ui.ui_dialogs as ui_dialogs
+from tuhoc.ui.ui_components import Badge, ConfirmDialog, Dialog, EmptyState, LoadingState, RoundedButton, Toast, Tooltip
 
 
 class Components(unittest.TestCase):
@@ -43,7 +43,7 @@ class Components(unittest.TestCase):
         dialog.primary.focus_force()
         dialog.after_idle(lambda:dialog.event_generate('<Escape>'))
         self.assertFalse(dialog.show())
-        with patch('ui_dialogs.ConfirmDialog') as wrapper:
+        with patch('tuhoc.ui.ui_dialogs.ConfirmDialog') as wrapper:
             wrapper.return_value.show.return_value=True
             self.assertTrue(ui_dialogs.askyesno('Mở?','Nội dung',parent=self.root))
             self.assertTrue(wrapper.call_args.kwargs['safe'])

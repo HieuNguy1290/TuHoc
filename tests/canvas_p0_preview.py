@@ -20,8 +20,8 @@ def descendants(widget):
 
 def verify(directory, feedback_enabled):
     import tuhoc.exercises.pygame_exercises as pygame_exercises
-    import unified_subjects
-    from level_flow import library_file, save_rows
+    import tuhoc.lessons.unified_subjects as unified_subjects
+    from tuhoc.lessons.level_flow import library_file, save_rows
     from main import App
 
     source = {"id": "p0-preview", "type": "fill", "prompt": "Câu mẫu",
@@ -38,7 +38,7 @@ def verify(directory, feedback_enabled):
         def layout(self, _title):
             return tk.Frame(self)
 
-    with patch("unified_subjects.prepare_subject", side_effect=prepare_fixture):
+    with patch("tuhoc.lessons.unified_subjects.prepare_subject", side_effect=prepare_fixture):
         app = PreviewApp()
     app._display_settings["dragon_feedback_enabled"] = feedback_enabled
     app.student = {"id": app.db.add_student("P0 preview learner", 1)}

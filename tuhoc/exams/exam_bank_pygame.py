@@ -13,7 +13,7 @@ import pygame
 from tuhoc.exercises.pygame_scroll import ScrollThumb
 from tkinter import Tk, filedialog
 from tuhoc.exams.exam_bank import ExamBank, SUBJECTS
-from safe_storage import commit_json
+from tuhoc.storage.safe_storage import commit_json
 from tuhoc.studio.studio_list import find_rows, remove_at
 
 # Presentation order only: existing IDs and Vietnamese labels are unchanged.

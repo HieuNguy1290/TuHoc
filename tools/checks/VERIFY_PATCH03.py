@@ -1,7 +1,7 @@
 """Run: python VERIFY_PATCH03.py (no GUI required)."""
 import sqlite3
 from datetime import datetime,timedelta
-from learning_analytics_ui import aggregate
+from tuhoc.ui.learning_analytics_ui import aggregate
 
 conn=sqlite3.connect(':memory:')
 conn.execute('CREATE TABLE learning_sessions(id INTEGER PRIMARY KEY,student_id INTEGER,theme TEXT,level INTEGER,started REAL,seconds REAL,correct INTEGER,total INTEGER)')

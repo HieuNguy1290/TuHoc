@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 from zipfile import ZipFile
 
-from layout_migrate import migrate_bytes, migrate_file, restore_file
+from tools.migrations.layout_migrate import migrate_bytes, migrate_file, restore_file
 from tuhoc.studio.layout_render import DESKTOP, MOBILE
 from tuhoc.studio.layout_templates import template_for
 from tuhoc.studio.question_layout_runtime import element
@@ -58,7 +58,7 @@ class LayoutTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), original + b'\n')
 
     def test_post_replace_failure_restores_backup(self):
-        import layout_migrate
+        import tools.migrations.layout_migrate as layout_migrate
 
         original = b'[{"type":"choice","prompt":"q","layout":{"option_0":{"y":0.5}}}]'
         real_replace = layout_migrate._replace
@@ -73,7 +73,7 @@ class LayoutTests(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             path = Path(tmp) / 'questions.json'
             path.write_bytes(original)
-            with patch('layout_migrate._replace', side_effect=corrupt_once), self.assertRaises(OSError):
+            with patch('tools.migrations.layout_migrate._replace', side_effect=corrupt_once), self.assertRaises(OSError):
                 migrate_file(path)
             self.assertEqual(path.read_bytes(), original)
             self.assertEqual(path.with_suffix('.json.bak').read_bytes(), original)
@@ -83,8 +83,8 @@ class LayoutTests(unittest.TestCase):
     def test_blank_prompt_is_only_valid_for_missing_letters(self):
         from tuhoc.exams.exam_bank import validate_question
         from tuhoc.exercises.question_prompt import display_prompt
-        from upgrade_v2 import Curriculum
-        from level_flow import save_rows
+        from tuhoc.lessons.upgrade_v2 import Curriculum
+        from tuhoc.lessons.level_flow import save_rows
 
         examples = [{'id': 'letters', 'type': 'picture_missing_letters', 'prompt': '',
                      'answer': 'Mèo', 'theme': 'Family & Friends', 'level': 1, 'lesson': 1},

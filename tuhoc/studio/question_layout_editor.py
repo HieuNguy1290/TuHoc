@@ -1568,7 +1568,7 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     win.bind('<Configure>', lambda event: fullscreen_btn.configure(
         text='Thu nhỏ cửa sổ' if is_maximized() else 'Phóng to cửa sổ') if event.widget is win else None, add='+')
     ttk.Label(toolbar, text='Thước: px | Ctrl+cuộn: zoom | Shift+cuộn: ngang').pack(side='right', padx=10)
-    from drag_scroll import CanvasPan
+    from tuhoc.ui.drag_scroll import CanvasPan
 
     canvas_pan = CanvasPan()
     canvas.bind('<ButtonPress-2>', lambda event: canvas_pan.start(canvas, event.y_root))

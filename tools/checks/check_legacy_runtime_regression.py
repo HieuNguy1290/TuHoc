@@ -10,7 +10,7 @@ import ast
 import json
 from pathlib import Path
 
-from tools.checks.paths import ROOT, source_file
+from tools.checks.paths import ROOT, report_path, source_file
 
 KINDS = ('choice', 'picture_choice', 'true_false', 'listening_choice',
          'order', 'matching', 'fill', 'listening_fill', 'error')
@@ -70,7 +70,7 @@ def audit(path: Path) -> dict:
 def main() -> int:
     path = source_file('pygame_exercises.py')
     report = audit(path)
-    output = ROOT / 'legacy_regression_03c31.json'
+    output = report_path('legacy_regression_03c31.json')
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
     print(json.dumps(report, ensure_ascii=False, indent=2))
     print('Report:', output)

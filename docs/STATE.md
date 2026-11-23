@@ -1,10 +1,8 @@
 ## Quyết định đã chốt
 
-- Studio trên desktop dùng khung hình Pygame và tọa độ từ renderer. Thử làm bài dùng một phiên tạm, riêng với dữ liệu người học. Studio Kiểm tra dùng kích thước thật của vùng thi hoặc cột câu hỏi con của bài đọc.
-- Câu đang soạn thiếu dữ liệu vẫn có canvas thiết kế. Khung Điện thoại giữ canvas thiết kế, vì runtime bài luyện hiện dựng bài ở khung desktop.
-
-- Cuộn kéo dùng tọa độ của vùng cuộn thực. Studio có cập nhật hình khi giữ chuột đổi cỡ và thanh định dạng chữ phía trên canvas.
+- Mã ứng dụng theo chức năng dưới `tuhoc/`. Công cụ kiểm tra chạy bằng `python -B -m tools.checks.<tên>`. Công cụ di trú và dữ liệu mẫu nằm dưới `tools/`.
+- `python -B main.py` và hai lệnh di trú cũ vẫn chạy. Đường dẫn hồ sơ, học liệu và tài nguyên được xác định từ gốc dự án.
 
 ## Việc còn lại
 
-- Chưa kiểm trực tiếp trên Windows với taskbar, DPI, IME và thiết bị âm thanh.
+- Chưa kiểm trực tiếp trên Windows với taskbar, DPI, IME, âm thanh và đóng gói.

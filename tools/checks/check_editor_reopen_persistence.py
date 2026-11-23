@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 import sys
 
-from tools.checks.paths import ROOT, source_file
+from tools.checks.paths import ROOT, report_path, source_file
 
 sys.path.insert(0, str(ROOT))
 
@@ -101,7 +101,7 @@ def main():
               'failed': sum(r['status']=='FAIL' for r in results), 'checks': results,
               'limitations': ['No live Tk mouse interaction or Windows GUI testing',
                               'Mathematical coordinate checks do not prove auto-scroll timing or hitbox correctness']}
-    output = ROOT / 'editor_reopen_03c38.json'
+    output = report_path('editor_reopen_03c38.json')
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
     for item in results:
         print('%s  %s: %s' % (item['status'], item['name'], item['detail']))

@@ -33,7 +33,7 @@ def read_template(path, kind):
 def save_template(path, kind, layout):
     import json
     from tuhoc.studio.question_layout_store import validate_layout
-    from safe_storage import commit_json
+    from tuhoc.storage.safe_storage import commit_json
 
     records = json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {}
     records[kind] = validate_layout(layout)

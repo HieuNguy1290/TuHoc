@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 import re
 
-from tools.checks.paths import ROOT, source_file
+from tools.checks.paths import ROOT, report_path, source_file
 
 MODULES = {
     'new_exercise_runtime.py': ['image_multi_choice', 'picture_missing_letters', 'sentence_gaps', 'passage_gaps', 'conversation_gaps'],
@@ -306,7 +306,7 @@ def write_matrix(matrix,path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output', type=Path, default=ROOT / 'layout_coverage_audit.json')
+    parser.add_argument('--output', type=Path, default=report_path('layout_coverage_audit.json'))
     parser.add_argument('--markdown', type=Path)
     args = parser.parse_args()
     report = {'root': str(ROOT), 'modules': {}, 'question_types': {}, 'warnings': []}

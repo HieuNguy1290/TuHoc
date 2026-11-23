@@ -79,7 +79,7 @@ def exercise(app,ex):
         path=app.media_file(ex.get('image','')) if ex.get('image') else None
         if path:
             try:
-                from animated_media import display_image
+                from tuhoc.ui.animated_media import display_image
                 display_image(page.main,path,350,220,bg=BG,anchor='w',pady=6)
             except (ImportError,OSError,ValueError,tk.TclError):_label(page.main,'Không thể hiển thị hình ảnh',12,color=MUTED).pack(anchor='w')
         else:_label(page.main,'Chưa có hình minh họa',12,color=MUTED).pack(anchor='w')

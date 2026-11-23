@@ -9,9 +9,9 @@ import json
 from pathlib import Path
 import sys
 
-from tools.checks.paths import ROOT, source_file
+from tools.checks.paths import ROOT, report_path, source_file
 
-REPORT = ROOT / 'editor_drag_zoom_03c36.json'
+REPORT = report_path('editor_drag_zoom_03c36.json')
 
 
 def check(name, fn, out):

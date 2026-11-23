@@ -1,8 +1,8 @@
 """Exercise shared Tk token defaults and scaled compatibility fonts."""
 import unittest
 
-from theme_config import UI_COLORS, UI_FONTS
-from ui_tokens import COLORS, DURATION, ELEVATION, RADIUS, SPACING, font, set_font_scale
+from tuhoc.ui.theme_config import UI_COLORS, UI_FONTS
+from tuhoc.ui.ui_tokens import COLORS, DURATION, ELEVATION, RADIUS, SPACING, font, set_font_scale
 
 
 class Tokens(unittest.TestCase):

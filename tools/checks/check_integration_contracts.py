@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 import sys
 
-from tools.checks.paths import ROOT, source_file
+from tools.checks.paths import ROOT, report_path, source_file
 
 REQUIRED = ('question_layout_store.py','question_layout_runtime.py','question_layout_editor.py',
             'layout_scroll_extent.py','level_flow.py','new_exercise_runtime.py',
@@ -82,7 +82,7 @@ def main():
     report['summary'] = {'pass':statuses.count('pass'),'fail':statuses.count('fail'),
                          'missing':statuses.count('missing'),'blocked':statuses.count('blocked'),
                          'review':statuses.count('review')}
-    output = ROOT / 'integration_contracts_03c33.json'
+    output = report_path('integration_contracts_03c33.json')
     output.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
     print('Build 03C.33 integration contract checks:',report['summary'])
     print('Report:',output)

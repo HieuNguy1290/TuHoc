@@ -2,8 +2,8 @@
 import tkinter as tk
 import unittest
 
-from drag_scroll import bind_menu_pan, install_drag_scroll
-from wheel_scroll import install_wheel_scroll
+from tuhoc.ui.drag_scroll import bind_menu_pan, install_drag_scroll
+from tuhoc.ui.wheel_scroll import install_wheel_scroll
 
 
 class DragScrollTests(unittest.TestCase):

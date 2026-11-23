@@ -8,9 +8,9 @@ import ast
 import json
 from pathlib import Path
 
-from tools.checks.paths import ROOT, source_file
+from tools.checks.paths import ROOT, report_path, source_file
 
-REPORT = ROOT / 'coordinate_contracts_03c34.json'
+REPORT = report_path('coordinate_contracts_03c34.json')
 
 
 def viewport_to_content(pos, scroll):

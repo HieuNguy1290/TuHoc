@@ -257,7 +257,7 @@ class AdminEditor:
         """Persist exact unique matching field; do not blindly replace multiple records."""
         content=getattr(self.app,'curriculum',None)
         if content is None:return False
-        from level_flow import library_file
+        from tuhoc.lessons.level_flow import library_file
         for kind in ('blocks','lessons','questions','vocab','reading'):
             path=library_file(content.data_dir,kind)
             if not path.exists():continue

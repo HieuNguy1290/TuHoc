@@ -10,9 +10,9 @@ import math
 from pathlib import Path
 import sys
 
-from tools.checks.paths import ROOT, source_file
+from tools.checks.paths import ROOT, report_path, source_file
 
-REPORT = ROOT / 'layout_json_consistency_03c35.json'
+REPORT = report_path('layout_json_consistency_03c35.json')
 REQUIRED = ('question_layout_store.py', 'question_layout_runtime.py',
             'question_layout_editor.py', 'layout_scroll_extent.py')
 

@@ -656,12 +656,12 @@ def run(question):
                             scroll = offset
                         continue
                 if event.type==pygame.QUIT:
-                    from pygame_exit_dialog import confirm
+                    from tuhoc.ui.pygame_exit_dialog import confirm
                     if confirm(letter_page.display if letter_page else screen, clock, 'Thoát bài tập?', 'Bạn muốn rời bài tập này?'):return None
                     continue
                 if event.type==pygame.KEYDOWN:
                     if event.key==pygame.K_ESCAPE:
-                        from pygame_exit_dialog import confirm
+                        from tuhoc.ui.pygame_exit_dialog import confirm
                         if confirm(letter_page.display if letter_page else screen, clock, 'Thoát bài tập?', 'Bạn muốn rời bài tập này?'):return None
                         continue
                     if kind=='picture_missing_letters':

@@ -7,7 +7,7 @@ import unittest
 import pygame
 
 from tuhoc.studio.extras_render import draw_extras
-from layout_migrate import migrate_file, restore_file
+from tools.migrations.layout_migrate import migrate_file, restore_file
 from tuhoc.studio.layout_render import DESKTOP, MOBILE
 from tuhoc.studio.layout_scroll_extent import content_bottom
 from tuhoc.studio.question_layout_store import get_layout, layout_v2, layout_v3, pixel_elements, pixel_extras, set_layout

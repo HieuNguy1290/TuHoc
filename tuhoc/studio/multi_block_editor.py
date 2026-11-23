@@ -10,11 +10,11 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from level_flow import library_file, load_rows
-from safe_storage import commit_json
-from lesson_display_names import breadcrumb
+from tuhoc.lessons.level_flow import library_file, load_rows
+from tuhoc.storage.safe_storage import commit_json
+from tuhoc.lessons.lesson_display_names import breadcrumb
 from tuhoc.studio.studio_list import find_rows, remove_at
-from ui_components import Toast
+from tuhoc.ui.ui_components import Toast
 
 
 def open_block_editor(app, theme, level, lesson=1, create_mode=False):
@@ -237,7 +237,7 @@ def open_block_editor(app, theme, level, lesson=1, create_mode=False):
             return
         if not blocks:
             if not messagebox.askyesno('Bài học trống', 'Lưu bài học không có block?', parent=window): return
-        from unified_subjects import subject_image
+        from tuhoc.lessons.unified_subjects import subject_image
         missing=[str(block.get('title') or index) for index,block in enumerate(blocks,1)
                  if block.get('image') and not subject_image(data_dir,block['image'])]
         if missing:

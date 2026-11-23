@@ -208,7 +208,7 @@ def run(question):
         return [options[i][selected[i]] for i in range(len(exp))]
 
     def leave():
-        from pygame_exit_dialog import confirm
+        from tuhoc.ui.pygame_exit_dialog import confirm
         return confirm(screen, clock, 'Thoát bài tập?', 'Bạn muốn rời bài tập này?')
 
     zoom = None

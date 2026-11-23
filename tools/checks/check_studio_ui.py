@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from tuhoc.exams.exam_bank_pygame import BankManager
-from quiz_history_ui import history_window
+from tuhoc.ui.quiz_history_ui import history_window
 from tuhoc.studio.studio_list import copy_question, find_rows, remove_at
 
 

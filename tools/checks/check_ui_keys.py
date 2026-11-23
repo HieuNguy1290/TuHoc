@@ -1,7 +1,7 @@
 """Check shell shortcut routing and editable-field behavior."""
 import unittest
 
-from ui_keys import GRID_MOVES, action_for
+from tuhoc.ui.ui_keys import GRID_MOVES, action_for
 
 
 class UIKeys(unittest.TestCase):

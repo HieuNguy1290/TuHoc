@@ -17,11 +17,11 @@ sys.path.insert(0, str(ROOT))
 class Phase4Regression(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.drafts = importlib.import_module('quiz_draft_store')
-        cls.history = importlib.import_module('quiz_history_ui')
-        cls.analytics = importlib.import_module('learning_analytics_ui')
-        cls.wrong = importlib.import_module('wrong_answers_ui')
-        cls.insights = importlib.import_module('result_insights')
+        cls.drafts = importlib.import_module('tuhoc.storage.quiz_draft_store')
+        cls.history = importlib.import_module('tuhoc.ui.quiz_history_ui')
+        cls.analytics = importlib.import_module('tuhoc.ui.learning_analytics_ui')
+        cls.wrong = importlib.import_module('tuhoc.ui.wrong_answers_ui')
+        cls.insights = importlib.import_module('tuhoc.ui.result_insights')
 
     def setUp(self):
         self.db = sqlite3.connect(':memory:')

@@ -6,15 +6,15 @@ from string import Formatter
 from tempfile import TemporaryDirectory
 import unittest
 
-from strings_vi import STRINGS, t
-from ui_errors import record_error
+from tuhoc.ui.strings_vi import STRINGS, t
+from tuhoc.ui.ui_errors import record_error
 
 
 class UIStrings(unittest.TestCase):
     def test_keys_and_format_fields(self):
         root=ROOT
         seen=set()
-        for name in ('main','ui_shell','home_ui','level_flow','wrong_answers_ui','quiz_history_ui','upgrade_v2'):
+        for name in ('tuhoc/app/main','ui_shell','home_ui','level_flow','wrong_answers_ui','quiz_history_ui','upgrade_v2'):
             nodes=ast.walk(ast.parse(source_file(name+'.py', root).read_text(encoding='utf-8')))
             for node in nodes:
                 if not (isinstance(node,ast.Call) and isinstance(node.func,ast.Name)

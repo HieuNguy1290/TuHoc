@@ -208,7 +208,7 @@ class ExamBank:
 
     def add_text_questions(self, questions):
         """Add a batch of text questions, preserving existing records by ID."""
-        from safe_storage import commit_json
+        from tuhoc.storage.safe_storage import commit_json
 
         rows = _read(self.questions_path, [])
         if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
@@ -339,7 +339,7 @@ class ExamBank:
     @staticmethod
     def _sample_questions(grade, lesson, subject):
         if (subject, str(grade), lesson) == ('tieng_anh', '1', 'Family & Friends'):
-            from seed_family_grade1 import build_questions
+            from tools.fixtures.seed_family_grade1 import build_questions
             return build_questions(lesson)
         if subject == 'tieng_viet' and str(grade) == '2':
             from exam_content.grade2 import LESSON, build_questions

@@ -578,7 +578,7 @@ def run(question, letter_mode=False):
                 draw_zoom(screen, zoom)
 
             def leave():
-                from pygame_exit_dialog import confirm
+                from tuhoc.ui.pygame_exit_dialog import confirm
                 return confirm(screen, clock, 'Thoát bài tập?', 'Bạn muốn rời bài tập này?')
 
             for event in pygame.event.get():

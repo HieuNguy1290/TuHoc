@@ -10,10 +10,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tools.checks.paths import ROOT, source_file
+from tools.checks.paths import ROOT, report_path, source_file
 
 SOURCE = ROOT / 'full_runtime_03c39.json'
-OUTPUT = ROOT / 'integration_failures_03c40.json'
+OUTPUT = report_path('integration_failures_03c40.json')
 
 # Known prerequisites of the optional regression scripts.
 REQUIREMENTS = {

@@ -282,7 +282,7 @@ def play(original, item, answer, png, scrolled, font_path):
 
 def verify_submission(db, fixture_dir, mode, rows):
     from tuhoc.exercises.pygame_review_panel import show_review
-    from upgrade_v2 import Curriculum, GameAppMixin, LearningService
+    from tuhoc.lessons.upgrade_v2 import Curriculum, GameAppMixin, LearningService
 
     class Quiz(GameAppMixin):
         def layout(self, _title):
@@ -383,8 +383,8 @@ def persisted(answer, kind):
 def run(output, font_path, only, layout_format):
     import main
     import tuhoc.exercises.pygame_exercises as pygame_exercises
-    from level_flow import QUESTION_TYPES
-    from upgrade_v2 import GameAppMixin
+    from tuhoc.lessons.level_flow import QUESTION_TYPES
+    from tuhoc.lessons.upgrade_v2 import GameAppMixin
 
     pygame.init()
     fixture_dir = output / "fixtures"
