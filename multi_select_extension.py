@@ -182,11 +182,12 @@ def run(question):
             screen.blit(title.render('Tự Học - Bài tập',True,(34,51,78)),(52,33))
             prompt.draw(screen, (34, 51, 78))
             y=answer_top
-            if picture is not None and kind != 'image_multi_select':
-                screen.blit(picture, picture_rect or picture.get_rect(midtop=(480, group_top + base_media_height)))
-            if question['type']=='image_multi_select':
-                if picture:screen.blit(picture,picture_rect or picture.get_rect(midtop=(480,group_top)))
-                elif note:screen.blit(small.render(note,True,(175,65,65)),(54,group_top))
+            rendered_image = None
+            if picture is not None:
+                rendered_image = picture_rect or picture.get_rect(midtop=(480, group_top + (0 if kind == 'image_multi_select' else base_media_height)))
+                screen.blit(picture, rendered_image)
+            if kind == 'image_multi_select':
+                if not picture and note:screen.blit(small.render(note,True,(175,65,65)),(54,group_top))
             elif question['type']=='audio_multi_select':
                 play=play_rect
                 pygame.draw.rect(screen,(204,232,255),play,border_radius=12)
@@ -221,7 +222,16 @@ def run(question):
             draw_complete(page.display, fixed_submit, font, bool(selected),
                           fixed_submit.collidepoint(mouse), pygame.mouse.get_pressed()[0])
             draw_question_progress(page.display, question)
-            present_frame(question)
+            regions = None
+            if question.get('_studio_scene'):
+                from studio_live_preview import enclosing, option_rects, text_rect
+                regions = {'question_text': text_rect(prompt),
+                           'answer_area': enclosing(rect for rect, _ in cells),
+                           'audio_player': play_rect if kind == 'audio_multi_select' else None,
+                           'answer_passage': text_rect(passage_box) if kind == 'text_multi_select' else None,
+                           'question_image': rendered_image}
+                regions.update(option_rects(cells))
+            present_frame(question, regions, scroll=page.scroll, limit=page.limit)
             for event in page.events():
                 if event.type==pygame.QUIT:return None
                 if event.type==pygame.KEYDOWN:

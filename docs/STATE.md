@@ -1,8 +1,8 @@
 ## Quyết định đã chốt
 
-- Studio dùng layout v4 cho định dạng mới và tiếp tục đọc bố cục cũ. Thanh định dạng áp dụng trực tiếp lên đoạn bôi đen. Cửa sổ Studio dùng chế độ phóng to của hệ điều hành và giữ nút lưu ở chân cửa sổ.
-- Kiểm tra chọn lớp và chủ đề theo môn. Bộ mẫu Tiếng Anh lớp 1 và Tiếng Việt lớp 2 tạo được đề theo các tỷ lệ mặc định từ Level 1 đến 10. Mở và làm đề mẫu không ghi vào ngân hàng.
+- Studio trên desktop dùng khung hình Pygame và tọa độ từ renderer. Thử làm bài dùng một phiên tạm, riêng với dữ liệu người học. Studio Kiểm tra dùng kích thước thật của vùng thi hoặc cột câu hỏi con của bài đọc.
+- Câu đang soạn thiếu dữ liệu vẫn có canvas thiết kế. Khung Điện thoại giữ canvas thiết kế, vì runtime bài luyện hiện dựng bài ở khung desktop.
 
 ## Việc còn lại
 
-- Chưa kiểm trực tiếp trên Windows với taskbar, DPI và IME. Đã xác nhận các nút cuối cửa sổ còn thấy được trên màn hình Linux 1024 × 600.
+- Chưa kiểm trực tiếp trên Windows với taskbar, DPI, IME và thiết bị âm thanh.

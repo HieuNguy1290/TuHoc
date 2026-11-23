@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 import pygame
 
 from exam_bank import ALLOWED_TYPES
-from exam_pygame import READ_VIEWPORT, layout_preview
+from exam_pygame import ExamLayoutScene, READ_VIEWPORT
 from layout_registry import controls_for
 from layout_render import MOBILE
 from layout_typography import TextBlock, _font
@@ -61,6 +61,11 @@ class LayoutV4Tests(unittest.TestCase):
             for kind in sorted(ALLOWED_TYPES | {'reading_group'}):
                 with self.subTest(kind=kind):
                     self.assertEqual(controls_for(kind, 'exam').runtime, 'exam_pygame')
-                    size, pixels = layout_preview(Path(folder), {**draft, 'type': kind}, layout)
-                    self.assertEqual(size, READ_VIEWPORT)
-                    self.assertEqual(len(pixels), size[0] * size[1] * 3)
+                    surface, regions, _, _ = ExamLayoutScene(Path(folder),
+                                                               {**draft, 'type': kind}, layout).draw()
+                    self.assertEqual(surface.get_size(), READ_VIEWPORT)
+                    if kind == 'reading_group':
+                        self.assertEqual(set(regions), {'answer_passage', 'answer_panel'})
+                    else:
+                        self.assertEqual(regions['question_text'][0], (9, 25, 361, 70))
+                        self.assertGreater(len(regions), 1)

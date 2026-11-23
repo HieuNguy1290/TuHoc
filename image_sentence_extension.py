@@ -508,6 +508,7 @@ def run(question, letter_mode=False):
     zoom = None
     try:
         while True:
+            displayed_scroll = scroll_y
             screen = lesson_surface if lesson_surface is not None else display_screen
             screen.fill(bg)
             pygame.draw.rect(screen, 'white', (25, 25, 910, max(590, content_height - 50)), border_radius=18)
@@ -649,7 +650,16 @@ def run(question, letter_mode=False):
                             target = None
                         break
             draw_question_progress(display_screen, question)
-            present_frame(question)
+            regions = None
+            if question.get('_studio_scene'):
+                from studio_live_preview import option_rects, text_rect
+                regions = {'question_text': text_rect(prompt),
+                           'question_image': (image_frame or pr) if picture else None,
+                           'audio_player': audio_rect if has_audio else None,
+                           'answer_area': (left, sentence_top, right-left, sentence_h)}
+                regions.update(option_rects((rect, index) for rect, (kind, index) in hits if kind == 'choice'))
+                regions.update(option_rects(((rect, index) for rect, (kind, index) in hits if kind == 'slot'), 'slot'))
+            present_frame(question, regions, scroll=displayed_scroll, limit=scroll_max)
             if wf_pending:      # giải mã âm thanh SAU khung hình đầu tiên, tránh màn hình đen
                 wf_pending = False
                 try:

@@ -179,6 +179,7 @@ def run(question):
             else:
                 for line in wrap_rich(question.get('prompt') or 'Điền đáp án vào các ô trống.', font, 845)[:4]:
                     draw_rich(screen, font, line, navy, 55, y); y += 33
+            prompt_bottom = y
             if has_audio:       # khung nghe ngay dưới đề, giống dạng nghe
                 y += 8
                 audio_rect = pygame.Rect(52, y, 856, 88)
@@ -197,13 +198,15 @@ def run(question):
                 if audio_err:
                     screen.blit(small.render(audio_err, True, (200, 60, 60)), (audio_rect.x + 22, audio_rect.centery - 8))
                 y = max(y + (0 if audio_layout else audio_rect.h) + 6, audio_rect.bottom + 6)
+            image_rect = None
             if picture:
                 y += 10
                 if authored_frame:
                     screen.blit(picture,authored_rect)
                     y = max(y,authored_frame.bottom+22)
                 else:
-                    screen.blit(picture, picture.get_rect(midtop=(480, y)))
+                    image_rect = picture.get_rect(midtop=(480, y))
+                    screen.blit(picture, image_rect)
                     y += picture.get_height() + 22
             else:
                 y += 24
@@ -214,6 +217,7 @@ def run(question):
             answer_right = min(920, answer_left + max(120, answer_layout.get('width', 845))) if answer_layout else 900
             if answer_layout:
                 y = answer_layout.get('y', y)
+            answer_top = y
             x = answer_left; line_height = 55; boxes = []
             pieces = re.split(r'(\[\[\d+\]\]|\s+)', template)
             for part in pieces:
@@ -257,7 +261,15 @@ def run(question):
             draw_complete(page.display, fixed_submit, small, ready,
                           fixed_submit.collidepoint(mouse), pygame.mouse.get_pressed()[0])
             draw_question_progress(page.display, question)
-            present_frame(question)
+            regions = None
+            if question.get('_studio_scene'):
+                from studio_live_preview import option_rects, text_rect
+                regions = {'question_text': text_rect(prompt_block) if text_layout else (55, 100, 845, prompt_bottom-100),
+                           'question_image': authored_frame or image_rect,
+                           'audio_player': audio_rect if has_audio else None,
+                           'answer_area': (answer_left, answer_top, answer_right-answer_left, y-answer_top+line_height)}
+                regions.update(option_rects(boxes, 'slot'))
+            present_frame(question, regions, scroll=page.scroll, limit=page.limit)
             if wf_pending:      # giải mã âm thanh SAU khung hình đầu tiên, tránh màn hình đen
                 wf_pending = False
                 try:

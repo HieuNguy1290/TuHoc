@@ -87,11 +87,26 @@ def draw_question_progress(surface, question):
     surface.blit(label, (rect.x + padding_x, rect.y + padding_y))
 
 
-def present_frame(question):
+def present_frame(question, regions=None, *, scroll=0, limit=0, fixed=()):
     """Present the renderer's frame and deliver one RGB snapshot to a studio preview."""
     import pygame
 
     pygame.display.flip()
+    scene = question.get('_studio_scene')
+    if scene is not None:
+        from question_layout_store import pixel_extras
+
+        values = dict(regions or {})
+        for extra in pixel_extras(question.get('layout')):
+            box = extra['rect']
+            values[extra['id']] = (box['x'], box['y'], box['width'], box['height'])
+        boxes = {}
+        for key, value in values.items():
+            if value is not None:
+                document = pygame.Rect(value)
+                visible = document.move(0, -scroll) if key not in fixed else document
+                boxes[key] = (tuple(document), tuple(visible))
+        scene(pygame.display.get_surface(), boxes, scroll, limit)
     capture = question.get('_studio_frame')
     if capture is not None:
         capture()

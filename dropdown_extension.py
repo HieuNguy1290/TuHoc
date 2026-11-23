@@ -155,7 +155,14 @@ def run(question):
                     menu.append((rect,j))
             page.present(question)
             page.complete(question, submit, small, selected is not None)
-            present_frame(question)
+            regions = None
+            if question.get('_studio_scene'):
+                from studio_live_preview import option_rects, text_rect
+                regions = {'question_text': text_rect(prompt), 'dropdown_area': field,
+                           'question_image': (image_rect or picture.get_rect(midtop=(480, group_top))) if picture else None,
+                           'answer_menu': menu_rect if opened else None}
+                regions.update(option_rects(menu))
+            present_frame(question, regions, scroll=page.scroll, limit=page.limit)
             for event in page.events(scroll_enabled=not opened):
                 if event.type==pygame.QUIT:return None
                 if event.type==pygame.KEYDOWN:

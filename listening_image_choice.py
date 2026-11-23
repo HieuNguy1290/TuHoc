@@ -470,7 +470,13 @@ def _run(question):
         page.complete(question, submit, f_bold, ready)
         screen = page.display
         if zoom_open:draw_zoom(screen,zoom_open)
-        present_frame(question)
+        regions = None
+        if question.get('_studio_scene'):
+            from studio_live_preview import option_rects, text_rect
+            regions = {'question_text': text_rect(prompt_block), 'audio_player': audio_rect,
+                       'question_image': (image_frame or qr) if question_picture is not None else None}
+            regions.update(option_rects((r, i) for i, r in enumerate(cards)))
+        present_frame(question, regions, scroll=page.scroll, limit=page.limit)
         if wf_pending:      # giai ma am thanh SAU khung hinh dau tien, tranh man hinh den
             wf_pending = False
             try:

@@ -1,7 +1,7 @@
 """Stage 2: optional per-question visual layout editor (Tk only).
 
-Does not modify Pygame drawing or input hitboxes. Coordinates are relative
-and stored by the caller only after explicit confirmation.
+Does not modify Pygame drawing or input hitboxes. Window state and the live viewport are temporary. Canvas changes are stored
+by the caller only after explicit confirmation.
 """
 import tkinter as tk
 from tkinter import ttk, messagebox, colorchooser
@@ -42,7 +42,7 @@ def resize_rect(start, mode, dx, dy, screen, *, keep_ratio=False):
     return {**start,'x':x,'y':y,'width':right-x,'height':bottom-y}
 
 
-def edit_layout(parent, question, initial=None, *, preview=None, templates=None, clipboard=None):
+def edit_layout(parent, question, initial=None, *, preview=None, templates=None, clipboard=None, live_question=None):
     """Open a modal editor. Return validated layout, or None if cancelled."""
     initial = validate_layout(initial or {})
     stored = initial
@@ -157,8 +157,18 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
             canvas.xview_scroll(-3 if (event.delta > 0 or event.num == 4) else 3, 'units')
             draw_rulers()
         else:
-            canvas.yview_scroll(-3 if (event.delta > 0 or event.num == 4) else 3, 'units')
-            draw_rulers()
+            direction = 1 if event.delta > 0 or event.num == 4 else -1
+            if live_renderer is not None and working is desktop_layout and preview_image is not None and (
+                practice or question.get('type') == 'reading_group'
+                or (direction > 0 and scene_scroll > 0) or (direction < 0 and scene_scroll < scene_limit)
+            ):
+                point = (round(canvas.canvasx(event.x)/zoom[0]-page_origin_x),
+                         round(canvas.canvasy(event.y)/zoom[0]-page_origin_y))
+                send_live('input', ('motion', point))
+                send_live('input', ('wheel', direction))
+            else:
+                canvas.yview_scroll(-3*direction, 'units')
+                draw_rulers()
         return 'break'
 
     def isolate_wheel(event):
@@ -250,6 +260,21 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     last_motion = None
     registered_motion = False
     preview_image = None
+    live_renderer = None
+    scene_boxes = {}
+    scene_scroll = 0
+    scene_limit = 0
+    scene_layout = None
+    requested = None
+    sent_revision = 0
+    sent_layout = None
+    live_job = None
+    poll_job = None
+    practice = False
+    practice_done = False
+    scene_error = None
+    menu_anchor = None
+    menu_revision = None
     canvas_image = None
     drag = [None]
     boxes = {}
@@ -359,7 +384,15 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
             screen = MOBILE if is_mobile else DESKTOP
             return to_relative(extra[frame], screen)
         base = option_defaults.get(el) or DEFAULTS[el]
-        return {**base, **desktop_layout.get(el, {}), **working.get(el, {})}
+        rects = scene_boxes.get(el) if working is desktop_layout else None
+        overrides = {**desktop_layout.get(el, {}), **working.get(el, {})}
+        if rects and preview_image is not None:
+            x, y, width, height = rects[0]
+            actual = to_relative(dict(x=x, y=y, width=width, height=height), (preview_image.width, DESKTOP[1]))
+            if requested and scene_layout == requested[0]:
+                return {**base, **overrides, **actual}
+            base = {**base, **actual}
+        return {**base, **overrides}
 
     def properties(el):
         if el in extras:
@@ -422,6 +455,8 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
 
     def switch_view():
         nonlocal page_w, page_h, max_page_h, working
+        if practice:
+            toggle_practice(force_edit=True)
         page_w, page_h = MOBILE if viewport_var.get() == 'Điện thoại' else DESKTOP
         max_page_h = page_h * PAGE_LIMIT
         dims[:] = [page_w, page_h]
@@ -431,6 +466,11 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
             expand_to(current(el))
         canvas.xview_moveto(0)
         canvas.yview_moveto(0)
+        if live_renderer:
+            state = ['disabled'] if working is mobile_layout else ['!disabled']
+            practice_button.state(state)
+            if menu_button is not None:
+                menu_button.state(state)
         show_pixels()
         redraw()
 
@@ -478,6 +518,155 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
             preview(current_layout, win, show_current_frame)
         except (ValueError, RuntimeError, OSError) as exc:
             messagebox.showwarning('Xem trước', str(exc), parent=win)
+
+    def queue_live_frame(*, reset=False):
+        nonlocal live_job, requested, scene_error
+        if live_renderer is None or working is mobile_layout or practice:
+            return
+        try:
+            target = (draft(), str(pending_image) if pending_image else None)
+        except ValueError:
+            return
+        if not reset and target == requested:
+            return
+        requested = target
+        scene_error = None
+        if live_job is None:
+            live_job = win.after(45, lambda: request_live_frame(reset=reset))
+
+    def request_live_frame(*, reset=False):
+        nonlocal live_job, sent_revision, sent_layout
+        live_job = None
+        if live_renderer is None or working is mobile_layout:
+            return
+        sent_revision += 1
+        layout, image = requested
+        sent_layout = layout
+        send_live('layout', (sent_revision, layout, reset, image))
+
+    def send_live(command, payload=None):
+        nonlocal scene_error
+        try:
+            live_renderer.send(command, payload)
+        except (OSError, EOFError) as exc:
+            scene_error = str(exc)
+            status.set('Không mở được mô phỏng Pygame.')
+
+    def poll_live():
+        nonlocal poll_job, scene_boxes, scene_scroll, scene_limit, scene_layout, menu_revision
+        nonlocal scene_error, practice_done
+        poll_job = None
+        if live_renderer is None:
+            return
+        try:
+            latest = None
+            for kind, payload in live_renderer.read():
+                if payload[0] != sent_revision:
+                    continue
+                if kind == 'frame':
+                    latest = payload
+                elif kind == 'finished':
+                    practice_done = True
+                    status.set('Đã làm thử. Bấm Thử lại để làm lại câu.')
+                    practice_button.configure(text='Thử lại')
+                elif kind == 'error':
+                    scene_error = payload[1] or 'Không tải được bài tập.'
+            if latest is not None:
+                _, size, pixels, scene_boxes, scene_scroll, scene_limit = latest
+                scene_layout = sent_layout
+                show_frame(size, pixels)
+                if not drag[0]:
+                    show_pixels()
+                if menu_button is not None:
+                    menu_button.configure(text='Đóng menu' if 'answer_menu' in scene_boxes else 'Mở menu')
+                if menu_anchor and menu_revision != sent_revision and 'answer_menu' not in scene_boxes:
+                    if click_rendered(menu_anchor):
+                        menu_revision = sent_revision
+            if scene_error:
+                status.set('Xem trước: ' + scene_error)
+        except (OSError, EOFError) as exc:
+            scene_error = str(exc) or 'Không tải được mô phỏng Pygame.'
+            status.set(scene_error)
+            return
+        poll_job = win.after(30, poll_live)
+
+    def stop_live(event):
+        if event.widget is not win:
+            return
+        for job in (live_job, poll_job):
+            if job is not None:
+                win.after_cancel(job)
+        if live_renderer is not None:
+            live_renderer.close()
+
+    def click_rendered(key):
+        if key in scene_boxes and preview_image is not None:
+            _, (x,y,width,height) = scene_boxes[key]
+            point = (x+width//2, y+height//2)
+            if 0 <= point[0] < preview_image.width and 0 <= point[1] < preview_image.height:
+                send_live('input', ('click', point))
+                send_live('input', ('release', point))
+                return True
+        return False
+
+    def toggle_menu():
+        nonlocal menu_anchor, menu_revision
+        if practice or working is mobile_layout:
+            return
+        if 'answer_menu' in scene_boxes:
+            menu_anchor = None
+            send_live('input', ('click', (4,4)))
+            send_live('input', ('release', (4,4)))
+        else:
+            active_key = active[0] or ''
+            key = 'dropdown_area' if question['type'] == 'dropdown_fill_blank' and 'slot_0' not in scene_boxes else (
+                active_key if active_key.startswith('slot_') else 'slot_0')
+            if click_rendered(key):
+                menu_anchor = key
+                menu_revision = sent_revision
+
+    def toggle_practice(*, force_edit=False):
+        nonlocal practice, practice_done, requested, menu_anchor
+        if live_renderer is None or working is mobile_layout:
+            return
+        retry = practice_done
+        practice = (retry or not practice) if not force_edit else False
+        practice_done = False
+        menu_anchor = None
+        if menu_button is not None:
+            menu_button.state(['disabled'] if practice else ['!disabled'])
+        practice_button.configure(text='Chỉnh bố cục' if practice else 'Thử làm bài')
+        requested = (draft(), str(pending_image) if pending_image else None)
+        send_live('play', practice)
+        if live_job is not None:
+            win.after_cancel(live_job)
+        request_live_frame(reset=retry)
+        canvas.focus_set()
+        redraw()
+
+    def live_input(kind, event):
+        if not practice or practice_done or preview_image is None:
+            return
+        point = (round(canvas.canvasx(event.x)/zoom[0]-page_origin_x),
+                 round(canvas.canvasy(event.y)/zoom[0]-page_origin_y))
+        if 0 <= point[0] < preview_image.width and 0 <= point[1] < preview_image.height:
+            send_live('input', (kind, point))
+        return 'break'
+
+    def live_key(event):
+        if not practice or practice_done:
+            return
+        keys = {'Return': 'return', 'KP_Enter': 'return', 'BackSpace': 'backspace',
+                'Tab': 'tab', 'ISO_Left_Tab': 'tab', 'Left': 'left', 'Right': 'right',
+                'Up': 'up', 'Down': 'down', 'Delete': 'delete', 'Prior': 'pageup', 'Next': 'pagedown'}
+        if event.keysym in keys:
+            send_live('input', ('key', (keys[event.keysym], bool(event.state & 1))))
+        elif event.char and event.char.isprintable() and not event.state & 4:
+            if event.char.isascii():
+                send_live('input', ('key', event.char.casefold() if event.char != ' ' else 'space'))
+            kind = 'text_key' if question.get('type') == 'multi_fill_blanks' else 'text'
+            send_live('input', (kind, event.char))
+        return 'break'
 
     def expand_to(values):
         needed = round((values['y'] + values['height']) * page_h) + 80
@@ -529,7 +718,8 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
 
     def snapshot():
         nonlocal preview_image
-        preview_image = None
+        if live_renderer is None:
+            preview_image = None
         history.append(capture())
         future.clear()
         if len(history) > 50:
@@ -691,13 +881,18 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         scale = zoom[0]
         rect = ((page_origin_x+x*page_w)*scale, (page_origin_y+y*page_h)*scale,
                 (page_origin_x+(x+w)*page_w)*scale, (page_origin_y+(y+h)*page_h)*scale)
+        if live and live_renderer is not None and el in scene_boxes:
+            _, visible = scene_boxes[el]
+            x, y, w, h = visible
+            rect = ((page_origin_x+x)*scale, (page_origin_y+y)*scale,
+                    (page_origin_x+x+w)*scale, (page_origin_y+y+h)*scale)
         a,b,c,d = rect
         boxes[el] = rect
         selected = el in selected_keys
         tag = 'block:'+el
         extra = extras.get(el)
         fill = '' if live else (extra['bg'] if extra else '#eff6ff' if selected else '#f8fafc')
-        canvas.create_rectangle(*rect, fill=fill, outline='#2563eb' if selected else '#cbd5e1',
+        canvas.create_rectangle(*rect, fill=fill, outline='#2563eb' if selected else '' if live and live_renderer else '#cbd5e1',
                                 width=2 if selected else 1, tags=tag)
 
         def text(x, y, value, size=12, style='normal', **options):
@@ -760,17 +955,25 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         images.clear()
         block_items.clear()
         boxes.clear()
-        status.set('Có thay đổi chưa lưu' if dirty() else 'Đã nạp bố cục')
+        message = ('Đã làm thử. Bấm Thử lại để làm lại câu.' if practice_done
+                   else 'Thử làm bài' if practice
+                   else 'Đang dựng bài tập…' if live_renderer and not preview_image and not scene_error
+                   else 'Có thay đổi chưa lưu' if dirty() else 'Đã nạp bố cục')
+        status.set(message)
         scale = zoom[0]
         w,h = page_w*scale,page_h*scale
         ox,oy = page_origin_x*scale,page_origin_y*scale
         limit = extended_h[0]*scale
-        canvas.configure(scrollregion=(0,0,(page_w+40)*scale,(extended_h[0]+40)*scale))
+        if live_renderer and preview_image and working is desktop_layout:
+            canvas.configure(scrollregion=(0,0,(preview_image.width+40)*scale,(preview_image.height+40)*scale))
+        else:
+            canvas.configure(scrollregion=(0,0,(page_w+40)*scale,(extended_h[0]+40)*scale))
         page_background = canvas.create_rectangle(ox,oy,ox+w,oy+limit,fill='white',outline='#94a3b8')
         live = preview_image is not None and viewport_var.get() == 'Máy tính'
         if live:
             from PIL import Image, ImageTk
-            size = tuple(round(value*scale) for value in preview_image.size)
+            image_size = preview_image.size
+            size = tuple(round(value*scale) for value in image_size)
             canvas_image = ImageTk.PhotoImage(preview_image.resize(size,Image.Resampling.LANCZOS),master=canvas)
             canvas.create_image(ox,oy,image=canvas_image,anchor='nw')
         else:
@@ -782,9 +985,16 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
                 canvas.create_line(ox,oy+y*scale,ox+w,oy+y*scale,fill='#e2e8f0')
         canvas.create_line(ox,oy+h,ox+w,oy+h,fill='#f59e0b',dash=(6,4))
         draw_rulers()
-        block_order = tuple(el for el in elements if el not in hidden)
+        if live and live_renderer is not None:
+            visible_height = preview_image.height
+            block_order = () if practice else tuple(el for el in elements if el not in hidden and el in scene_boxes
+                and scene_boxes[el][1][1] < visible_height
+                and scene_boxes[el][1][1] + scene_boxes[el][1][3] > 0)
+        else:
+            block_order = tuple(el for el in elements if el not in hidden)
         for el in block_order:
             draw_block(el,live)
+        queue_live_frame()
         if not live:
             canvas.create_text(ox+w-18*scale,oy+22*scale,text='Câu: --/--  (khóa)',
                                anchor='e',fill='#475569',font=('Segoe UI',max(6,round(11*scale)),'bold'),tags='locked')
@@ -800,8 +1010,9 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         ruler_left.delete('all')
         ruler_top.create_text(7,13,anchor='w',text='px',fill='#64748b',font=('Segoe UI',8))
         x0,y0=canvas.canvasx(0),canvas.canvasy(0)
+        preview_ratio = preview_image.width / page_w if live_renderer and preview_image and working is desktop_layout else 1
         for n in range(0,page_w+1,25):
-            xx=ox+n*scale-x0
+            xx=ox+n*scale*preview_ratio-x0
             if 0<=xx<=ruler_top.winfo_width():
                 major=n%100==0
                 ruler_top.create_line(xx,28,xx,8 if major else 19,fill='#64748b')
@@ -829,14 +1040,24 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         return None,None
 
     def hover(event):
+        if practice:
+            return live_input('motion', event)
         _, mode = hit(canvas.canvasx(event.x),canvas.canvasy(event.y))
         cursor = cursors.get(mode,'fleur' if mode=='move' else '')
         if canvas.cget('cursor') != cursor:
             canvas.configure(cursor=cursor)
 
+    drag_scene_offset = 0
+
+    def draw_offset(el):
+        rects = scene_boxes.get(el) if live_renderer and working is desktop_layout else None
+        return rects[0][1]-rects[1][1] if rects else 0
+
     def down(event):
-        nonlocal registered_motion, marquee
+        nonlocal registered_motion, marquee, drag_scene_offset
         canvas.focus_set()
+        if practice:
+            return live_input('click', event)
         x,y=canvas.canvasx(event.x),canvas.canvasy(event.y)
         el, mode = hit(x,y)
         if event.state&1 and el:
@@ -858,6 +1079,7 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         registered_motion = False
         group_start.clear()
         if el not in locked:
+            drag_scene_offset = draw_offset(el)
             drag[0]=(el,mode,x,y,deepcopy(current(el)))
             if mode=='move':
                 group_start.update({key:current(key) for key in selected_keys-hidden-locked})
@@ -872,6 +1094,8 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
 
     def release(event=None):
         nonlocal scroll_job, last_motion, drag_visual, marquee
+        if practice and event is not None:
+            return live_input('release', event)
         if drag_visual is not None:
             canvas.after_cancel(drag_visual)
             drag_visual = None
@@ -895,9 +1119,12 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         if scroll_job is not None:
             canvas.after_cancel(scroll_job)
             scroll_job = None
+        queue_live_frame()
 
     def move(event):
         nonlocal scroll_job, last_motion, registered_motion
+        if practice:
+            return live_input('motion', event)
         last_motion = event
         if marquee is not None:
             x,y,item=marquee
@@ -911,18 +1138,26 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         edge = 28
         view_w, view_h = canvas.winfo_width(), canvas.winfo_height()
         if event.y >= view_h-edge:
+            if live_renderer and preview_image and working is desktop_layout and scene_scroll < scene_limit:
+                send_live('input', ('motion', (round(event.x/zoom[0]), min(520, preview_image.height-1))))
+                send_live('input', ('wheel', -1))
             if canvas.yview()[1] >= .95 and extended_h[0] < max_page_h:
                 extended_h[0] = min(max_page_h, extended_h[0] + 160)
                 canvas.configure(scrollregion=(0, 0, (page_w+40)*zoom[0], (extended_h[0]+40)*zoom[0]))
             canvas.yview_scroll(2, 'units')
         elif event.y <= edge:
+            if live_renderer and preview_image and working is desktop_layout and scene_scroll > 0:
+                send_live('input', ('motion', (round(event.x/zoom[0]), min(320, preview_image.height-1))))
+                send_live('input', ('wheel', 1))
             canvas.yview_scroll(-2, 'units')
         if event.x >= view_w-edge and (page_w+40)*zoom[0] > view_w:
             canvas.xview_scroll(2, 'units')
         elif event.x <= edge:
             canvas.xview_scroll(-2, 'units')
-        dx = (canvas.canvasx(event.x)-ox)/(dims[0]*zoom[0])
-        dy = (canvas.canvasy(event.y)-oy)/(dims[1]*zoom[0])
+        visible_w = preview_image.width if live_renderer and preview_image and working is desktop_layout else dims[0]
+        dx = (canvas.canvasx(event.x)-ox)/(visible_w*zoom[0])
+        viewport_delta = (draw_offset(el) - drag_scene_offset) * zoom[0]
+        dy = (canvas.canvasy(event.y)-oy+viewport_delta)/(dims[1]*zoom[0])
         v = dict(start)
         if snap.get():
             dx = round(dx*page_w/8)*8/page_w
@@ -957,6 +1192,8 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         auto = event.y >= view_h-edge or event.y <= edge or event.x >= view_w-edge or event.x <= edge
         if auto and scroll_job is None:
             scroll_job = canvas.after(60,repeat_motion)
+        if live_renderer is not None:
+            queue_live_frame()
         schedule_drag(el,mode)
 
     def schedule_drag(el,mode):
@@ -968,6 +1205,9 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
         nonlocal drag_visual
         drag_visual = None
         if el not in block_items:
+            return
+        if live_renderer is not None and working is desktop_layout and preview_image is not None:
+            show_pixels()
             return
         if mode == 'move':
             for key in group_start:
@@ -1015,7 +1255,8 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
 
     def restore(state):
         nonlocal preview_image, image_path, pending_image
-        preview_image = None
+        if live_renderer is None:
+            preview_image = None
         for target, values in zip((desktop_layout, mobile_layout, extras), state):
             target.clear()
             target.update(deepcopy(values))
@@ -1260,7 +1501,8 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     canvas.bind('<ButtonRelease-1>', release)
     canvas.bind('<Motion>', hover)
     canvas.bind('<Double-Button-1>',edit_text)
-    canvas.bind('<Key-t>',lambda _event:add_text())
+    canvas.bind('<Key-t>', lambda event: live_key(event) if practice else add_text())
+    canvas.bind('<KeyPress>', live_key)
     canvas.bind('<Control-d>',duplicate)
     if clipboard is not None and 'question_image' in system_elements:
         canvas.bind('<Control-v>',paste_image)
@@ -1305,12 +1547,27 @@ def edit_layout(parent, question, initial=None, *, preview=None, templates=None,
     footer = ttk.Frame(win, padding=10)
     footer.pack(side='bottom', fill='x', before=main)
     ttk.Label(footer, textvariable=status).pack(side='left')
-    if preview is not None:
+    menu_button = None
+    if live_question is not None:
+        from studio_live_preview import LivePreview
+
+        try:
+            live_renderer = LivePreview(live_question)
+            practice_button = ttk.Button(footer, text='Thử làm bài', command=toggle_practice)
+            practice_button.pack(side='left', padx=12)
+            if question.get('type') in ('dropdown_fill_blank', 'inline_dropdown_fill'):
+                menu_button = ttk.Button(footer, text='Mở menu', command=toggle_menu)
+                menu_button.pack(side='left', padx=4)
+            win.bind('<Destroy>', stop_live, add='+')
+            poll_job = win.after(30, poll_live)
+        except (OSError, RuntimeError) as exc:
+            scene_error = str(exc)
+    if preview is not None and live_renderer is None:
         ttk.Button(footer, text='Xem trước Pygame', command=try_preview).pack(side='left', padx=12)
     ttk.Button(footer, text='Lưu bố cục', command=save).pack(side='right', padx=5)
     ttk.Button(footer, text='Hủy', command=cancel).pack(side='right')
     # ESC closes the modal editor as before; maximize is not exclusive fullscreen.
-    win.bind('<Escape>', lambda e: cancel())
+    win.bind('<Escape>', lambda _e: toggle_practice(force_edit=True) if practice else cancel())
     win.protocol('WM_DELETE_WINDOW', cancel)
     sync_elements()
     for el in elements:

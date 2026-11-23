@@ -2873,4 +2873,6 @@ class App(ModernGamesMixin, DictationMixin, GameAppMixin, LevelFlowMixin, Lesson
 install_navigation_profiler(App)
 
 if __name__=='__main__':
+    from multiprocessing import freeze_support
+    freeze_support()
     App().mainloop()

@@ -804,7 +804,7 @@ class BankManager:
         target = self.reading_questions[self.reading_child] if child else None
         data = target if child else self.reading_form if self.edit_type == 'reading_group' else self.form
         kind = 'choice' if child else self.edit_type
-        question = {**data, 'type': kind, '_layout_context': 'exam',
+        question = {**data, 'id': data.get('id') or self.edit_id, 'type': kind, '_layout_context': 'exam',
                     'prompt': data.get('prompt') or data.get('title', '')}
         if kind == 'matching':
             question['pairs'] = [(pair['left'], pair['right']) for pair in self.match_pairs]
@@ -828,7 +828,19 @@ class BankManager:
         try:
             root = Tk()
             root.withdraw()
-            layout = edit_layout(root, question, initial, preview=preview)
+            live_question = {**question, '_preview_root': str(self.bank.folder.parent)}
+            if child:
+                live_question['_preview_child_index'] = self.reading_child
+                live_question['_preview_group'] = {
+                    **self.reading_form, 'layout': self.edit_layout,
+                    'questions': [{**item, 'options': options_for(item['options'])} for item in self.reading_questions],
+                }
+            for field in ('image', 'audio'):
+                if live_question.get(field):
+                    live_question[field] = self.bank._resolve_media(live_question[field])
+            if kind == 'image_multi_choice':
+                live_question['options'] = [self.bank._resolve_media(path) for path in question['options']]
+            layout = edit_layout(root, question, initial, preview=preview, live_question=live_question)
             if layout is not None:
                 if child:
                     target['layout'] = layout

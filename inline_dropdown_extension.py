@@ -280,7 +280,15 @@ def run(question):
             page.complete(question, submit, small, can and opened is None)
             if zoom:
                 draw_zoom(screen, zoom)
-            present_frame(question)
+            regions = None
+            if question.get('_studio_scene'):
+                from studio_live_preview import option_rects, text_rect
+                regions = {'question_text': text_rect(prompt),
+                           'question_image': (image_frame or pr) if picture else None,
+                           'dropdown_area': (left, sentence_top, right-left, sentence_h),
+                           'answer_menu': mr if opened is not None and opened in fields else None}
+                regions.update(option_rects(((rect, i) for i, rect in fields.items()), 'slot'))
+            present_frame(question, regions, scroll=page.scroll, limit=page.limit)
             for event in page.events(scroll_enabled=(opened is None and zoom is None)):
                 if zoom:
                     if event.type in (pygame.MOUSEBUTTONDOWN, pygame.QUIT) or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):

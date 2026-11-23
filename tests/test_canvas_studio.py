@@ -170,6 +170,54 @@ class StudioTests(unittest.TestCase):
 
         self.interact({'type': 'choice', 'prompt': 'Câu hỏi', 'options': ['Có', 'Không']}, None, check)
 
+    def test_live_canvas_moves_actual_answer_from_its_drawn_position(self):
+        import time
+        from question_layout_editor import edit_layout
+
+        question = {'type': 'choice', 'prompt': 'Choose the odd one out:',
+                    'options': ['Dog', 'Kite', 'Cat', 'Bird']}
+        self.root.wm_geometry('1100x770')
+        errors = []
+
+        def drive():
+            win = widgets(self.root, tk.Toplevel)[0]
+            try:
+                win.update_idletasks()
+                canvas = next(c for c in widgets(win, tk.Canvas) if str(c.cget('takefocus')) == '1')
+                deadline = time.monotonic()+8
+                while not any(canvas.type(item) == 'image' for item in canvas.find_all()):
+                    self.assertLess(time.monotonic(), deadline, [label.cget('text') for label in widgets(win, ttk.Label)])
+                    win.update()
+                    time.sleep(.02)
+
+                def bounds():
+                    return tuple(canvas.coords(canvas.find_withtag('block:option_1')[0]))
+
+                next(b for b in widgets(win, ttk.Button) if b.cget('text') == '+').invoke()
+                before = bounds()
+                x = round(before[0]+35-canvas.canvasx(0))
+                y = round((before[1]+before[3])/2-canvas.canvasy(0))
+                canvas.event_generate('<ButtonPress-1>', x=x, y=y)
+                canvas.event_generate('<B1-Motion>', x=x+30, y=y+3, state=0x108)
+                canvas.event_generate('<ButtonRelease-1>', x=x+30, y=y+3)
+                choices = widgets(win, tk.Listbox)[0]
+                self.assertEqual(choices.get(choices.curselection()[0]), 'option_1')
+                while bounds() == before:
+                    self.assertLess(time.monotonic(), deadline, 'Pygame did not redraw the moved answer')
+                    win.update()
+                    time.sleep(.02)
+                self.assertAlmostEqual(bounds()[0]-before[0], 30, delta=2)
+                next(b for b in widgets(win, ttk.Button) if b.cget('text') == 'Lưu bố cục').invoke()
+            except BaseException as exc:
+                errors.append(exc)
+                win.destroy()
+
+        self.root.after(80, drive)
+        saved = edit_layout(self.root, question, live_question=question)
+        if errors:
+            raise errors[0]
+        self.assertGreater(saved['desktop']['option_1']['x'], 66)
+
     def test_drag_at_zoom_with_scrolled_origin(self):
         question = {'type': 'fill', 'prompt': 'Câu hỏi'}
         initial = {'input_area': {'x': 100/960, 'y': 750/640, 'width': 300/960, 'height': 50/640}}

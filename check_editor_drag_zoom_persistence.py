@@ -30,7 +30,7 @@ def editor_contract():
     if missing:
         raise AssertionError('Missing editor handlers: ' + ', '.join(missing))
     source = path.read_text(encoding='utf-8-sig')
-    for token in ('canvas.canvasx(event.x)', 'canvas.canvasy(event.y)', 'dims[0]*zoom[0]', 'dims[1]*zoom[0]', 'validate_layout(working)', 'deepcopy(initial)'):
+    for token in ('canvas.canvasx(event.x)', 'canvas.canvasy(event.y)', 'visible_w*zoom[0]', 'dims[1]*zoom[0]', 'validate_layout(working)', 'deepcopy(initial)'):
         if token not in source:
             raise AssertionError('Missing editor coordinate/persistence contract: ' + token)
     return 'Required handlers and zoom-normalized drag formulas detected'

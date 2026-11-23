@@ -216,7 +216,7 @@ def run(question):
             except (pygame.error, OSError, ValueError):
                 pass
         choices=list(exp)+list(question.get('distractors',[]));random.shuffle(choices)
-        assigned={};selected_slot=0;scroll=0;choice_page=0
+        assigned={};selected_slot=0;scroll=0;max_scroll=0;choice_page=0
         # Layout overrides apply only to the three gap-based question types.
         # Keep the choice bank, answer correctness and legacy geometry unchanged.
         from question_layout_runtime import element as layout_element
@@ -387,6 +387,10 @@ def run(question):
                 draw_question_progress(screen, question)
             # Draw the waveform only on the fixed viewport after scrolling content
             # has been presented. Drawing here would create a second scrolled copy.
+            current_page = letter_page or choice_page_surface
+            gap_mode = kind in ('sentence_gaps', 'passage_gaps', 'conversation_gaps')
+            displayed_scroll = current_page.scroll if current_page else scroll if gap_mode else 0
+            displayed_limit = current_page.limit if current_page else max_scroll if gap_mode else 0
             if narration_path and narration_waveform is not None:
                 narration_waveform.update()
             elif narration_button is not None:
@@ -772,7 +776,37 @@ def run(question):
                             assigned[selected_slot]=index
                             selected_slot=next((i for i in range(len(exp)) if i not in assigned),selected_slot)
                         break
-            present_frame(question)
+            regions = None
+            if question.get('_studio_scene'):
+                from studio_live_preview import enclosing, option_rects, text_rect
+                current_page = letter_page or choice_page_surface
+                gap_mode = kind in ('sentence_gaps', 'passage_gaps', 'conversation_gaps')
+                media = narration_waveform_area if narration_waveform is not None or narration_waveform_pending else narration_button
+                regions = {'question_text': text_rect(prompt_block), 'audio_player': media}
+                fixed = {'audio_player'} if not audio_doc else set()
+                if kind == 'image_multi_choice':
+                    regions['question_image'] = (question_picture_frame or target) if question_picture is not None else None
+                elif kind == 'picture_missing_letters':
+                    regions['question_image'] = (letter_picture_frame or picture_rect) if picture else None
+                    regions['answer_area'] = (letter_left, letter_top, letter_width, letter_height)
+                else:
+                    regions['question_image'] = (gap_picture_frame or image_rect.move(0, displayed_scroll)) if sentence_picture is not None else None
+                    regions['answer_area'] = (gap_left, gap_top, gap_right-gap_left, gap_viewport.height)
+                    region_words = [(rect, index) for rect, (action, index) in hits if action == 'choice']
+                    if region_words:
+                        regions['word_bank'] = enclosing(rect for rect, _ in region_words).move(0, displayed_scroll if 'y' in bank else 0)
+                        if 'y' not in bank:
+                            fixed.add('word_bank')
+                    fixed.update(('answer_area', 'question_text'))
+                for rect, (action, index) in hits:
+                    prefix = {'choose':'option', 'letter':'slot', 'slot':'slot', 'choice':'word'}.get(action)
+                    if prefix:
+                        key = f'{prefix}_{index}'
+                        shifts = gap_mode and (action == 'slot' or 'y' in (word_layouts[index] or {}) or 'y' in bank)
+                        regions[key] = rect.move(0, displayed_scroll) if shifts else rect
+                        if gap_mode and not shifts:
+                            fixed.add(key)
+            present_frame(question, regions, scroll=displayed_scroll, limit=max_scroll if regions and gap_mode else displayed_limit, fixed=fixed if regions else ())
             if narration_waveform_pending:
                 narration_waveform_pending = False
                 try:

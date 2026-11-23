@@ -1819,66 +1819,68 @@ class LevelFlowMixin:
                          if type_widget.get() in type_names else kind_var.get())
             type_widget.set(type_names[QUESTION_TYPES.index(kind_var.get())])
             rebuild()
-        def preview(layout_override=None, owner=None, on_frame=None):
-            """Use the actual exercise window for previews; never save or score."""
+        def preview_question(layout_override=None):
             typ = kind_var.get()
-            try:
-                prompt = get(controls['prompt'])
-                question = {'type': typ, 'prompt': prompt if typ == 'picture_missing_letters' else prompt or 'Xem trước bài tập'}
-                if typ in NEW_TYPES:
-                    question.update(entries['_collect_new']())
-                elif typ == 'matching':
-                    pairs = []
-                    for i in range(len([key for key in entries if key.startswith('left_')])):
-                        left = get(entries[f'left_{i}'])
-                        right = get(entries[f'right_{i}'])
-                        if left and right:
-                            pairs.append(left + ' = ' + right)
-                    if len(pairs) < 2:
-                        raise ValueError('Cần ít nhất hai cặp để xem trước bài nối.')
-                    question.update(options=pairs, answer=' | '.join(pairs))
-                    question['image'] = get(entries['image']) if 'image' in entries else ''
+            prompt = get(controls['prompt'])
+            question = {'type': typ, 'prompt': prompt if typ == 'picture_missing_letters' else prompt or 'Xem trước bài tập'}
+            if typ in NEW_TYPES:
+                question.update(entries['_collect_new']())
+            elif typ == 'matching':
+                pairs = []
+                for i in range(len([key for key in entries if key.startswith('left_')])):
+                    left = get(entries[f'left_{i}'])
+                    right = get(entries[f'right_{i}'])
+                    if left and right:
+                        pairs.append(left + ' = ' + right)
+                if len(pairs) < 2:
+                    raise ValueError('Cần ít nhất hai cặp để xem trước bài nối.')
+                question.update(options=pairs, answer=' | '.join(pairs))
+                question['image'] = get(entries['image']) if 'image' in entries else ''
+            else:
+                if typ in ('choice', 'picture_choice', 'listening_choice'):
+                    raw_options = [get(entries[f'option_{i}']) for i in range(4)]
+                    if len([v for v in raw_options if v]) < 2:
+                        raise ValueError('Cần ít nhất 2 phương án để xem trước.')
+                    if raw_options != [v for v in raw_options if v] + [''] * raw_options.count(''):
+                        raise ValueError('Hãy nhập phương án liên tiếp từ A, không bỏ trống ở giữa.')
+                    question['options'] = [v for v in raw_options if v]
+                elif typ == 'true_false':
+                    question['options'] = ['Đúng', 'Sai']
+                elif typ == 'order':
+                    parts=[v.strip() for v in get(entries['order_parts']).split('|') if v.strip()]
+                    if parts and not 2 <= len(parts) <= 20:
+                        raise ValueError('Bài sắp xếp cần 2–20 thẻ.')
+                    question['options']=parts
                 else:
-                    if typ in ('choice', 'picture_choice', 'listening_choice'):
-                        raw_options = [get(entries[f'option_{i}']) for i in range(4)]
-                        if len([v for v in raw_options if v]) < 2:
-                            raise ValueError('Cần ít nhất 2 phương án để xem trước.')
-                        if raw_options != [v for v in raw_options if v] + [''] * raw_options.count(''):
-                            raise ValueError('Hãy nhập phương án liên tiếp từ A, không bỏ trống ở giữa.')
-                        question['options'] = [v for v in raw_options if v]
-                    elif typ == 'true_false':
-                        question['options'] = ['Đúng', 'Sai']
-                    elif typ == 'order':
-                        parts=[v.strip() for v in get(entries['order_parts']).split('|') if v.strip()]
-                        if parts and not 2 <= len(parts) <= 20:
-                            raise ValueError('Bài sắp xếp cần 2–20 thẻ.')
-                        question['options']=parts
-                    else:
-                        question['options'] = []
-                    answer_widget = entries.get('correct', entries.get('answer'))
-                    question['answer'] = get(answer_widget) if answer_widget is not None else ''
-                    if not question['answer']:
-                        raise ValueError('Hãy nhập đáp án để xem trước.')
-                    question['image'] = get(entries['image']) if 'image' in entries else ''
-                    question['audio'] = get(entries['audio']) if 'audio' in entries else ''
-                # Media fields are shared by every question type, including NEW_TYPES.
-                question['image'] = get(entries['image']) if 'image' in entries else question.get('image', '')
-                question['audio'] = get(entries['audio']) if 'audio' in entries else question.get('audio', '')
-                # Preview the current staged visual layout, including unsaved edits.
-                # This is a copy only: preview must never persist or mutate a question.
-                from question_layout_store import get_layout
-                question['layout'] = get_layout({'layout': pending_layout['value'] if layout_override is None else layout_override})
-                if typ == 'listening_image_choice':
-                    import listening_image_choice  # thieu file nay thi bao loi ro rang, khong im lang
+                    question['options'] = []
+                answer_widget = entries.get('correct', entries.get('answer'))
+                question['answer'] = get(answer_widget) if answer_widget is not None else ''
+                if not question['answer']:
+                    raise ValueError('Hãy nhập đáp án để xem trước.')
+                question['image'] = get(entries['image']) if 'image' in entries else ''
+                question['audio'] = get(entries['audio']) if 'audio' in entries else ''
+            # Media fields are shared by every question type, including NEW_TYPES.
+            question['image'] = get(entries['image']) if 'image' in entries else question.get('image', '')
+            question['audio'] = get(entries['audio']) if 'audio' in entries else question.get('audio', '')
+            # Preview the current staged visual layout, including unsaved edits.
+            # This is a copy only: preview must never persist or mutate a question.
+            from question_layout_store import get_layout
+            question['layout'] = get_layout({'layout': pending_layout['value'] if layout_override is None else layout_override})
+            return question
+
+        def preview(layout_override=None, owner=None, on_frame=None):
+            try:
+                question = preview_question(layout_override)
                 import pygame_exercises
-                if not pygame_exercises.launch(owner or self, question, lambda _answer: None, allow_feedback=False, on_frame=on_frame):
+
+                if not pygame_exercises.launch(owner or self, question, lambda _answer: None,
+                                               allow_feedback=False, on_frame=on_frame):
                     messagebox.showwarning('Xem trước',
                         'Không mở được cửa sổ xem trước. Hãy đóng cửa sổ bài tập khác rồi thử lại.', parent=self)
             except (ValueError, OSError, TypeError, KeyError, ImportError) as exc:
                 messagebox.showwarning('Xem trước', str(exc), parent=self)
+
         def edit_visual_layout():
-            # Stage 2: edit and stage layout only. The existing Pygame preview
-            # remains unchanged until the rendering integration in Stage 3.
             from question_layout_editor import edit_layout
             typ = kind_var.get()
             question = {'type': typ, 'prompt': get(controls['prompt']), 'id': get(controls['id']),
@@ -1910,10 +1912,18 @@ class LevelFlowMixin:
                 templates = self.data_dir / 'canvas_templates.json'
                 can_paste = 'image' in entries and (
                     sys.platform in ('win32','darwin') or which('xclip') or which('wl-paste'))
+                from pygame_exercises import prepare_preview_question
+                live_question = None
+                try:
+                    live_question = prepare_preview_question(self, preview_question())
+                    live_question.update(_index=1, _total=1)
+                except (OSError, ValueError, TypeError, KeyError):
+                    # Incomplete drafts remain editable until their content is ready.
+                    pass
                 with TemporaryDirectory(prefix='tuhoc-clipboard-') as scratch:
                     clipboard = Path(scratch) / f'clipboard-{uuid4().hex}.png' if can_paste else None
                     updated = edit_layout(self,question,pending_layout['value'],
-                                          preview=preview,templates=templates,clipboard=clipboard)
+                                          preview=preview,templates=templates,clipboard=clipboard, live_question=live_question)
                     if updated is not None:
                         if clipboard is not None and clipboard.is_file():
                             put(entries['image'],store_media(clipboard))

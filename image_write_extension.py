@@ -135,7 +135,12 @@ def run(question):
             page.present(question)
             page.complete(question, submit, small, enabled)
             if zoom_open and path:draw_zoom(page.display,path)
-            present_frame(question)
+            regions = None
+            if question.get('_studio_scene'):
+                from studio_live_preview import text_rect
+                regions = {'question_text': text_rect(prompt) if text_layout else (prompt_x, prompt_y, 850, len(lines)*32),
+                           'question_image': (authored_frame or image_rect) if picture else None, 'input_area': field}
+            present_frame(question, regions, scroll=page.scroll, limit=page.limit)
             for event in page.events():
                 if zoom_open:
                     if event.type in (pygame.MOUSEBUTTONDOWN,pygame.QUIT) or (event.type==pygame.KEYDOWN and event.key==pygame.K_ESCAPE):zoom_open=False

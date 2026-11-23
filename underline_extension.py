@@ -241,7 +241,17 @@ def run(question):
             button=pygame.Rect(704,button_y,200,46)
             page.present(question)
             page.complete(question, button, small, bool(chosen))
-            present_frame(question)
+            regions = None
+            if question.get('_studio_scene'):
+                from studio_live_preview import enclosing, option_rects, text_rect
+                word_regions = {}
+                for rect, index in hit:
+                    word_regions[index] = word_regions[index].union(rect) if index in word_regions else rect
+                regions = {'question_text': text_rect(prompt),
+                           'question_image': (image_rect or picture.get_rect(midtop=(480, group_top))) if picture else None,
+                           'answer_area': enclosing(word_regions.values())}
+                regions.update(option_rects((rect, i) for i, rect in word_regions.items()))
+            present_frame(question, regions, scroll=page.scroll, limit=page.limit)
             for event in page.events():
                 if event.type==pygame.QUIT:return None
                 if event.type==pygame.KEYDOWN and event.key==pygame.K_ESCAPE:return None

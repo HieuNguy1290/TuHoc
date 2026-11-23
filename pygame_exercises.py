@@ -201,28 +201,8 @@ def _exercise_worker():
             if pending is None:
                 _close_display()
 
-def launch(parent, question, on_answer, on_cancel=None, *, allow_feedback=True, on_frame=None):
-    """Open an independent SDL window and poll results on Tk's main thread.
-
-    Editor previews opt out of feedback grading via allow_feedback.
-    """
-    if not available() or question.get('type') not in SUPPORTED:
-        return False
-    # Resolve media on Tk thread before launching the SDL worker.
+def prepare_preview_question(parent, question):
     prepared = dict(question)
-    frames = queue.Queue(maxsize=1) if on_frame is not None else None
-    if frames is not None:
-        frame_sent = False
-
-        def capture_frame():
-            nonlocal frame_sent
-            if not frame_sent:
-                import pygame
-                surface = pygame.display.get_surface()
-                frames.put_nowait((surface.get_size(), pygame.image.tobytes(surface, 'RGB')))
-                frame_sent = True
-
-        prepared['_studio_frame'] = capture_frame
     # The quiz flow normally supplies _pygame_image; resolve image fields
     # as well for callers that only pass the original question object.
     if not prepared.get('_pygame_image') and prepared.get('image') and hasattr(parent, 'media_file'):
@@ -239,14 +219,12 @@ def launch(parent, question, on_answer, on_cancel=None, *, allow_feedback=True, 
     if prepared.get('type') in ('image_multi_choice', 'listening_image_choice'):
         resolved = {}
         for opt in prepared.get('image_options', []):
-            ref = str(opt.get('image',''))
+            ref = str(opt.get('image', '') if isinstance(opt, dict) else opt)
             try:
                 path = parent.media_file(ref) if hasattr(parent,'media_file') else None
                 if path and Path(path).is_file(): resolved[ref] = str(path)
             except (OSError, ValueError, TypeError): pass
         prepared['_choice_images'] = resolved
-        if prepared.get('type') == 'listening_image_choice':
-            question['_choice_images'] = resolved  # de bang tra dap an ve duoc hinh
     if prepared.get('type') == 'matching':
         # Image tokens are stored relative to the current subject's content_library.
         from matching_widget import parse_pairs
@@ -263,6 +241,34 @@ def launch(parent, question, on_answer, on_cancel=None, *, allow_feedback=True, 
             except (OSError, ValueError, TypeError):
                 pass
         prepared['_matching_images'] = resolved
+    return prepared
+
+
+def launch(parent, question, on_answer, on_cancel=None, *, allow_feedback=True, on_frame=None):
+    """Open an independent SDL window and poll results on Tk's main thread.
+
+    Editor previews opt out of feedback grading via allow_feedback.
+    """
+    if not available() or question.get('type') not in SUPPORTED:
+        return False
+    # Resolve media on Tk thread before launching the SDL worker.
+    prepared = prepare_preview_question(parent, question)
+    frames = queue.Queue(maxsize=1) if on_frame is not None else None
+    if frames is not None:
+        frame_sent = False
+
+        def capture_frame():
+            nonlocal frame_sent
+            if not frame_sent:
+                import pygame
+                surface = pygame.display.get_surface()
+                frames.put_nowait((surface.get_size(), pygame.image.tobytes(surface, 'RGB')))
+                frame_sent = True
+
+        prepared['_studio_frame'] = capture_frame
+    if prepared.get('type') == 'listening_image_choice':
+        question['_choice_images'] = prepared.get('_choice_images', {})
+
     if _app_shutdown.is_set():
         return False
     _shutdown_requested.clear()
@@ -901,6 +907,8 @@ def _run(question):
                 image_x = (960 - question_image.get_width()) // 2 if kind == 'matching' else 66
                 screen.blit(question_image, (image_x, image_y))
                 y = max(y, image_y + question_image.get_height() + 12)
+            if is_listening and not image_frame:
+                image_x = 66
             zoom_hit = None
             matching_zoom_hits = []
             if question_image is not None:
@@ -1137,7 +1145,8 @@ def _run(question):
             if (question.get('layout') or {}).get('extras') and not content_scroll:
                 draw_question_progress(screen, question)
             # Show a vertical slice of the tall content; horizontal position never moves.
-            display_screen.blit(screen, (0, 0), (0, content_scroll, 960, 640))
+            displayed_scroll = content_scroll
+            display_screen.blit(screen, (0, 0), (0, displayed_scroll, 960, 640))
             scrollbar_track = None
             scrollbar_thumb = None
             if max_content_scroll:
@@ -1495,7 +1504,27 @@ def _run(question):
                         elif isinstance(index, int):
                             # Selecting an answer must never submit it immediately.
                             selected_option = index
-            present_frame(question)
+            regions = None
+            if question.get('_studio_scene'):
+                from studio_live_preview import enclosing, option_rects, text_rect
+                regions = {'question_text': text_rect(prompt_block) or
+                           (prompt_x, prompt_y, prompt_width, max(1, prompt_bottom - prompt_y)),
+                           'question_image': (image_frame or pygame.Rect(image_x, image_y, *question_image.get_size()))
+                                             if question_image is not None else None,
+                           'audio_player': _audio_player_bounds}
+                if kind == 'matching':
+                    n = len(matching_pairs)
+                    regions.update(option_rects((rect, i) for i, (rect, _, _) in enumerate(matching_cells[:n])))
+                    regions.update(option_rects((rect, n+i) for i, (rect, _, _) in enumerate(matching_cells[n:])))
+                    regions['answer_area'] = enclosing(rect for rect, _, _ in matching_cells)
+                elif kind in ('fill', 'error', 'listening_fill'):
+                    regions['input_area'] = r
+                else:
+                    regions.update(option_rects(cells))
+                    regions['answer_area'] = enclosing(rect for rect, index in cells if type(index) is int)
+                    if kind == 'order':
+                        regions['answer_preview'] = preview_rect
+            present_frame(question, regions, scroll=displayed_scroll, limit=max_content_scroll)
             # Show the actual question before loading/decoding audio.
             if waveform_pending:
                 waveform_pending = False
